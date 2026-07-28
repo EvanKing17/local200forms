@@ -9,10 +9,28 @@ pickerBtns.forEach(btn => {
     btn.classList.add('active');
     btn.setAttribute('aria-selected', 'true');
     document.getElementById('form-' + btn.dataset.form).classList.add('active');
+    updateActivePreview();
   });
 });
 
+/* ============ Mobile preview toggle ============ */
+const workspace = document.getElementById('workspace');
+const previewToggle = document.getElementById('previewToggle');
+
+previewToggle.addEventListener('click', () => {
+  const open = workspace.classList.toggle('preview-open');
+  previewToggle.textContent = open ? 'Edit' : 'Preview';
+  previewToggle.setAttribute('aria-expanded', String(open));
+});
+
 /* ============ Helpers ============ */
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
 function fd(form) {
   const data = {};
   new FormData(form).forEach((v, k) => { data[k] = v; });
@@ -73,9 +91,7 @@ function sectionLabel(doc, x, y, text) {
 }
 
 /* ============ FORD FORM ============ */
-document.getElementById('fordForm').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const data = fd(e.target);
+function buildFordDoc(data) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
 
@@ -146,18 +162,26 @@ document.getElementById('fordForm').addEventListener('submit', (e) => {
   doc.setTextColor(150, 146, 132);
   doc.text('Generated locally — no data stored or transmitted.', marginX, 780);
 
+  return doc;
+}
+
+const fordForm = document.getElementById('fordForm');
+
+fordForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const data = fd(e.target);
+  const doc = buildFordDoc(data);
   const fname = (data.employeeName || 'grievance').trim().replace(/\s+/g, '_');
   download(doc, `Grievance_Claim_${fname || 'form'}.pdf`);
 });
 
 document.getElementById('fordClear').addEventListener('click', () => {
-  document.getElementById('fordForm').reset();
+  fordForm.reset();
+  updateActivePreview();
 });
 
 /* ============ UNIFOR FORM ============ */
-document.getElementById('uniforForm').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const data = fd(e.target);
+function buildUniforDoc(data) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
 
@@ -234,10 +258,50 @@ document.getElementById('uniforForm').addEventListener('submit', (e) => {
   doc.text('PRIVATE', 306, 770, { align: 'center' });
   doc.text('pg. 1 / 5', 572, 770, { align: 'right' });
 
+  return doc;
+}
+
+const uniforForm = document.getElementById('uniforForm');
+
+uniforForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const data = fd(e.target);
+  const doc = buildUniforDoc(data);
   const fname = (data.grievorName || 'factsheet').trim().replace(/\s+/g, '_');
   download(doc, `Local200_FactSheet_${fname || 'form'}.pdf`);
 });
 
 document.getElementById('uniforClear').addEventListener('click', () => {
-  document.getElementById('uniforForm').reset();
+  uniforForm.reset();
+  updateActivePreview();
 });
+
+/* ============ Live preview ============ */
+const previewFrame = document.getElementById('pdfPreview');
+let previewUrl = null;
+
+const FORM_BUILDERS = {
+  ford: { form: fordForm, build: buildFordDoc },
+  unifor: { form: uniforForm, build: buildUniforDoc },
+};
+
+function renderPreview() {
+  const activeBtn = document.querySelector('.picker-btn.active');
+  const entry = FORM_BUILDERS[activeBtn.dataset.form];
+  const doc = entry.build(fd(entry.form));
+  const blobUrl = URL.createObjectURL(doc.output('blob'));
+
+  previewFrame.src = blobUrl + '#toolbar=0&navpanes=0';
+
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl = blobUrl;
+}
+
+const updateActivePreview = debounce(renderPreview, 350);
+
+fordForm.addEventListener('input', updateActivePreview);
+fordForm.addEventListener('change', updateActivePreview);
+uniforForm.addEventListener('input', updateActivePreview);
+uniforForm.addEventListener('change', updateActivePreview);
+
+renderPreview();

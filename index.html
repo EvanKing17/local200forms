@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grievance Forms</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -37,7 +34,7 @@
   </button>
 </nav>
 
-<main class="stage">
+<main class="workspace" id="workspace">
 
   <!-- ================= FORD FORM ================= -->
   <section class="form-panel active" id="form-ford" aria-labelledby="form-ford-heading">
@@ -220,7 +217,19 @@
     </form>
   </section>
 
+  <!-- ================= LIVE PREVIEW ================= -->
+  <aside class="preview-pane" id="previewPane" aria-label="Live PDF preview">
+    <div class="preview-toolbar">
+      <span class="preview-title">Live preview</span>
+    </div>
+    <iframe id="pdfPreview" title="PDF preview"></iframe>
+  </aside>
+
 </main>
+
+<button type="button" class="preview-toggle" id="previewToggle" aria-expanded="false" aria-controls="previewPane">
+  Preview
+</button>
 
 <footer class="footer">
   <p>Everything above stays in this browser tab. Closing or reloading the page clears it — nothing is saved, logged, or sent anywhere.</p>
