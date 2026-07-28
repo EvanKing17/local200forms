@@ -9,7 +9,7 @@ pickerBtns.forEach(btn => {
     btn.classList.add('active');
     btn.setAttribute('aria-selected', 'true');
     document.getElementById('form-' + btn.dataset.form).classList.add('active');
-    updateActivePreview();
+    renderPreview();
   });
 });
 
@@ -48,6 +48,28 @@ function download(doc, filename) {
   doc.save(filename);
 }
 
+const PAGE_BOTTOM = 760;
+
+/* Adds a new page and resets to the top margin if the next block won't fit */
+function ensureSpace(doc, y, estHeight, marginTop = 40) {
+  if (y + estHeight > PAGE_BOTTOM) {
+    doc.addPage();
+    return marginTop;
+  }
+  return y;
+}
+
+/* Shrinks a single line of text down to minSize if it doesn't fit maxWidth */
+function fitSingleLine(doc, text, maxWidth, baseSize, minSize = 6) {
+  let size = baseSize;
+  doc.setFontSize(size);
+  while (size > minSize && doc.getTextWidth(text) > maxWidth) {
+    size -= 0.5;
+    doc.setFontSize(size);
+  }
+  return size;
+}
+
 /* Dark header bar: bold black-on-white "Section X:" style label matching the printed originals */
 function sectionBar(doc, x, y, w, boldLabel, restLabel) {
   const h = 18;
@@ -63,63 +85,108 @@ function sectionBar(doc, x, y, w, boldLabel, restLabel) {
   return y + h;
 }
 
-/* One continuous bordered row split into cells by thin divider lines (Ford-style field grid) */
-function boxedGrid(doc, x, y, w, h, cells) {
+/*
+ * One continuous bordered row split into cells by thin divider lines.
+ * Height grows automatically to fit whatever the label/value need — nothing is ever truncated.
+ */
+function boxedGrid(doc, x, y, w, cells, minH = 34) {
+  const labelFontSize = 6.5, valueFontSize = 9.5, lineHeight = 11;
+  const prepared = cells.map(c => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(labelFontSize);
+    const labelLines = doc.splitTextToSize(c.label.toUpperCase(), c.width - 8).slice(0, 2);
+    doc.setFontSize(valueFontSize);
+    const valueLines = doc.splitTextToSize(c.value || '', c.width - 10);
+    return { ...c, labelLines, valueLines };
+  });
+  const maxLabelLines = Math.max(1, ...prepared.map(p => p.labelLines.length));
+  const maxValueLines = Math.max(1, ...prepared.map(p => p.valueLines.length));
+  const labelBlockH = 9 + (maxLabelLines - 1) * 7.5;
+  const h = Math.max(minH, labelBlockH + 6 + maxValueLines * lineHeight + 6);
+
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.75);
   doc.rect(x, y, w, h);
   let cx = x;
-  cells.forEach((c, i) => {
-    const cw = c.width;
+  prepared.forEach((c, i) => {
     if (i > 0) doc.line(cx, y, cx, y + h);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
+    doc.setFontSize(labelFontSize);
     doc.setTextColor(80, 80, 80);
-    const labelLines = doc.splitTextToSize(c.label.toUpperCase(), cw - 8).slice(0, 2);
-    doc.text(labelLines, cx + 5, y + 9);
-    const valueY = y + 9 + (labelLines.length - 1) * 7.5 + 12;
+    doc.text(c.labelLines, cx + 5, y + 9);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
+    doc.setFontSize(valueFontSize);
     doc.setTextColor(0, 0, 0);
-    const lines = doc.splitTextToSize(c.value || '', cw - 10);
-    doc.text(lines.slice(0, Math.max(1, Math.floor((y + h - valueY) / 11))), cx + 5, valueY);
-    cx += cw;
+    doc.text(c.valueLines, cx + 5, y + labelBlockH + 12);
+    cx += c.width;
   });
   return y + h;
 }
 
-/* Plain label above a blank bordered box (Details of Incident, Comments, etc.) */
-function labelBox(doc, x, y, w, h, label, value) {
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
-  doc.text(label, x, y);
-  const boxY = y + 6;
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.75);
-  doc.rect(x, boxY, w, h);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
-  doc.setTextColor(0, 0, 0);
-  const lines = doc.splitTextToSize(value || '', w - 10);
-  doc.text(lines.slice(0, Math.max(1, Math.floor((h - 10) / 12))), x + 5, boxY + 14);
-  return boxY + h;
+/*
+ * Plain label above a bordered box (Details of Incident, Comments, the Unifor question boxes, ...).
+ * Grows to fit the value; if the value is longer than a page can hold, spills onto a
+ * "(continued)" box on a new page rather than cutting anything off.
+ */
+function flowTextBox(doc, x, y, w, label, value, minH = 26) {
+  const fontSize = 9.5, lineHeight = 12;
+  doc.setFontSize(fontSize);
+  const allLines = doc.splitTextToSize(value || '', w - 10);
+  let idx = 0, currentY = y, first = true;
+  do {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text(first ? label : label.replace(/:\s*$/, '') + ' (continued):', x, currentY);
+    const boxY = currentY + 6;
+    const availH = PAGE_BOTTOM - boxY;
+    const maxLines = Math.max(1, Math.floor((availH - 10) / lineHeight));
+    const remaining = allLines.length - idx;
+    const linesThisBox = Math.max(1, Math.min(remaining, maxLines));
+    const boxH = Math.max(minH, linesThisBox * lineHeight + 10);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.75);
+    doc.rect(x, boxY, w, boxH);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(0, 0, 0);
+    doc.text(allLines.slice(idx, idx + linesThisBox), x + 5, boxY + 14);
+    idx += linesThisBox;
+    currentY = boxY + boxH;
+    first = false;
+    if (idx < allLines.length) {
+      doc.addPage();
+      currentY = 40;
+    }
+  } while (idx < allLines.length);
+  return currentY;
 }
 
-/* Label + inline value on a baseline underline (Ford hours grid) */
-function underlineField(doc, x, y, w, label, value) {
+/*
+ * An hours field: bold label, then a small bordered box right-aligned within the column.
+ * The value is centered and the box grows (font shrinks first) rather than clipping.
+ */
+function hourField(doc, x, y, w, label, value) {
+  const boxW = 70;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(0, 0, 0);
-  doc.text(label, x, y);
-  const labelW = doc.getTextWidth(label) + 6;
+  doc.text(label, x, y + 13);
+
+  const boxX = x + w - boxW;
+  const val = (value || '').toString();
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
-  const lines = doc.splitTextToSize(value || '', Math.max(10, w - labelW));
-  doc.text(lines[0] || '', x + labelW, y);
+  fitSingleLine(doc, val, boxW - 8, 9.5, 6.5);
+  const lines = doc.getTextWidth(val) > boxW - 8 ? doc.splitTextToSize(val, boxW - 8) : [val];
+  const boxH = Math.max(18, lines.length * 11 + 6);
+
   doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.5);
-  doc.line(x + labelW, y + 3, x + w, y + 3);
+  doc.setLineWidth(0.75);
+  doc.rect(boxX, y, boxW, boxH);
+  doc.setTextColor(0, 0, 0);
+  const startY = y + (boxH - (lines.length - 1) * 11) / 2 + 3.5;
+  lines.forEach((ln, i) => doc.text(ln, boxX + boxW / 2, startY + i * 11, { align: 'center' }));
+  return y + boxH;
 }
 
 /* An empty square checkbox followed by its label */
@@ -143,39 +210,6 @@ function markCheckbox(doc, x, y) {
   doc.line(x + 1, top + size - 1, x + size - 1, top + 1);
 }
 
-/* Unifor-style shaded field: bold label to the left, filled (borderless) value box */
-function shadedField(doc, x, y, w, h, label, value, labelW) {
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
-  doc.text(label, x, y + h / 2 + 3);
-  const bx = x + labelW, bw = w - labelW;
-  doc.setFillColor(226, 226, 236);
-  doc.rect(bx, y, bw, h, 'F');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
-  const lines = doc.splitTextToSize(value || '', bw - 8);
-  doc.text(lines[0] || '', bx + 4, y + h / 2 + 3);
-}
-
-/* Unifor-style shaded question box: bold label above, filled (borderless) box below */
-function shadedBigBox(doc, x, y, w, h, label, value) {
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(0, 0, 0);
-  doc.text(label, x, y);
-  const boxY = y + 6;
-  doc.setFillColor(226, 226, 236);
-  doc.rect(x, boxY, w, h, 'F');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
-  doc.setTextColor(0, 0, 0);
-  const lines = doc.splitTextToSize(value || '', w - 10);
-  doc.text(lines.slice(0, Math.max(1, Math.floor((h - 8) / 12))), x + 5, boxY + 14);
-  return boxY + h;
-}
-
 /* ============ FORD FORM ============ */
 function buildFordDoc(data) {
   const { jsPDF } = window.jspdf;
@@ -195,7 +229,7 @@ function buildFordDoc(data) {
   y += 4;
 
   const w4 = W / 4;
-  y = boxedGrid(doc, marginX, y, W, 34, [
+  y = boxedGrid(doc, marginX, y, W, [
     { label: 'Employee Name', value: data.employeeName, width: w4 },
     { label: 'Global ID', value: data.globalId, width: w4 },
     { label: 'Department', value: data.department, width: w4 },
@@ -207,27 +241,31 @@ function buildFordDoc(data) {
   const articleVal = data.article
     ? `Article ${data.article} and all other relevant articles of the agreement`
     : 'and all other relevant articles of the agreement';
-  y = boxedGrid(doc, marginX, y, W, 34, [
+  y = boxedGrid(doc, marginX, y, W, [
     { label: 'Article Violation', value: articleVal, width: artW },
     { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: dateW },
     { label: 'Date Filed', value: fmtDate(data.dateFiled), width: dateW },
   ]);
   y += 6;
 
-  y = labelBox(doc, marginX, y + 8, W, 120, 'Details of Incident:', data.details);
+  y = ensureSpace(doc, y, 40);
+  y = flowTextBox(doc, marginX, y + 8, W, 'Details of Incident:', data.details, 100);
   y += 12;
 
+  y = ensureSpace(doc, y, 70);
   const hoursColW = W / 2 - 10;
-  underlineField(doc, marginX, y, hoursColW, 'Hours at straight time:', data.hoursStraight);
-  underlineField(doc, marginX + hoursColW + 20, y, hoursColW, 'Hours of #1 Shift Prem:', data.hoursShift1);
-  y += 22;
-  underlineField(doc, marginX, y, hoursColW, 'Hours at time & one half:', data.hoursTimeHalf);
-  underlineField(doc, marginX + hoursColW + 20, y, hoursColW, 'Hours of #3 Shift Prem:', data.hoursShift3);
-  y += 22;
-  underlineField(doc, marginX, y, hoursColW, 'Hours at double time:', data.hoursDouble);
-  y += 22;
+  let hy = y;
+  hourField(doc, marginX, hy, hoursColW, 'Hours at straight time:', data.hoursStraight);
+  hourField(doc, marginX + hoursColW + 20, hy, hoursColW, 'Hours of #1 Shift Prem:', data.hoursShift1);
+  hy += 24;
+  hourField(doc, marginX, hy, hoursColW, 'Hours at time & one half:', data.hoursTimeHalf);
+  hourField(doc, marginX + hoursColW + 20, hy, hoursColW, 'Hours of #3 Shift Prem:', data.hoursShift3);
+  hy += 24;
+  hourField(doc, marginX, hy, hoursColW, 'Hours at double time:', data.hoursDouble);
+  y = hy + 24;
 
   // ---- Section B: Department Response (reserved, left blank for department) ----
+  y = ensureSpace(doc, y, 120);
   y = sectionBar(doc, marginX, y, W, 'Section B:', ' Department Response');
   y += 4;
 
@@ -240,39 +278,41 @@ function buildFordDoc(data) {
   checkboxText(doc, marginX + W * 0.62, y + approveH / 2, 'Grievance Denied');
   y += approveH + 6;
 
-  y = boxedGrid(doc, marginX, y, W, 40, [
+  y = boxedGrid(doc, marginX, y, W, [
     { label: 'Department Representative (print name)', value: '', width: W / 3 },
     { label: 'Signature', value: '', width: W / 3 },
     { label: 'Department Charge No', value: '', width: W / 3 },
   ]);
   y += 6;
-  y = labelBox(doc, marginX, y + 8, W, 26, 'Comments:', '');
+  y = flowTextBox(doc, marginX, y + 8, W, 'Comments:', '', 26);
   y += 12;
 
   // ---- Section C: Employee Relations Response (reserved) ----
+  y = ensureSpace(doc, y, 120);
   y = sectionBar(doc, marginX, y, W, 'Section C:', ' Employee Relations Response');
   y += 4;
-  y = boxedGrid(doc, marginX, y, W, 40, [
+  y = boxedGrid(doc, marginX, y, W, [
     { label: 'Employee Relations Representative (print name)', value: '', width: W * 0.34 },
     { label: 'Signature', value: '', width: W * 0.34 },
     { label: 'Grievance Stage', value: '', width: W * 0.16 },
     { label: 'Number', value: '', width: W * 0.16 },
   ]);
   y += 6;
-  y = labelBox(doc, marginX, y + 8, W, 26, 'Comments:', '');
+  y = flowTextBox(doc, marginX, y + 8, W, 'Comments:', '', 26);
   y += 12;
 
   // ---- Section D: Payroll & Accounting Department (reserved) ----
+  y = ensureSpace(doc, y, 110);
   y = sectionBar(doc, marginX, y, W, 'Section D:', ' Payroll & Accounting Department');
   y += 4;
-  y = boxedGrid(doc, marginX, y, W, 34, [
+  y = boxedGrid(doc, marginX, y, W, [
     { label: 'Rate', value: '', width: w4 },
     { label: 'Hours', value: '', width: w4 },
     { label: 'Amount', value: '', width: w4 },
     { label: 'Pay Period', value: '', width: w4 },
   ]);
   y += 6;
-  labelBox(doc, marginX, y + 8, W, 26, 'Comments:', '');
+  y = flowTextBox(doc, marginX, y + 8, W, 'Comments:', '', 26);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -294,7 +334,6 @@ fordForm.addEventListener('submit', (e) => {
 
 document.getElementById('fordClear').addEventListener('click', () => {
   fordForm.reset();
-  updateActivePreview();
 });
 
 /* ============ UNIFOR FORM ============ */
@@ -347,51 +386,76 @@ function buildUniforDoc(data) {
   doc.text('This form to accompany First Stage Grievance appealed to Bargaining Committee', 306, y, { align: 'center' });
   y += 26;
 
-  const fh = 20;
-  shadedField(doc, marginX, y, 240, fh, "Grievor's Name:", data.grievorName, 82);
-  shadedField(doc, marginX + 250, y, 140, fh, 'GID #:', data.gid, 40);
-  shadedField(doc, marginX + 400, y, 132, fh, 'Dept:', data.dept, 35);
-  y += 30;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: "Grievor's Name", value: data.grievorName, width: W * 0.45 },
+    { label: 'GID #', value: data.gid, width: W * 0.25 },
+    { label: 'Dept', value: data.dept, width: W * 0.30 },
+  ]);
+  y += 6;
 
-  shadedField(doc, marginX, y, 240, fh, 'Seniority Date:', fmtDate(data.seniorityDate), 88);
-  shadedField(doc, marginX + 250, y, 140, fh, 'Classification:', data.classification, 78);
-  shadedField(doc, marginX + 400, y, 132, fh, 'Rate: $', data.rate, 40);
-  y += 30;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Seniority Date', value: fmtDate(data.seniorityDate), width: W * 0.35 },
+    { label: 'Classification', value: data.classification, width: W * 0.35 },
+    { label: 'Rate $', value: data.rate, width: W * 0.30 },
+  ]);
+  y += 6;
 
-  shadedField(doc, marginX + 40, y, 260, fh, 'Time in Classification:', data.timeInClass, 118);
-  shadedField(doc, marginX + 320, y, 212, fh, 'COLA: $', data.cola, 45);
-  y += 32;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Time in Classification', value: data.timeInClass, width: W / 2 },
+    { label: 'COLA $', value: data.cola, width: W / 2 },
+  ]);
+  y += 6;
 
-  shadedField(doc, marginX, y, W / 2 - 10, fh, "Employee's Supervisor:", data.supervisor, 110);
-  shadedField(doc, marginX + W / 2 + 10, y, W / 2 - 10, fh, 'General Supervisor:', data.generalSupervisor, 105);
-  y += 30;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: "Employee's Supervisor", value: data.supervisor, width: W / 2 },
+    { label: 'General Supervisor', value: data.generalSupervisor, width: W / 2 },
+  ]);
+  y += 6;
 
-  shadedField(doc, marginX, y, W / 2 - 10, fh, 'Superintendent:', data.superintendent, 80);
-  shadedField(doc, marginX + W / 2 + 10, y, W / 2 - 10, fh, 'Date of Incident:', fmtDate(data.uniforDateIncident), 90);
-  y += 32;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Superintendent', value: data.superintendent, width: W / 2 },
+    { label: 'Date of Incident', value: fmtDate(data.uniforDateIncident), width: W / 2 },
+  ]);
+  y += 6;
 
-  doc.setFont('helvetica', 'bold');
+  // Discipline checkboxes + Date Grievance Filed — content here is always short and fixed, so a
+  // plain fixed-height row (unlike boxedGrid) is safe.
+  const disciplineH = 34;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.75);
+  doc.rect(marginX, y, W / 2, disciplineH);
+  doc.rect(marginX + W / 2, y, W / 2, disciplineH);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(80, 80, 80);
+  doc.text('DISCIPLINE ON RECORD?', marginX + 5, y + 9);
+  doc.text('DATE GRIEVANCE FILED', marginX + W / 2 + 5, y + 9);
+  checkboxText(doc, marginX + 10, y + 24, 'Yes');
+  checkboxText(doc, marginX + 60, y + 24, 'No');
+  if (data.discipline === 'Yes') markCheckbox(doc, marginX + 10, y + 24);
+  else markCheckbox(doc, marginX + 60, y + 24);
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
   doc.setTextColor(0, 0, 0);
-  doc.text('Discipline on Record?', marginX, y + 14);
-  checkboxText(doc, marginX + 130, y + 14, 'Yes');
-  checkboxText(doc, marginX + 178, y + 14, 'No');
-  if (data.discipline === 'Yes') markCheckbox(doc, marginX + 130, y + 14);
-  else markCheckbox(doc, marginX + 178, y + 14);
-  shadedField(doc, marginX + W / 2 + 10, y, W / 2 - 10, fh, 'Date Grievance Filed:', fmtDate(data.uniforDateFiled), 120);
-  y += 34;
+  doc.text(fmtDate(data.uniforDateFiled), marginX + W / 2 + 5, y + 24);
+  y += disciplineH + 6;
 
-  y = shadedBigBox(doc, marginX, y, W, 50, 'Who is involved in this grievance?', data.whoInvolved);
-  y += 10;
+  y = ensureSpace(doc, y, 60);
+  y = flowTextBox(doc, marginX, y + 8, W, 'Who is involved in this grievance?', data.whoInvolved, 44);
+  y += 12;
 
-  shadedField(doc, marginX, y, W / 2 - 10, fh, 'When did it happen?', data.whenHappened, 110);
-  shadedField(doc, marginX + W / 2 + 10, y, W / 2 - 10, fh, 'Where did it happen?', data.whereHappened, 115);
-  y += 32;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'When did it happen?', value: data.whenHappened, width: W / 2 },
+    { label: 'Where did it happen?', value: data.whereHappened, width: W / 2 },
+  ]);
+  y += 6;
 
-  y = shadedBigBox(doc, marginX, y, W, 80, 'Why is this a grievance?', data.whyGrievance);
-  y += 10;
+  y = ensureSpace(doc, y, 90);
+  y = flowTextBox(doc, marginX, y + 8, W, 'Why is this a grievance?', data.whyGrievance, 70);
+  y += 12;
 
-  shadedBigBox(doc, marginX, y, W, 64, 'What do we want?', data.whatWeWant);
+  y = ensureSpace(doc, y, 60);
+  y = flowTextBox(doc, marginX, y + 8, W, 'What do we want?', data.whatWeWant, 56);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
@@ -415,7 +479,6 @@ uniforForm.addEventListener('submit', (e) => {
 
 document.getElementById('uniforClear').addEventListener('click', () => {
   uniforForm.reset();
-  updateActivePreview();
 });
 
 /* ============ Live preview ============ */
@@ -441,9 +504,266 @@ function renderPreview() {
 
 const updateActivePreview = debounce(renderPreview, 350);
 
-fordForm.addEventListener('input', updateActivePreview);
-fordForm.addEventListener('change', updateActivePreview);
-uniforForm.addEventListener('input', updateActivePreview);
-uniforForm.addEventListener('change', updateActivePreview);
+/* Live-refresh toggle: while off, edits no longer auto-render — a manual refresh button appears instead */
+const liveRefreshToggle = document.getElementById('liveRefreshToggle');
+const manualRefreshBtn = document.getElementById('manualRefreshBtn');
+
+function maybeUpdatePreview() {
+  if (liveRefreshToggle.checked) updateActivePreview();
+}
+
+liveRefreshToggle.addEventListener('change', () => {
+  manualRefreshBtn.hidden = liveRefreshToggle.checked;
+  if (liveRefreshToggle.checked) renderPreview();
+});
+
+manualRefreshBtn.addEventListener('click', renderPreview);
+
+fordForm.addEventListener('input', maybeUpdatePreview);
+fordForm.addEventListener('change', maybeUpdatePreview);
+uniforForm.addEventListener('input', maybeUpdatePreview);
+uniforForm.addEventListener('change', maybeUpdatePreview);
 
 renderPreview();
+
+/* ============ Unsaved-changes guard ============ */
+function formHasData(form) {
+  return Array.from(form.elements).some(el => {
+    if (!el.name) return false;
+    if (el.type === 'radio' || el.type === 'checkbox') return false;
+    return (el.value || '').toString().trim() !== '';
+  });
+}
+
+window.addEventListener('beforeunload', (e) => {
+  if (formHasData(fordForm) || formHasData(uniforForm)) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+/* ============ Custom date picker ============ */
+function dateKeyLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseDateKey(key) {
+  if (!key) return null;
+  const [y, m, d] = key.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+function isSameDay(a, b) {
+  return dateKeyLocal(a) === dateKeyLocal(b);
+}
+
+const DATEPICKER_FOCUSABLE = 'button:not([disabled])';
+
+/*
+ * Replaces a native <input type="date"> with a popover calendar (quick-picks, month grid,
+ * keyboard focus-trap) matching the app's existing DatePicker component. A hidden input keeps
+ * the same name/value contract (YYYY-MM-DD, built from local date parts — never parsed through
+ * `new Date("YYYY-MM-DD")`, which reads as UTC midnight and can display a day early).
+ */
+function setupDatePicker(originalInput) {
+  const name = originalInput.name;
+  const originalId = originalInput.id;
+  const placeholder = 'Select date';
+
+  const hidden = document.createElement('input');
+  hidden.type = 'hidden';
+  hidden.name = name;
+  hidden.defaultValue = originalInput.value || '';
+  hidden.value = originalInput.value || '';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'datepicker';
+
+  const triggerId = originalId || `dp-${name}`;
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.id = triggerId;
+  trigger.className = 'datepicker-trigger';
+  trigger.setAttribute('aria-haspopup', 'dialog');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.innerHTML = '<span class="datepicker-value"></span>' +
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+    '<rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M3 10h18M8 2v4M16 2v4"></path></svg>';
+
+  const panel = document.createElement('div');
+  panel.className = 'datepicker-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', 'Choose a date');
+  panel.tabIndex = -1;
+  panel.hidden = true;
+
+  wrapper.appendChild(hidden);
+  wrapper.appendChild(trigger);
+  wrapper.appendChild(panel);
+
+  const parentLabel = originalInput.closest('label');
+  if (parentLabel) parentLabel.setAttribute('for', triggerId);
+  originalInput.replaceWith(wrapper);
+
+  let viewMonth = parseDateKey(hidden.value) || new Date();
+  let open = false;
+  let previouslyFocused = null;
+
+  function selectedDate() { return parseDateKey(hidden.value); }
+
+  function updateTriggerLabel() {
+    const sel = selectedDate();
+    const span = trigger.querySelector('.datepicker-value');
+    if (sel) {
+      span.textContent = sel.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      span.classList.remove('is-placeholder');
+    } else {
+      span.textContent = placeholder;
+      span.classList.add('is-placeholder');
+    }
+  }
+
+  function setValue(key) {
+    hidden.value = key || '';
+    updateTriggerLabel();
+    hidden.dispatchEvent(new Event('input', { bubbles: true }));
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function pick(d) {
+    setValue(dateKeyLocal(d));
+    close();
+  }
+
+  function renderPanel() {
+    const today = new Date();
+    const sel = selectedDate();
+    const year = viewMonth.getFullYear();
+    const month = viewMonth.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    const startOffset = firstOfMonth.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const cells = [];
+    for (let i = 0; i < startOffset; i++) {
+      cells.push({ date: new Date(year, month, 1 - (startOffset - i)), inMonth: false });
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      cells.push({ date: new Date(year, month, day), inMonth: true });
+    }
+    while (cells.length < 42) {
+      const last = cells[cells.length - 1].date;
+      const next = new Date(last);
+      next.setDate(next.getDate() + 1);
+      cells.push({ date: next, inMonth: false });
+    }
+
+    const monthLabel = viewMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const dowLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+    panel.innerHTML = `
+      <div class="dp-quickpicks">
+        <button type="button" class="dp-chip" data-quick="0">Today</button>
+        <button type="button" class="dp-chip" data-quick="1">Tomorrow</button>
+        <button type="button" class="dp-chip" data-quick="7">+1 week</button>
+        ${sel ? '<button type="button" class="dp-clear" data-clear>Clear</button>' : ''}
+      </div>
+      <div class="dp-nav">
+        <button type="button" class="dp-navbtn" data-nav="-1" aria-label="Previous month">&#8249;</button>
+        <span class="dp-month">${monthLabel}</span>
+        <button type="button" class="dp-navbtn" data-nav="1" aria-label="Next month">&#8250;</button>
+      </div>
+      <div class="dp-grid">
+        ${dowLabels.map(d => `<div class="dp-dow">${d}</div>`).join('')}
+        ${cells.map(({ date, inMonth }) => {
+          const isToday = isSameDay(date, today);
+          const isSelected = sel && isSameDay(date, sel);
+          const cls = ['dp-day'];
+          if (isSelected) cls.push('is-selected');
+          else if (isToday) cls.push('is-today');
+          if (!inMonth) cls.push('is-outside');
+          return `<button type="button" class="${cls.join(' ')}" data-day="${dateKeyLocal(date)}">${date.getDate()}</button>`;
+        }).join('')}
+      </div>
+    `;
+
+    panel.querySelectorAll('[data-quick]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const d = new Date();
+        d.setDate(d.getDate() + Number(btn.dataset.quick));
+        pick(d);
+      });
+    });
+    const clearBtn = panel.querySelector('[data-clear]');
+    if (clearBtn) clearBtn.addEventListener('click', () => { setValue(null); close(); });
+    panel.querySelectorAll('[data-nav]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + Number(btn.dataset.nav), 1);
+        renderPanel();
+      });
+    });
+    panel.querySelectorAll('[data-day]').forEach(btn => {
+      btn.addEventListener('click', () => pick(parseDateKey(btn.dataset.day)));
+    });
+  }
+
+  function handleOutsideClick(e) {
+    if (!wrapper.contains(e.target)) close();
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    const items = Array.from(panel.querySelectorAll(DATEPICKER_FOCUSABLE)).filter(el => el.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  function openPanel() {
+    if (open) return;
+    open = true;
+    viewMonth = selectedDate() || new Date();
+    previouslyFocused = document.activeElement;
+    panel.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    renderPanel();
+    const focusable = panel.querySelector(DATEPICKER_FOCUSABLE);
+    if (focusable) focusable.focus();
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+  }
+
+  function close() {
+    if (!open) return;
+    open = false;
+    panel.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('mousedown', handleOutsideClick);
+    document.removeEventListener('keydown', handleKeyDown);
+    if (previouslyFocused && previouslyFocused.focus) previouslyFocused.focus();
+  }
+
+  trigger.addEventListener('click', () => (open ? close() : openPanel()));
+
+  wrapper.refreshDisplay = updateTriggerLabel;
+  updateTriggerLabel();
+}
+
+document.querySelectorAll('input[type="date"]').forEach(setupDatePicker);
+
+// Native form.reset() restores the hidden inputs' default values without firing input/change,
+// so each date picker's visible trigger label needs an explicit nudge afterward.
+[fordForm, uniforForm].forEach(form => {
+  form.addEventListener('reset', () => {
+    setTimeout(() => {
+      form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
+      renderPreview();
+    }, 0);
+  });
+});

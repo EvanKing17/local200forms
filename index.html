@@ -40,23 +40,29 @@
   <section class="form-panel active" id="form-ford" aria-labelledby="form-ford-heading">
     <form id="fordForm">
       <div class="sheet-header">
-        <h1 id="form-ford-heading">Grievance Investigation &amp; Claim Form</h1>
+        <div class="sheet-header-text">
+          <h1 id="form-ford-heading">Grievance Investigation &amp; Claim Form</h1>
+        </div>
+        <div class="sheet-header-actions">
+          <button type="button" class="btn-secondary" id="fordClear">Clear form</button>
+          <button type="submit" class="btn-primary">Generate PDF</button>
+        </div>
       </div>
 
       <fieldset class="section">
         <legend>Section A — Employee Details &amp; Grievance Summary</legend>
         <div class="grid grid-4">
           <label>Employee Name
-            <input type="text" name="employeeName" autocomplete="off">
+            <input type="text" name="employeeName" autocomplete="off" value="Evan Robert King Thompson MacGregor">
           </label>
           <label>Global ID
-            <input type="text" name="globalId" autocomplete="off">
+            <input type="text" name="globalId" autocomplete="off" value="002173535">
           </label>
           <label>Department
-            <input type="text" name="department" autocomplete="off">
+            <input type="text" name="department" autocomplete="off" value="8383 - Heads Godzilla Motorline">
           </label>
           <label>Process Coach
-            <input type="text" name="processCoach" autocomplete="off">
+            <input type="text" name="processCoach" autocomplete="off" value="Wes Macauley, Johnny Appleseed">
           </label>
         </div>
 
@@ -64,37 +70,41 @@
           <label>Article Violation
             <div class="inline-prefix">
               <span>Article</span>
-              <input type="text" name="article" autocomplete="off" placeholder="e.g. 78">
+              <input type="text" name="article" autocomplete="off" placeholder="e.g. 78" value="14.02, 10.06(a)(i)(2), 4.01">
               <span class="prefix-note">and all other relevant articles of the agreement</span>
             </div>
           </label>
           <label>Date of Incident
-            <input type="date" name="dateIncident">
+            <input type="date" name="dateIncident" value="2026-07-14">
           </label>
           <label>Date Filed
-            <input type="date" name="dateFiled">
+            <input type="date" name="dateFiled" value="2026-07-29">
           </label>
         </div>
 
         <label class="full">Details of Incident
-          <textarea name="details" rows="9" placeholder="What happened, in your own words — who, what, when, where, and why it violates the agreement."></textarea>
+          <textarea name="details" rows="9" placeholder="What happened, in your own words — who, what, when, where, and why it violates the agreement.">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin eget imperdiet justo. Nulla facilisi. Fusce molestie in nunc ac sollicitudin. Nullam non lorem at dolor tincidunt ornare. Curabitur hendrerit posuere vehicula. Nullam varius dapibus elementum. Maecenas non dapibus justo.
+
+Fusce convallis arcu eu dapibus porta. Cras et eleifend lorem, vel posuere ante. Pellentesque a pharetra lectus, sed malesuada libero. Maecenas in feugiat odio. Maecenas fringilla ligula a est tempus vehicula. Pellentesque volutpat consequat sapien quis sollicitudin. Cras posuere faucibus blandit. Donec placerat ullamcorper lacus, ac luctus leo gravida sit amet. Donec accumsan luctus diam a posuere.
+
+Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phasellus semper malesuada aliquam. Quisque orci risus, dictum vitae urna id, sollicitudin efficitur purus. Fusce rutrum scelerisque justo sit amet vestibulum. Etiam gravida, nisi eu rutrum facilisis, mi eros finibus magna.</textarea>
         </label>
 
         <div class="grid grid-4 hours-grid">
           <label>Hours at straight time
-            <input type="text" name="hoursStraight" inputmode="decimal">
+            <input type="text" name="hoursStraight" inputmode="decimal" value="8">
           </label>
           <label>Hours at time &amp; one half
-            <input type="text" name="hoursTimeHalf" inputmode="decimal">
+            <input type="text" name="hoursTimeHalf" inputmode="decimal" value="8">
           </label>
           <label>Hours at double time
-            <input type="text" name="hoursDouble" inputmode="decimal">
+            <input type="text" name="hoursDouble" inputmode="decimal" value="8">
           </label>
           <label>Hours of #1 Shift Prem
-            <input type="text" name="hoursShift1" inputmode="decimal">
+            <input type="text" name="hoursShift1" inputmode="decimal" value="8">
           </label>
           <label>Hours of #3 Shift Prem
-            <input type="text" name="hoursShift3" inputmode="decimal">
+            <input type="text" name="hoursShift3" inputmode="decimal" value="8">
           </label>
         </div>
       </fieldset>
@@ -108,11 +118,6 @@
       <fieldset class="section muted">
         <legend>Section D — Payroll &amp; Accounting <span class="reserved">left blank for payroll</span></legend>
       </fieldset>
-
-      <div class="actions">
-        <button type="button" class="btn-secondary" id="fordClear">Clear form</button>
-        <button type="submit" class="btn-primary">Generate PDF</button>
-      </div>
     </form>
   </section>
 
@@ -120,8 +125,14 @@
   <section class="form-panel" id="form-unifor" aria-labelledby="form-unifor-heading">
     <form id="uniforForm">
       <div class="sheet-header">
-        <h1 id="form-unifor-heading">Local 200 Grievance Committee Fact Sheet</h1>
-        <p class="sheet-note">For local union use only — accompanies first stage grievance appealed to Bargaining Committee</p>
+        <div class="sheet-header-text">
+          <h1 id="form-unifor-heading">Local 200 Grievance Committee Fact Sheet</h1>
+          <p class="sheet-note">For local union use only — accompanies first stage grievance appealed to Bargaining Committee</p>
+        </div>
+        <div class="sheet-header-actions">
+          <button type="button" class="btn-secondary" id="uniforClear">Clear form</button>
+          <button type="submit" class="btn-primary">Generate PDF</button>
+        </div>
       </div>
 
       <fieldset class="section">
@@ -209,11 +220,6 @@
           <textarea name="whatWeWant" rows="4"></textarea>
         </label>
       </fieldset>
-
-      <div class="actions">
-        <button type="button" class="btn-secondary" id="uniforClear">Clear form</button>
-        <button type="submit" class="btn-primary">Generate PDF</button>
-      </div>
     </form>
   </section>
 
@@ -221,6 +227,20 @@
   <aside class="preview-pane" id="previewPane" aria-label="Live PDF preview">
     <div class="preview-toolbar">
       <span class="preview-title">Live preview</span>
+      <div class="preview-controls">
+        <label class="preview-live-toggle">
+          <input type="checkbox" id="liveRefreshToggle" checked>
+          Live refresh
+        </label>
+        <button type="button" id="manualRefreshBtn" class="preview-refresh-btn" title="Refresh preview" aria-label="Refresh preview" hidden>
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <path d="M3 3v5h5"></path>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+            <path d="M16 16h5v5"></path>
+          </svg>
+        </button>
+      </div>
     </div>
     <iframe id="pdfPreview" title="PDF preview"></iframe>
   </aside>
