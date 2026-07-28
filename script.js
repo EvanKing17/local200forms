@@ -1,17 +1,4 @@
-/* ============ Tab switching ============ */
-const pickerBtns = document.querySelectorAll('.picker-btn');
 const panels = document.querySelectorAll('.form-panel');
-
-pickerBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    pickerBtns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
-    panels.forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    btn.setAttribute('aria-selected', 'true');
-    document.getElementById('form-' + btn.dataset.form).classList.add('active');
-    renderPreview();
-  });
-});
 
 /* ============ Mobile preview toggle ============ */
 const workspace = document.getElementById('workspace');
@@ -66,6 +53,53 @@ document.querySelectorAll('.currency-input').forEach(el => {
 
 function download(doc, filename) {
   doc.save(filename);
+}
+
+/*
+ * "NAME - MMDDYYYY FORMTYPE.pdf" — a real Save As dialog isn't something a page can force open
+ * (that's the user's own "always ask where to save files" browser setting); this just supplies
+ * the suggested filename for whatever save behavior the browser is configured to use.
+ */
+function buildFilename(name, formTypeLabel) {
+  const today = new Date();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const yyyy = today.getFullYear();
+  const safeName = (name || 'Unnamed').trim().replace(/[\\/:*?"<>|]/g, '') || 'Unnamed';
+  return `${safeName} - ${mm}${dd}${yyyy} ${formTypeLabel}.pdf`;
+}
+
+const FORM_SIGNATURE = 'local200forms-v1';
+
+/*
+ * Every generated PDF carries its own form data back out again, tucked into the standard PDF
+ * Subject/Keywords metadata fields — invisible in the document itself, but readable from the raw
+ * file bytes without needing a PDF parser (see readEmbeddedFormData below). This only round-trips
+ * for a PDF re-uploaded as-is; a printed-and-rescanned copy has no metadata left to read.
+ */
+function embedFormData(doc, formType, data) {
+  const payload = JSON.stringify({ formType, data });
+  const encoded = btoa(unescape(encodeURIComponent(payload)));
+  doc.setProperties({ subject: FORM_SIGNATURE, keywords: encoded });
+}
+
+/* Reverses embedFormData from a raw PDF file's bytes. Returns null if unrecognized. */
+function readEmbeddedFormData(bytes) {
+  const text = new TextDecoder('latin1').decode(bytes);
+  const subjectMatch = text.match(/\/Subject\s*\(([^)]*)\)/);
+  if (!subjectMatch || subjectMatch[1] !== FORM_SIGNATURE) return null;
+
+  const keywordsMatch = text.match(/\/Keywords\s*\(([^)]*)\)/);
+  if (!keywordsMatch) return null;
+
+  try {
+    const json = decodeURIComponent(escape(atob(keywordsMatch[1])));
+    const payload = JSON.parse(json);
+    if (!payload || !payload.formType || !payload.data) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
 const PAGE_BOTTOM = 760;
@@ -339,6 +373,7 @@ function buildFordDoc(data) {
   doc.setTextColor(140, 140, 140);
   doc.text('Generated locally — no data stored or transmitted.', marginX, 780);
 
+  embedFormData(doc, 'ford', data);
   return doc;
 }
 
@@ -348,8 +383,7 @@ fordForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildFordDoc(data);
-  const fname = (data.employeeName || 'grievance').trim().replace(/\s+/g, '_');
-  download(doc, `Grievance_Claim_${fname || 'form'}.pdf`);
+  download(doc, buildFilename(data.employeeName, 'Grievance Claim'));
 });
 
 document.getElementById('fordClear').addEventListener('click', () => {
@@ -483,6 +517,7 @@ function buildUniforDoc(data) {
   doc.text('PRIVATE', 306, 770, { align: 'center' });
   doc.text('pg. 1 / 5', 572, 770, { align: 'right' });
 
+  embedFormData(doc, 'unifor', data);
   return doc;
 }
 
@@ -492,8 +527,7 @@ uniforForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildUniforDoc(data);
-  const fname = (data.grievorName || 'factsheet').trim().replace(/\s+/g, '_');
-  download(doc, `Local200_FactSheet_${fname || 'form'}.pdf`);
+  download(doc, buildFilename(data.grievorName, 'Fact Sheet'));
 });
 
 document.getElementById('uniforClear').addEventListener('click', () => {
@@ -505,13 +539,15 @@ const previewFrame = document.getElementById('pdfPreview');
 let previewUrl = null;
 
 const FORM_BUILDERS = {
-  ford: { form: fordForm, build: buildFordDoc },
-  unifor: { form: uniforForm, build: buildUniforDoc },
+  ford: { form: fordForm, build: buildFordDoc, label: 'Grievance Claim' },
+  unifor: { form: uniforForm, build: buildUniforDoc, label: 'Fact Sheet' },
 };
 
+let currentFormType = null;
+
 function renderPreview() {
-  const activeBtn = document.querySelector('.picker-btn.active');
-  const entry = FORM_BUILDERS[activeBtn.dataset.form];
+  if (!currentFormType) return;
+  const entry = FORM_BUILDERS[currentFormType];
   const doc = entry.build(fd(entry.form));
   const blobUrl = URL.createObjectURL(doc.output('blob'));
 
@@ -563,6 +599,93 @@ window.addEventListener('beforeunload', (e) => {
     e.returnValue = '';
   }
 });
+
+/* ============ Home / fill-form view routing ============ */
+const homeView = document.getElementById('homeView');
+
+function showHome() {
+  currentFormType = null;
+  homeView.hidden = false;
+  workspace.hidden = true;
+  previewToggle.style.display = 'none';
+}
+
+/* Fills a form's fields (including custom date pickers) from a plain {name: value} object */
+function populateForm(form, data) {
+  form.reset();
+  Object.entries(data).forEach(([key, value]) => {
+    const el = form.elements[key];
+    if (!el) return;
+    if (typeof RadioNodeList !== 'undefined' && el instanceof RadioNodeList) {
+      Array.from(el).forEach(radio => { radio.checked = radio.value === value; });
+    } else if (el.type === 'hidden' && el.closest('.datepicker')) {
+      el.closest('.datepicker').setValue(value);
+    } else {
+      el.value = value;
+    }
+  });
+}
+
+function showForm(type, data) {
+  currentFormType = type;
+  homeView.hidden = true;
+  workspace.hidden = false;
+  previewToggle.style.display = '';
+  panels.forEach(p => p.classList.remove('active'));
+  document.getElementById('form-' + type).classList.add('active');
+  const entry = FORM_BUILDERS[type];
+  if (data) populateForm(entry.form, data);
+  else entry.form.reset();
+  document.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
+  renderPreview();
+}
+
+document.querySelectorAll('.form-card').forEach(card => {
+  card.addEventListener('click', () => showForm(card.dataset.form));
+});
+
+document.getElementById('backToForms').addEventListener('click', () => {
+  if (formHasData(FORM_BUILDERS[currentFormType].form) &&
+      !confirm('Leave this form? Anything you’ve entered will be lost unless you’ve already saved a PDF.')) {
+    return;
+  }
+  showHome();
+});
+
+/* ============ Upload & recognize a previously generated PDF ============ */
+const uploadInput = document.getElementById('uploadInput');
+const uploadError = document.getElementById('uploadError');
+
+function showUploadError(message) {
+  uploadError.textContent = message;
+  uploadError.hidden = false;
+}
+
+uploadInput.addEventListener('change', async () => {
+  const file = uploadInput.files[0];
+  uploadInput.value = ''; // allow re-selecting the same file later
+  if (!file) return;
+
+  uploadError.hidden = true;
+  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+    showUploadError('Please choose a PDF file.');
+    return;
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const payload = readEmbeddedFormData(bytes);
+  if (!payload) {
+    showUploadError('This doesn’t look like a form generated by this app — only PDFs created here can be recognized and auto-filled.');
+    return;
+  }
+  if (!FORM_BUILDERS[payload.formType]) {
+    showUploadError('Unrecognized form type.');
+    return;
+  }
+  showForm(payload.formType, payload.data);
+});
+
+showHome();
 
 /* ============ Custom date picker ============ */
 function dateKeyLocal(d) {
@@ -877,6 +1000,7 @@ function setupDatePicker(originalInput, options = {}) {
   trigger.addEventListener('click', () => (open ? close() : openPanel()));
 
   wrapper.refreshDisplay = updateTriggerLabel;
+  wrapper.setValue = setValue;
   updateTriggerLabel();
 }
 
