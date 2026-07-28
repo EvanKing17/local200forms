@@ -1,10 +1,12 @@
 const panels = document.querySelectorAll('.form-panel');
 
 /*
- * Form display names (homepage card + sheet-header/PDF title) live in forms.config.json rather
- * than hardcoded here, so they can be edited without touching this file — see admin.html, a
- * local-only page for editing that file directly. These defaults are only a fallback in case the
- * fetch below fails (e.g. opened from a context where local file fetches are blocked).
+ * Form display names (homepage card + sheet-header/PDF title) live in forms.config.js rather than
+ * hardcoded here, so they can be edited without touching this file — see admin.html, a
+ * local-only page for editing that file directly. It's a plain <script src> (loaded before this
+ * file, see index.html) rather than a fetch()'d JSON file specifically so this keeps working when
+ * the app is opened straight from disk via file:// — fetch() of a local file is blocked by CORS
+ * in Chrome/Edge under file://, but a <script src> tag loads local files fine regardless.
  */
 const DEFAULT_FORMS_CONFIG = {
   ford: {
@@ -23,7 +25,7 @@ const DEFAULT_FORMS_CONFIG = {
     homeSub: 'Unifor — first stage appeal',
   },
 };
-let FORMS_CONFIG = DEFAULT_FORMS_CONFIG;
+const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };
 
 function applyFormsConfig() {
   Object.entries(FORMS_CONFIG).forEach(([type, cfg]) => {
@@ -37,21 +39,6 @@ function applyFormsConfig() {
     const heading = document.getElementById(`form-${type}-heading`);
     if (heading && cfg.title) heading.textContent = cfg.title;
   });
-  if (typeof refreshHomePreviews === 'function') refreshHomePreviews();
-  if (currentFormType) renderPreview();
-}
-
-async function loadFormsConfig() {
-  try {
-    const res = await fetch('forms.config.json', { cache: 'no-store' });
-    if (res.ok) {
-      const loaded = await res.json();
-      FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...loaded };
-    }
-  } catch {
-    // Keep the defaults — this just means the config file couldn't be fetched.
-  }
-  applyFormsConfig();
 }
 
 /* ============ Mobile preview toggle ============ */
@@ -879,8 +866,8 @@ uploadInput.addEventListener('change', async () => {
   showForm(payload.formType, payload.data);
 });
 
+applyFormsConfig();
 showHome();
-loadFormsConfig();
 
 /* ============ Custom date picker ============ */
 function dateKeyLocal(d) {

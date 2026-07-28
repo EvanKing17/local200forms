@@ -91,20 +91,22 @@
 <div class="wrap">
   <h1>Forms Admin</h1>
   <p class="lede">
-    Local-only editor for <code>forms.config.json</code> — the titles and homepage labels shown
+    Local-only editor for <code>forms.config.js</code> — the titles and homepage labels shown
     in the app. Not linked from the app itself; open this file directly when you want to rename
-    something. After saving, commit the updated <code>forms.config.json</code> to publish the
+    something. After saving, commit the updated <code>forms.config.js</code> to publish the
     change.
   </p>
 
   <div id="cards"></div>
 
   <div class="actions">
-    <button type="button" class="btn-primary" id="saveBtn">Save forms.config.json</button>
+    <button type="button" class="btn-primary" id="saveBtn">Save forms.config.js</button>
     <span class="status" id="status"></span>
   </div>
 </div>
 
+<!-- Loaded as a plain script (not fetched) so this works over file:// the same as the main app -->
+<script src="forms.config.js"></script>
 <script>
 const FIELDS = [
   { key: 'title', label: 'Title (sheet header / PDF heading)' },
@@ -117,9 +119,8 @@ const FORM_NAMES = { ford: 'Ford — Grievance Claim', policy: 'Ford — Policy 
 
 let config = {};
 
-async function load() {
-  const res = await fetch('forms.config.json', { cache: 'no-store' });
-  config = await res.json();
+function load() {
+  config = window.FORMS_CONFIG_DATA || {};
   render();
 }
 
@@ -164,19 +165,21 @@ function setStatus(msg, cls) {
 
 async function save() {
   const updated = { ...config, ...collect() };
-  const json = JSON.stringify(updated, null, 2) + '\n';
+  const source = '/* Form display names — homepage card label/subtitle + sheet-header/PDF title. '
+    + 'Edited via admin.html; a plain <script src> (not fetch) so this loads fine over file://. */\n'
+    + 'window.FORMS_CONFIG_DATA = ' + JSON.stringify(updated, null, 2) + ';\n';
 
   if (window.showSaveFilePicker) {
     try {
       const handle = await window.showSaveFilePicker({
-        suggestedName: 'forms.config.json',
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        suggestedName: 'forms.config.js',
+        types: [{ description: 'JavaScript', accept: { 'text/javascript': ['.js'] } }],
       });
       const writable = await handle.createWritable();
-      await writable.write(json);
+      await writable.write(source);
       await writable.close();
       config = updated;
-      setStatus('Saved. Commit forms.config.json to publish this change.', 'ok');
+      setStatus('Saved. Commit forms.config.js to publish this change.', 'ok');
       return;
     } catch (err) {
       if (err.name === 'AbortError') { setStatus('Cancelled.'); return; }
@@ -188,16 +191,16 @@ async function save() {
   // The anchor must be attached to the document, and the object URL must outlive the "Save As"
   // dialog if the browser is set to prompt for a location — revoking it immediately after click()
   // can race that dialog and produce a truncated (sometimes 0-byte) file.
-  const blob = new Blob([json], { type: 'application/json' });
+  const blob = new Blob([source], { type: 'text/javascript' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'forms.config.json';
+  a.download = 'forms.config.js';
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
-  setStatus('Downloaded — replace forms.config.json in the project with this file, then commit.');
+  setStatus('Downloaded — replace forms.config.js in the project with this file, then commit.');
 }
 
 document.getElementById('saveBtn').addEventListener('click', save);
