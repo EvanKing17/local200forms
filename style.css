@@ -155,6 +155,23 @@ button:focus-visible,
   box-shadow: 0 2px 12px rgba(37, 99, 235, 0.12);
 }
 
+.form-card-preview {
+  width: 100%;
+  aspect-ratio: 8.5 / 11;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--c-col-bg);
+  border: 1px solid var(--c-border);
+  margin-bottom: 10px;
+}
+
+.form-card-preview iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  pointer-events: none;
+}
+
 .picker-index {
   font-size: 11px;
   color: var(--c-text-faint);

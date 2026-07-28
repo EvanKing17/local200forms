@@ -1,5 +1,59 @@
 const panels = document.querySelectorAll('.form-panel');
 
+/*
+ * Form display names (homepage card + sheet-header/PDF title) live in forms.config.json rather
+ * than hardcoded here, so they can be edited without touching this file — see admin.html, a
+ * local-only page for editing that file directly. These defaults are only a fallback in case the
+ * fetch below fails (e.g. opened from a context where local file fetches are blocked).
+ */
+const DEFAULT_FORMS_CONFIG = {
+  ford: {
+    title: 'Grievance Investigation & Claim Form',
+    homeLabel: 'Grievance Investigation & Claim Form',
+    homeSub: 'Ford — Section A intake',
+  },
+  policy: {
+    title: 'Policy Grievance Form',
+    homeLabel: 'Policy Grievance Form',
+    homeSub: 'Ford — policy grievance',
+  },
+  unifor: {
+    title: 'Local 200 Grievance Committee Fact Sheet',
+    homeLabel: 'Local 200 Fact Sheet',
+    homeSub: 'Unifor — first stage appeal',
+  },
+};
+let FORMS_CONFIG = DEFAULT_FORMS_CONFIG;
+
+function applyFormsConfig() {
+  Object.entries(FORMS_CONFIG).forEach(([type, cfg]) => {
+    const card = document.querySelector(`.form-card[data-form="${type}"]`);
+    if (card) {
+      const label = card.querySelector('.picker-label');
+      const sub = card.querySelector('.picker-sub');
+      if (label && cfg.homeLabel) label.textContent = cfg.homeLabel;
+      if (sub && cfg.homeSub) sub.textContent = cfg.homeSub;
+    }
+    const heading = document.getElementById(`form-${type}-heading`);
+    if (heading && cfg.title) heading.textContent = cfg.title;
+  });
+  if (typeof refreshHomePreviews === 'function') refreshHomePreviews();
+  if (currentFormType) renderPreview();
+}
+
+async function loadFormsConfig() {
+  try {
+    const res = await fetch('forms.config.json', { cache: 'no-store' });
+    if (res.ok) {
+      const loaded = await res.json();
+      FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...loaded };
+    }
+  } catch {
+    // Keep the defaults — this just means the config file couldn't be fetched.
+  }
+  applyFormsConfig();
+}
+
 /* ============ Mobile preview toggle ============ */
 const workspace = document.getElementById('workspace');
 const previewToggle = document.getElementById('previewToggle');
@@ -122,6 +176,17 @@ function fitSingleLine(doc, text, maxWidth, baseSize, minSize = 6) {
     doc.setFontSize(size);
   }
   return size;
+}
+
+/* Centered bold form title at the top of the page, wrapping (rather than overflowing) if it's long */
+function drawFormHeading(doc, text) {
+  const y = 40;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(0, 0, 0);
+  const lines = doc.splitTextToSize(text, 480);
+  lines.forEach((line, i) => doc.text(line, 306, y + i * 18, { align: 'center' }));
+  return y + lines.length * 18;
 }
 
 /* Dark header bar: bold black-on-white "Section X:" style label matching the printed originals */
@@ -326,13 +391,7 @@ function buildFordDoc(data) {
 
   const marginX = 40;
   const W = 532;
-  let y = 40;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Grievance Investigation & Claim Form', 306, y, { align: 'center' });
-  y += 18;
+  let y = drawFormHeading(doc, FORMS_CONFIG.ford.title);
 
   y = sectionBar(doc, marginX, y, W, 'Section A:', ' Employee Details & Grievance Summary');
   y += 4;
@@ -346,14 +405,15 @@ function buildFordDoc(data) {
   ]);
   y += 4;
 
-  const artW = W * 0.52, dateW = (W - artW) / 2;
+  // Article Violation spans two grid columns, Date of Incident/Filed each take one, so the
+  // dividers in this row land exactly on the dividers from the row above.
   const articleVal = data.article
     ? `Article ${data.article} and all other relevant articles of the agreement`
     : 'and all other relevant articles of the agreement';
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Article Violation', value: articleVal, width: artW },
-    { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: dateW },
-    { label: 'Date Filed', value: fmtDate(data.dateFiled), width: dateW },
+    { label: 'Article Violation', value: articleVal, width: w4 * 2 },
+    { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: w4 },
+    { label: 'Date Filed', value: fmtDate(data.dateFiled), width: w4 },
   ]);
   y += 4;
 
@@ -422,6 +482,85 @@ fordForm.addEventListener('submit', (e) => {
 
 document.getElementById('fordClear').addEventListener('click', () => {
   fordForm.reset();
+});
+
+/* ============ POLICY GRIEVANCE FORM ============ */
+/* A trimmed variant of the Ford form for policy grievances: same Section A layout, but with the
+   hours grid and the money-related Section D (Payroll & Accounting) removed entirely. */
+function buildPolicyDoc(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+  const marginX = 40;
+  const W = 532;
+  let y = drawFormHeading(doc, FORMS_CONFIG.policy.title);
+
+  y = sectionBar(doc, marginX, y, W, 'Section A:', ' Employee Details & Grievance Summary');
+  y += 4;
+
+  const w4 = W / 4;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Employee Name', value: data.employeeName, width: w4 },
+    { label: 'Global ID', value: data.globalId, width: w4 },
+    { label: 'Department', value: data.department, width: w4 },
+    { label: 'Process Coach', value: data.processCoach, width: w4 },
+  ]);
+  y += 4;
+
+  const articleVal = data.article
+    ? `Article ${data.article} and all other relevant articles of the agreement`
+    : 'and all other relevant articles of the agreement';
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Article Violation', value: articleVal, width: w4 * 2 },
+    { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: w4 },
+    { label: 'Date Filed', value: fmtDate(data.dateFiled), width: w4 },
+  ]);
+  y += 4;
+
+  y = flowTextBox(doc, marginX, y + 6, W, 'Details of Incident:', data.details, 70);
+  y += 8;
+
+  // ---- Section B: Department Response (reserved, left blank for department) ----
+  y = drawResponseSection(doc, marginX, W, y, 'Section B:', ' Department Response', [
+    { label: 'Department Representative (print name)', value: '', width: W / 3 },
+    { label: 'Signature', value: '', width: W / 3 },
+    { label: 'Department Charge No', value: '', width: W / 3 },
+  ], 34, 100, {
+    height: 30,
+    draw(doc, x, y, w) {
+      const approveH = 30;
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.75);
+      doc.rect(x, y, w, approveH);
+      doc.line(x + w * 0.42, y, x + w * 0.58, y + approveH);
+      checkboxText(doc, x + 16, y + approveH / 2, 'Grievance Approved');
+      checkboxText(doc, x + w * 0.62, y + approveH / 2, 'Grievance Denied');
+    },
+  });
+
+  // ---- Section C: Employee Relations Response (reserved) ----
+  y = drawResponseSection(doc, marginX, W, y, 'Section C:', ' Employee Relations Response', [
+    { label: 'Employee Relations Representative (print name)', value: '', width: W * 0.34 },
+    { label: 'Signature', value: '', width: W * 0.34 },
+    { label: 'Grievance Stage', value: '', width: W * 0.16 },
+    { label: 'Number', value: '', width: W * 0.16 },
+  ], 34, 100);
+
+  embedFormData(doc, 'policy', data);
+  return doc;
+}
+
+const policyForm = document.getElementById('policyForm');
+
+policyForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const data = fd(e.target);
+  const doc = buildPolicyDoc(data);
+  download(doc, buildFilename(data.employeeName, 'Policy Grievance'));
+});
+
+document.getElementById('policyClear').addEventListener('click', () => {
+  policyForm.reset();
 });
 
 /* ============ UNIFOR FORM ============ */
@@ -576,6 +715,7 @@ let previewUrl = null;
 
 const FORM_BUILDERS = {
   ford: { form: fordForm, build: buildFordDoc, label: 'Grievance Claim' },
+  policy: { form: policyForm, build: buildPolicyDoc, label: 'Policy Grievance' },
   unifor: { form: uniforForm, build: buildUniforDoc, label: 'Fact Sheet' },
 };
 
@@ -615,6 +755,8 @@ manualRefreshBtn.addEventListener('click', renderPreview);
 
 fordForm.addEventListener('input', maybeUpdatePreview);
 fordForm.addEventListener('change', maybeUpdatePreview);
+policyForm.addEventListener('input', maybeUpdatePreview);
+policyForm.addEventListener('change', maybeUpdatePreview);
 uniforForm.addEventListener('input', maybeUpdatePreview);
 uniforForm.addEventListener('change', maybeUpdatePreview);
 
@@ -630,7 +772,7 @@ function formHasData(form) {
 }
 
 window.addEventListener('beforeunload', (e) => {
-  if (formHasData(fordForm) || formHasData(uniforForm)) {
+  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm)) {
     e.preventDefault();
     e.returnValue = '';
   }
@@ -644,6 +786,22 @@ function showHome() {
   homeView.hidden = false;
   workspace.hidden = true;
   previewToggle.style.display = 'none';
+  refreshHomePreviews();
+}
+
+/* Renders each homepage card's small preview thumbnail from that form's current field values */
+const homePreviewUrls = {};
+
+function refreshHomePreviews() {
+  Object.entries(FORM_BUILDERS).forEach(([type, entry]) => {
+    const iframe = document.querySelector(`.form-card[data-form="${type}"] .form-card-preview iframe`);
+    if (!iframe) return;
+    const doc = entry.build(fd(entry.form));
+    const blobUrl = URL.createObjectURL(doc.output('blob'));
+    iframe.src = blobUrl + '#toolbar=0&navpanes=0&view=FitH';
+    if (homePreviewUrls[type]) URL.revokeObjectURL(homePreviewUrls[type]);
+    homePreviewUrls[type] = blobUrl;
+  });
 }
 
 /* Fills a form's fields (including custom date pickers) from a plain {name: value} object */
@@ -722,6 +880,7 @@ uploadInput.addEventListener('change', async () => {
 });
 
 showHome();
+loadFormsConfig();
 
 /* ============ Custom date picker ============ */
 function dateKeyLocal(d) {
@@ -1047,7 +1206,7 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
 
 // Native form.reset() restores the hidden inputs' default values without firing input/change,
 // so each date picker's visible trigger label needs an explicit nudge afterward.
-[fordForm, uniforForm].forEach(form => {
+[fordForm, policyForm, uniforForm].forEach(form => {
   form.addEventListener('reset', () => {
     setTimeout(() => {
       form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());

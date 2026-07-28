@@ -1,0 +1,17 @@
+{
+  "ford": {
+    "title": "Grievance Investigation & Claim Form",
+    "homeLabel": "Grievance Investigation & Claim Form",
+    "homeSub": "Ford — Section A intake"
+  },
+  "policy": {
+    "title": "Policy Grievance Form",
+    "homeLabel": "Policy Grievance Form",
+    "homeSub": "Ford — policy grievance"
+  },
+  "unifor": {
+    "title": "Local 200 Grievance Committee Fact Sheet",
+    "homeLabel": "Local 200 Fact Sheet",
+    "homeSub": "Unifor — first stage appeal"
+  }
+}

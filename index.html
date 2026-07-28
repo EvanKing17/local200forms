@@ -24,12 +24,20 @@
 
   <div class="form-cards">
     <button class="form-card" data-form="ford">
+      <div class="form-card-preview"><iframe tabindex="-1" title="Preview"></iframe></div>
       <span class="picker-index">01</span>
       <span class="picker-label">Grievance Investigation &amp; Claim Form</span>
       <span class="picker-sub">Ford — Section A intake</span>
     </button>
-    <button class="form-card" data-form="unifor">
+    <button class="form-card" data-form="policy">
+      <div class="form-card-preview"><iframe tabindex="-1" title="Preview"></iframe></div>
       <span class="picker-index">02</span>
+      <span class="picker-label">Policy Grievance Form</span>
+      <span class="picker-sub">Ford — policy grievance</span>
+    </button>
+    <button class="form-card" data-form="unifor">
+      <div class="form-card-preview"><iframe tabindex="-1" title="Preview"></iframe></div>
+      <span class="picker-index">03</span>
       <span class="picker-label">Local 200 Fact Sheet</span>
       <span class="picker-sub">Unifor — first stage appeal</span>
     </button>
@@ -121,6 +129,59 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
             <input type="text" name="hoursShift3" inputmode="decimal" value="8">
           </label>
         </div>
+      </fieldset>
+    </form>
+  </section>
+
+  <!-- ================= POLICY GRIEVANCE FORM ================= -->
+  <section class="form-panel" id="form-policy" aria-labelledby="form-policy-heading">
+    <form id="policyForm">
+      <div class="sheet-header">
+        <div class="sheet-header-text">
+          <h1 id="form-policy-heading">Policy Grievance Form</h1>
+        </div>
+        <div class="sheet-header-actions">
+          <button type="button" class="btn-secondary" id="policyClear">Clear form</button>
+          <button type="submit" class="btn-primary">Generate PDF</button>
+        </div>
+      </div>
+
+      <fieldset class="section">
+        <legend>Section A — Employee Details &amp; Grievance Summary</legend>
+        <div class="grid grid-4">
+          <label>Employee Name
+            <input type="text" name="employeeName" autocomplete="off" value="Evan Robert King Thompson MacGregor">
+          </label>
+          <label>Global ID
+            <input type="text" name="globalId" autocomplete="off" value="002173535">
+          </label>
+          <label>Department
+            <input type="text" name="department" autocomplete="off" value="8383 - Heads Godzilla Motorline">
+          </label>
+          <label>Process Coach
+            <input type="text" name="processCoach" autocomplete="off" value="Wes Macauley, Johnny Appleseed">
+          </label>
+        </div>
+
+        <div class="grid grid-3">
+          <label>Article Violation
+            <div class="inline-prefix">
+              <span>Article</span>
+              <input type="text" name="article" autocomplete="off" placeholder="e.g. 78" value="8.01, 3.02">
+              <span class="prefix-note">and all other relevant articles of the agreement</span>
+            </div>
+          </label>
+          <label>Date of Incident
+            <input type="date" name="dateIncident" value="2026-07-14">
+          </label>
+          <label>Date Filed
+            <input type="date" name="dateFiled" value="2026-07-29">
+          </label>
+        </div>
+
+        <label class="full">Details of Incident
+          <textarea name="details" rows="9" placeholder="What happened, in your own words — who, what, when, where, and why it violates the agreement.">The posted attendance policy was applied inconsistently across shifts, resulting in a written warning issued to the grievor for an absence that would not have been counted under the policy as applied to other employees in the same classification. This is a policy grievance affecting the interpretation and application of the attendance policy generally, not an individual pay or hours dispute.</textarea>
+        </label>
       </fieldset>
     </form>
   </section>
