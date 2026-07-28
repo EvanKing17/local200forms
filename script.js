@@ -158,6 +158,13 @@ function boxedGrid(doc, x, y, w, cells, minH = 34) {
   const labelBlockH = 9 + (maxLabelLines - 1) * 7.5;
   const h = Math.max(minH, labelBlockH + 6 + maxValueLines * lineHeight + 6);
 
+  // A grid row is drawn as one piece (splitting a row's cells across a page break would look
+  // broken), so if it doesn't fit here, move the whole thing to a fresh page instead of clipping.
+  if (y + h > PAGE_BOTTOM) {
+    doc.addPage();
+    y = 40;
+  }
+
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.75);
   doc.rect(x, y, w, h);
@@ -188,6 +195,12 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
   const allLines = doc.splitTextToSize(value || '', w - 10);
   let idx = 0, currentY = y, first = true;
   do {
+    // If even the minimum box height won't fit before the page edge, start fresh on a new page
+    // rather than drawing an oversized box that gets physically clipped by the margin.
+    if (currentY + 6 + minH > PAGE_BOTTOM) {
+      doc.addPage();
+      currentY = 40;
+    }
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(0, 0, 0);
@@ -197,7 +210,8 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
     const maxLines = Math.max(1, Math.floor((availH - 10) / lineHeight));
     const remaining = allLines.length - idx;
     const linesThisBox = Math.max(1, Math.min(remaining, maxLines));
-    const boxH = Math.max(minH, linesThisBox * lineHeight + 10);
+    // Clamped to availH as a hard floor: the box can never be drawn past the page edge.
+    const boxH = Math.min(availH, Math.max(minH, linesThisBox * lineHeight + 10));
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.75);
     doc.rect(x, boxY, w, boxH);
@@ -307,6 +321,7 @@ function buildFordDoc(data) {
   y = flowTextBox(doc, marginX, y + 6, W, 'Details of Incident:', data.details, 70);
   y += 8;
 
+  y = ensureSpace(doc, y, 70);
   const hoursColW = W / 2 - 10;
   let hy = y;
   hourField(doc, marginX, hy, hoursColW, 'Hours at straight time:', data.hoursStraight);
@@ -474,8 +489,10 @@ function buildUniforDoc(data) {
   y += 6;
 
   // Discipline checkboxes + Date Grievance Filed — content here is always short and fixed, so a
-  // plain fixed-height row (unlike boxedGrid) is safe.
+  // plain fixed-height row (unlike boxedGrid) is safe, as long as it isn't started too close to
+  // the page edge itself.
   const disciplineH = 34;
+  y = ensureSpace(doc, y, disciplineH);
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.75);
   doc.rect(marginX, y, W / 2, disciplineH);

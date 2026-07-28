@@ -414,22 +414,6 @@ fieldset.section legend {
   font-weight: 600;
 }
 
-fieldset.section.muted {
-  padding: 12px 24px;
-  background: var(--c-surface-alt);
-}
-
-fieldset.section.muted legend { color: var(--c-text-faint); }
-
-.reserved {
-  text-transform: none;
-  letter-spacing: 0;
-  font-style: italic;
-  color: var(--c-text-faint);
-  font-weight: 400;
-  margin-left: 8px;
-}
-
 /* ---------- Grid & fields ---------- */
 .grid {
   display: grid;
