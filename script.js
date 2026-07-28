@@ -417,6 +417,7 @@ function buildFordDoc(data) {
   hourField(doc, marginX + hoursColW + 20, hy, hoursColW, 'Hours of #3 Shift Prem:', data.hoursShift3);
   hy += 22;
   hourField(doc, marginX, hy, hoursColW, 'Hours at double time:', data.hoursDouble);
+  hourField(doc, marginX + hoursColW + 20, hy, hoursColW, 'Hours at triple time:', data.hoursTriple);
   y = hy + 22;
 
   // ---- Section B: Department Response (reserved, left blank for department) ----
@@ -710,9 +711,11 @@ function renderPreview() {
   const blobUrl = URL.createObjectURL(doc.output('blob'));
 
   // Fade out instead of an abrupt white reload flash while the new PDF loads in.
+  // Leave the toolbar on (zoom, page nav, print/download) — navpanes=0 hides the thumbnail
+  // sidebar, and view=FitH scales the page to fit the preview pane's width on load.
   previewFrame.classList.add('is-refreshing');
   previewFrame.onload = () => previewFrame.classList.remove('is-refreshing');
-  previewFrame.src = blobUrl + '#toolbar=0&navpanes=0';
+  previewFrame.src = blobUrl + '#navpanes=0&view=FitH';
 
   if (previewUrl) URL.revokeObjectURL(previewUrl);
   previewUrl = blobUrl;

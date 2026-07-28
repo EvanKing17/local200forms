@@ -397,12 +397,17 @@ fieldset.section:last-of-type {
 }
 
 fieldset.section legend {
+  /* display:block strips the browser's special legend layout, which straddles the fieldset's
+     top border by default — with no border-top on this fieldset, that made the text appear
+     to float outside the card entirely instead of sitting inline as a normal section title. */
+  display: block;
   font-size: 11.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--c-accent);
-  padding: 0 6px;
   font-weight: 600;
+  padding: 0;
+  margin-bottom: 14px;
 }
 
 /* ---------- Grid & fields ---------- */
