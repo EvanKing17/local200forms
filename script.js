@@ -143,9 +143,9 @@ function sectionBar(doc, x, y, w, boldLabel, restLabel) {
  * One continuous bordered row split into cells by thin divider lines.
  * Height grows automatically to fit whatever the label/value need — nothing is ever truncated.
  */
-function boxedGrid(doc, x, y, w, cells, minH = 34) {
-  const labelFontSize = 6.5, valueFontSize = 9.5, lineHeight = 11;
-  const prepared = cells.map(c => {
+function prepareGridCells(doc, cells) {
+  const labelFontSize = 6.5, valueFontSize = 9.5;
+  return cells.map(c => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(labelFontSize);
     const labelLines = doc.splitTextToSize(c.label.toUpperCase(), c.width - 8).slice(0, 2);
@@ -153,10 +153,50 @@ function boxedGrid(doc, x, y, w, cells, minH = 34) {
     const valueLines = doc.splitTextToSize(c.value || '', c.width - 10);
     return { ...c, labelLines, valueLines };
   });
+}
+
+function gridHeightFromPrepared(prepared, minH) {
+  const lineHeight = 11;
   const maxLabelLines = Math.max(1, ...prepared.map(p => p.labelLines.length));
   const maxValueLines = Math.max(1, ...prepared.map(p => p.valueLines.length));
   const labelBlockH = 9 + (maxLabelLines - 1) * 7.5;
-  const h = Math.max(minH, labelBlockH + 6 + maxValueLines * lineHeight + 6);
+  return { h: Math.max(minH, labelBlockH + 6 + maxValueLines * lineHeight + 6), labelBlockH };
+}
+
+/* Measures the height boxedGrid(doc, x, y, w, cells, minH) would draw, without drawing it */
+function measureBoxedGrid(doc, cells, minH = 34) {
+  return gridHeightFromPrepared(prepareGridCells(doc, cells), minH).h;
+}
+
+/*
+ * A "Section X: ..." header bar + an optional fixed extra block (e.g. Ford's Approved/Denied
+ * row) + a field grid + a Comments box, treated as one atomic unit: its full height is measured
+ * up front, so the whole section moves to a new page together rather than splitting a header
+ * or grid from the Comments box that follows it.
+ */
+function drawResponseSection(doc, marginX, W, y, boldLabel, restLabel, gridCells, gridMinH, commentsMinH, extra) {
+  const gridH = measureBoxedGrid(doc, gridCells, gridMinH);
+  const extraH = extra ? extra.height + 5 : 0;
+  const totalH = 18 + 4 + extraH + gridH + 4 + 6 + commentsMinH;
+  y = ensureSpace(doc, y, totalH);
+
+  y = sectionBar(doc, marginX, y, W, boldLabel, restLabel);
+  y += 4;
+  if (extra) {
+    extra.draw(doc, marginX, y, W);
+    y += extra.height + 5;
+  }
+  y = boxedGrid(doc, marginX, y, W, gridCells, gridMinH);
+  y += 4;
+  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', commentsMinH);
+  y += 8;
+  return y;
+}
+
+function boxedGrid(doc, x, y, w, cells, minH = 34) {
+  const labelFontSize = 6.5, valueFontSize = 9.5;
+  const prepared = prepareGridCells(doc, cells);
+  const { h, labelBlockH } = gridHeightFromPrepared(prepared, minH);
 
   // A grid row is drawn as one piece (splitting a row's cells across a page break would look
   // broken), so if it doesn't fit here, move the whole thing to a fresh page instead of clipping.
@@ -334,54 +374,38 @@ function buildFordDoc(data) {
   y = hy + 22;
 
   // ---- Section B: Department Response (reserved, left blank for department) ----
-  y = ensureSpace(doc, y, 90);
-  y = sectionBar(doc, marginX, y, W, 'Section B:', ' Department Response');
-  y += 4;
-
-  const approveH = 30;
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.75);
-  doc.rect(marginX, y, W, approveH);
-  doc.line(marginX + W * 0.42, y, marginX + W * 0.58, y + approveH);
-  checkboxText(doc, marginX + 16, y + approveH / 2, 'Grievance Approved');
-  checkboxText(doc, marginX + W * 0.62, y + approveH / 2, 'Grievance Denied');
-  y += approveH + 5;
-
-  y = boxedGrid(doc, marginX, y, W, [
+  y = drawResponseSection(doc, marginX, W, y, 'Section B:', ' Department Response', [
     { label: 'Department Representative (print name)', value: '', width: W / 3 },
     { label: 'Signature', value: '', width: W / 3 },
     { label: 'Department Charge No', value: '', width: W / 3 },
-  ]);
-  y += 4;
-  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 100);
-  y += 8;
+  ], 34, 100, {
+    height: 30,
+    draw(doc, x, y, w) {
+      const approveH = 30;
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.75);
+      doc.rect(x, y, w, approveH);
+      doc.line(x + w * 0.42, y, x + w * 0.58, y + approveH);
+      checkboxText(doc, x + 16, y + approveH / 2, 'Grievance Approved');
+      checkboxText(doc, x + w * 0.62, y + approveH / 2, 'Grievance Denied');
+    },
+  });
 
   // ---- Section C: Employee Relations Response (reserved) ----
-  y = ensureSpace(doc, y, 90);
-  y = sectionBar(doc, marginX, y, W, 'Section C:', ' Employee Relations Response');
-  y += 4;
-  y = boxedGrid(doc, marginX, y, W, [
+  y = drawResponseSection(doc, marginX, W, y, 'Section C:', ' Employee Relations Response', [
     { label: 'Employee Relations Representative (print name)', value: '', width: W * 0.34 },
     { label: 'Signature', value: '', width: W * 0.34 },
     { label: 'Grievance Stage', value: '', width: W * 0.16 },
     { label: 'Number', value: '', width: W * 0.16 },
-  ]);
-  y += 4;
-  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 100);
-  y += 8;
+  ], 34, 100);
 
   // ---- Section D: Payroll & Accounting Department (reserved) ----
-  y = ensureSpace(doc, y, 90);
-  y = sectionBar(doc, marginX, y, W, 'Section D:', ' Payroll & Accounting Department');
-  y += 4;
-  y = boxedGrid(doc, marginX, y, W, [
+  y = drawResponseSection(doc, marginX, W, y, 'Section D:', ' Payroll & Accounting Department', [
     { label: 'Rate', value: '', width: w4 },
     { label: 'Hours', value: '', width: w4 },
     { label: 'Amount', value: '', width: w4 },
     { label: 'Pay Period', value: '', width: w4 },
-  ]);
-  y += 4;
-  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 100);
+  ], 34, 100);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
