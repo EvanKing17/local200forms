@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grievance Forms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">§</span>
+    <div class="brand-text">
+      <span class="brand-title">Grievance Forms</span>
+      <span class="brand-sub">fill in the browser — nothing leaves your machine</span>
+    </div>
+  </div>
+  <div class="privacy-chip">
+    <span class="dot"></span> No data stored · PDF generated locally
+  </div>
+</header>
+
+<nav class="form-picker" role="tablist" aria-label="Choose a form">
+  <button class="picker-btn active" data-form="ford" role="tab" aria-selected="true">
+    <span class="picker-index">01</span>
+    <span class="picker-label">Grievance Investigation &amp; Claim Form</span>
+    <span class="picker-sub">Ford — Section A intake</span>
+  </button>
+  <button class="picker-btn" data-form="unifor" role="tab" aria-selected="false">
+    <span class="picker-index">02</span>
+    <span class="picker-label">Local 200 Fact Sheet</span>
+    <span class="picker-sub">Unifor — first stage appeal</span>
+  </button>
+</nav>
+
+<main class="stage">
+
+  <!-- ================= FORD FORM ================= -->
+  <section class="form-panel active" id="form-ford" aria-labelledby="form-ford-heading">
+    <form id="fordForm">
+      <div class="sheet-header">
+        <h1 id="form-ford-heading">Grievance Investigation &amp; Claim Form</h1>
+      </div>
+
+      <fieldset class="section">
+        <legend>Section A — Employee Details &amp; Grievance Summary</legend>
+        <div class="grid grid-4">
+          <label>Employee Name
+            <input type="text" name="employeeName" autocomplete="off">
+          </label>
+          <label>Global ID
+            <input type="text" name="globalId" autocomplete="off">
+          </label>
+          <label>Department
+            <input type="text" name="department" autocomplete="off">
+          </label>
+          <label>Process Coach
+            <input type="text" name="processCoach" autocomplete="off">
+          </label>
+        </div>
+
+        <div class="grid grid-3">
+          <label>Article Violation
+            <div class="inline-prefix">
+              <span>Article</span>
+              <input type="text" name="article" autocomplete="off" placeholder="e.g. 78">
+              <span class="prefix-note">and all other relevant articles of the agreement</span>
+            </div>
+          </label>
+          <label>Date of Incident
+            <input type="date" name="dateIncident">
+          </label>
+          <label>Date Filed
+            <input type="date" name="dateFiled">
+          </label>
+        </div>
+
+        <label class="full">Details of Incident
+          <textarea name="details" rows="9" placeholder="What happened, in your own words — who, what, when, where, and why it violates the agreement."></textarea>
+        </label>
+
+        <div class="grid grid-4 hours-grid">
+          <label>Hours at straight time
+            <input type="text" name="hoursStraight" inputmode="decimal">
+          </label>
+          <label>Hours at time &amp; one half
+            <input type="text" name="hoursTimeHalf" inputmode="decimal">
+          </label>
+          <label>Hours at double time
+            <input type="text" name="hoursDouble" inputmode="decimal">
+          </label>
+          <label>Hours of #1 Shift Prem
+            <input type="text" name="hoursShift1" inputmode="decimal">
+          </label>
+          <label>Hours of #3 Shift Prem
+            <input type="text" name="hoursShift3" inputmode="decimal">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="section muted">
+        <legend>Section B — Department Response <span class="reserved">left blank for department</span></legend>
+      </fieldset>
+      <fieldset class="section muted">
+        <legend>Section C — Employee Relations Response <span class="reserved">left blank for ER</span></legend>
+      </fieldset>
+      <fieldset class="section muted">
+        <legend>Section D — Payroll &amp; Accounting <span class="reserved">left blank for payroll</span></legend>
+      </fieldset>
+
+      <div class="actions">
+        <button type="button" class="btn-secondary" id="fordClear">Clear form</button>
+        <button type="submit" class="btn-primary">Generate PDF</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ================= UNIFOR FORM ================= -->
+  <section class="form-panel" id="form-unifor" aria-labelledby="form-unifor-heading">
+    <form id="uniforForm">
+      <div class="sheet-header">
+        <h1 id="form-unifor-heading">Local 200 Grievance Committee Fact Sheet</h1>
+        <p class="sheet-note">For local union use only — accompanies first stage grievance appealed to Bargaining Committee</p>
+      </div>
+
+      <fieldset class="section">
+        <div class="grid grid-3">
+          <label>SP Number
+            <div class="inline-prefix"><span>SP-</span><input type="text" name="spNumber" autocomplete="off"></div>
+          </label>
+          <label>Grievor's Name
+            <input type="text" name="grievorName" autocomplete="off">
+          </label>
+          <label>GID #
+            <input type="text" name="gid" autocomplete="off">
+          </label>
+        </div>
+
+        <div class="grid grid-3">
+          <label>Dept
+            <input type="text" name="dept" autocomplete="off">
+          </label>
+          <label>Seniority Date
+            <input type="date" name="seniorityDate">
+          </label>
+          <label>Classification
+            <input type="text" name="classification" autocomplete="off">
+          </label>
+        </div>
+
+        <div class="grid grid-3">
+          <label>Rate $
+            <input type="text" name="rate" inputmode="decimal">
+          </label>
+          <label>Time in Classification
+            <input type="text" name="timeInClass" autocomplete="off">
+          </label>
+          <label>COLA $
+            <input type="text" name="cola" inputmode="decimal">
+          </label>
+        </div>
+
+        <div class="grid grid-3">
+          <label>Employee's Supervisor
+            <input type="text" name="supervisor" autocomplete="off">
+          </label>
+          <label>General Supervisor
+            <input type="text" name="generalSupervisor" autocomplete="off">
+          </label>
+          <label>Superintendent
+            <input type="text" name="superintendent" autocomplete="off">
+          </label>
+        </div>
+
+        <div class="grid grid-3">
+          <label>Date of Incident
+            <input type="date" name="uniforDateIncident">
+          </label>
+          <label>Date Grievance Filed
+            <input type="date" name="uniforDateFiled">
+          </label>
+          <label>Discipline on Record?
+            <span class="radio-row">
+              <label class="radio"><input type="radio" name="discipline" value="Yes"> Yes</label>
+              <label class="radio"><input type="radio" name="discipline" value="No" checked> No</label>
+            </span>
+          </label>
+        </div>
+
+        <label class="full">Who is involved in this grievance?
+          <textarea name="whoInvolved" rows="3"></textarea>
+        </label>
+
+        <div class="grid grid-2">
+          <label>When did it happen?
+            <input type="text" name="whenHappened" autocomplete="off">
+          </label>
+          <label>Where did it happen?
+            <input type="text" name="whereHappened" autocomplete="off">
+          </label>
+        </div>
+
+        <label class="full">Why is this a grievance?
+          <textarea name="whyGrievance" rows="5"></textarea>
+        </label>
+
+        <label class="full">What do we want?
+          <textarea name="whatWeWant" rows="4"></textarea>
+        </label>
+      </fieldset>
+
+      <div class="actions">
+        <button type="button" class="btn-secondary" id="uniforClear">Clear form</button>
+        <button type="submit" class="btn-primary">Generate PDF</button>
+      </div>
+    </form>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>Everything above stays in this browser tab. Closing or reloading the page clears it — nothing is saved, logged, or sent anywhere.</p>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
