@@ -24,6 +24,11 @@ const DEFAULT_FORMS_CONFIG = {
     homeLabel: 'Local 200 Fact Sheet',
     homeSub: 'Unifor — first stage appeal',
   },
+  investigation: {
+    title: '4.01 Investigation Form',
+    homeLabel: '4.01 Investigation Form',
+    homeSub: 'Workplace incident intake',
+  },
 };
 const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };
 
@@ -176,6 +181,54 @@ function drawFormHeading(doc, text, y = 40) {
   const lines = doc.splitTextToSize(text, 480);
   lines.forEach((line, i) => doc.text(line, 306, y + i * 18, { align: 'center' }));
   return y + lines.length * 18;
+}
+
+const UNIFOR_LOGO_ASPECT = 1342 / 532;
+
+/* The official Unifor logo (see unifor-logo.js), right-aligned so rightEdgeX is its right edge */
+function drawUniforLogo(doc, rightEdgeX, topY, width = 110) {
+  if (!window.UNIFOR_LOGO_PNG) return;
+  const h = width / UNIFOR_LOGO_ASPECT;
+  doc.addImage(window.UNIFOR_LOGO_PNG, 'PNG', rightEdgeX - width, topY, width, h);
+}
+
+/* SP number + logo, repeated at the top of every Unifor Fact Sheet page. Returns the y to start content at. */
+function drawUniforPageHeader(doc, marginX, W, data) {
+  const y = 44;
+  doc.setFillColor(226, 226, 236);
+  doc.rect(marginX, y, 90, 18, 'F');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`SP-${data.spNumber || ''}`, marginX + 6, y + 12);
+  drawUniforLogo(doc, marginX + W, y - 4);
+  return y + 40;
+}
+
+/* "Unifor Local 200 / PRIVATE / pg. X / 5" footer, repeated at the bottom of every page */
+function drawUniforFooter(doc, marginX, W, pageNum, totalPages = 5) {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(140, 140, 140);
+  doc.text('Unifor Local 200', marginX, 770);
+  doc.text('PRIVATE', 306, 770, { align: 'center' });
+  doc.text(`pg. ${pageNum} / ${totalPages}`, marginX + W, 770, { align: 'right' });
+}
+
+/* A bold question with Yes/No checkboxes at a fixed offset from x, for the short single-line questions */
+/* Wraps label to fit before checkboxX if labelMaxWidth is given; returns the line count so the
+   caller can advance y correctly (checkboxes stay pinned to the first line). */
+function yesNoQuestion(doc, x, y, label, value, checkboxX, labelMaxWidth) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(0, 0, 0);
+  const lines = labelMaxWidth ? doc.splitTextToSize(label, labelMaxWidth) : [label];
+  doc.text(lines, x, y);
+  checkboxText(doc, checkboxX, y - 3, 'Yes');
+  checkboxText(doc, checkboxX + 55, y - 3, 'No');
+  if (value === 'Yes') markCheckbox(doc, checkboxX, y - 3);
+  else if (value === 'No') markCheckbox(doc, checkboxX + 55, y - 3);
+  return lines.length;
 }
 
 /* Dark header bar: bold black-on-white "Section X:" style label matching the printed originals */
@@ -558,34 +611,8 @@ function buildUniforDoc(data) {
 
   const marginX = 40;
   const W = 532;
-  let y = 44;
+  let y = drawUniforPageHeader(doc, marginX, W, data);
 
-  // SP number, shaded (no border) to match the fill-in fields below
-  doc.setFillColor(226, 226, 236);
-  doc.rect(marginX, y, 90, 18, 'F');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
-  doc.text(`SP-${data.spNumber || ''}`, marginX + 6, y + 12);
-
-  // Unifor mark (approximate — swap in the real logo asset via addImage if you have it)
-  const logoX = marginX + W - 130;
-  doc.setFillColor(196, 30, 30);
-  doc.roundedRect(logoX, y - 6, 26, 26, 3, 3, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(255, 255, 255);
-  doc.text('U', logoX + 13, y + 12, { align: 'center' });
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(20, 40, 90);
-  doc.text('UNIFOR', logoX + 32, y + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(90, 90, 90);
-  doc.text('the Union | le syndicat', logoX + 32, y + 17);
-
-  y += 40;
   y = drawFormHeading(doc, FORMS_CONFIG.unifor.title, y);
   y += 4;
   doc.setFont('helvetica', 'normal');
@@ -668,12 +695,109 @@ function buildUniforDoc(data) {
 
   y = flowTextBox(doc, marginX, y + 6, W, 'What do we want?', data.whatWeWant, 56);
 
+  drawUniforFooter(doc, marginX, W, 1);
+
+  // ---- Page 2: Supervisor's Statement / Your Observation / Additional Information ----
+  doc.addPage();
+  y = drawUniforPageHeader(doc, marginX, W, data);
+  y += 10;
+  y = flowTextBox(doc, marginX, y, W, "Supervisor's Statement", data.supervisorStatement, 170);
+  y += 14;
+  y = flowTextBox(doc, marginX, y, W, 'Your Observation', data.yourObservation, 170);
+  y += 14;
+  y = flowTextBox(doc, marginX, y, W, 'Additional Information', data.additionalInfo, 170);
+  drawUniforFooter(doc, marginX, W, 2);
+
+  // ---- Page 3: Investigation questions ----
+  doc.addPage();
+  y = drawUniforPageHeader(doc, marginX, W, data);
+  y += 10;
+
+  const q1Lines = yesNoQuestion(
+    doc, marginX, y,
+    "Have you discussed the supervisor's disposition to the aggrieved? If not, please do so and detail below.",
+    data.discussedDisposition, marginX + 340, 300
+  );
+  y += q1Lines * 12 + 8;
+  y = flowTextBox(doc, marginX, y, W, 'Details:', data.dispositionDetail, 44);
+  y += 10;
+
+  y = flowTextBox(doc, marginX, y, W, 'What other members are affected? (other than the aggrieved)', data.otherMembersAffected, 40);
+  y += 10;
+  y = flowTextBox(doc, marginX, y, W, 'Name any Witnesses (if possible, get individual signed statements)', data.witnesses, 40);
+  y += 10;
+  y = flowTextBox(doc, marginX, y, W, 'What has the past practice been in regard to similar violations?', data.pastPractice, 40);
+  y += 10;
+
+  const q2Lines = yesNoQuestion(doc, marginX, y, 'Has a violation of this nature been called to the Company’s attention before?', data.priorViolation, marginX + 340, 300);
+  y += q2Lines * 12 + 8;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(0, 0, 0);
+  doc.text('If so, when?', marginX, y);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(140, 140, 140);
-  doc.text('Unifor Local 200', marginX, 770);
-  doc.text('PRIVATE', 306, 770, { align: 'center' });
-  doc.text('pg. 1 / 5', 572, 770, { align: 'right' });
+  doc.text(data.priorViolationWhen || '', marginX + 70, y);
+  y += 14;
+  y = flowTextBox(doc, marginX, y, W, 'What action did the company take?', data.companyAction, 40);
+  y += 10;
+
+  const q3Lines = yesNoQuestion(doc, marginX, y, 'Did the supervisor make any effort to settle this in the discussion?', data.settleEffort, marginX + 340, 300);
+  y += q3Lines * 12 + 8;
+  const q4Lines = yesNoQuestion(doc, marginX, y, 'Did they make an offer?', data.madeOffer, marginX + 340, 300);
+  y += q4Lines * 12 + 8;
+  flowTextBox(doc, marginX, y, W, 'What exactly were they willing to do?', data.willingToDo, 50);
+
+  drawUniforFooter(doc, marginX, W, 3);
+
+  // ---- Page 4: Statements, settlement, submission ----
+  doc.addPage();
+  y = drawUniforPageHeader(doc, marginX, W, data);
+  y += 10;
+
+  y = flowTextBox(doc, marginX, y, W, "Which of the supervisor's statements are true?", data.statementsTrue, 46);
+  y += 10;
+  y = flowTextBox(doc, marginX, y, W, 'Which are false?', data.statementsFalse, 46);
+  y += 10;
+  y = flowTextBox(doc, marginX, y, W, 'What do you think a reasonable settlement would be?', data.reasonableSettlement, 50);
+  y += 10;
+  y = flowTextBox(doc, marginX, y, W, 'Any other suggestions or comments?', data.otherComments, 50);
+  y += 14;
+
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Submitted By', value: data.submittedBy, width: W * 0.65 },
+    { label: 'Shift', value: data.shift, width: W * 0.35 },
+  ]);
+  y += 24;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(0, 0, 0);
+  doc.text("Grievor's Signature:", marginX, y);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.75);
+  doc.line(marginX + 110, y + 2, marginX + 400, y + 2);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(120, 120, 120);
+  const noteLines = doc.splitTextToSize(
+    'NOTE: These facts are basic requirements to the grievance procedure. They must be filled out. ' +
+    'Additional facts may be filled in on space available, or attached separately.',
+    W
+  );
+  doc.text(noteLines, marginX, 748);
+
+  drawUniforFooter(doc, marginX, W, 4);
+
+  // ---- Page 5: Committee comments ----
+  doc.addPage();
+  y = drawUniforPageHeader(doc, marginX, W, data);
+  y += 10;
+  y = flowTextBox(doc, marginX, y, W, "Committeeperson's Comments on Second Stage", data.committeepersonComments, 280);
+  y += 14;
+  flowTextBox(doc, marginX, y, W, "Plant Chair's Comments on Third Stage", data.plantChairComments, 280);
+
+  drawUniforFooter(doc, marginX, W, 5);
 
   embedFormData(doc, 'unifor', data);
   return doc;
@@ -692,6 +816,73 @@ document.getElementById('uniforClear').addEventListener('click', () => {
   uniforForm.reset();
 });
 
+/* ============ 4.01 INVESTIGATION FORM ============ */
+function buildInvestigationDoc(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+  const marginX = 40;
+  const W = 532;
+  let y = 40;
+
+  // Step box, top-right
+  const stepW = 60, stepH = 20;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Step:', marginX + W - stepW - 34, y + 14);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.75);
+  doc.rect(marginX + W - stepW, y, stepW, stepH);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.step || '', marginX + W - stepW + 6, y + 14);
+
+  y = drawFormHeading(doc, FORMS_CONFIG.investigation.title, y + 26);
+  y += 14;
+
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Name of Supervisor', value: data.supervisorName, width: W / 2 },
+    { label: 'Area', value: data.area, width: W / 2 },
+  ]);
+  y += 4;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Date of Infraction', value: fmtDate(data.dateInfraction), width: W / 2 },
+    { label: 'Dept #', value: data.deptNum, width: W / 2 },
+  ]);
+  y += 4;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Name of Witnesses', value: data.witnessNames, width: W / 2 },
+    { label: 'Time', value: data.time, width: W / 2 },
+  ]);
+  y += 4;
+  y = boxedGrid(doc, marginX, y, W, [{ label: 'Unifor Representative', value: data.uniforRep, width: W }]);
+  y += 4;
+  y = boxedGrid(doc, marginX, y, W, [{ label: 'HR Representative', value: data.hrRep, width: W }]);
+  y += 10;
+
+  y = flowTextBox(doc, marginX, y, W, 'Investigation of Incident:', data.investigation, 170);
+  y += 12;
+  y = flowTextBox(doc, marginX, y, W, "Supervisor's Remarks:", data.supervisorRemarks, 130);
+  y += 12;
+  flowTextBox(doc, marginX, y, W, 'Resolution:', data.resolution, 110);
+
+  embedFormData(doc, 'investigation', data);
+  return doc;
+}
+
+const investigationForm = document.getElementById('investigationForm');
+
+investigationForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const data = fd(e.target);
+  const doc = buildInvestigationDoc(data);
+  download(doc, buildFilename(data.supervisorName, 'Investigation Form'));
+});
+
+document.getElementById('investigationClear').addEventListener('click', () => {
+  investigationForm.reset();
+});
+
 /* ============ Live preview ============ */
 const previewFrame = document.getElementById('pdfPreview');
 let previewUrl = null;
@@ -700,6 +891,7 @@ const FORM_BUILDERS = {
   ford: { form: fordForm, build: buildFordDoc, label: 'Grievance Claim' },
   policy: { form: policyForm, build: buildPolicyDoc, label: 'Policy Grievance' },
   unifor: { form: uniforForm, build: buildUniforDoc, label: 'Fact Sheet' },
+  investigation: { form: investigationForm, build: buildInvestigationDoc, label: 'Investigation Form' },
 };
 
 let currentFormType = null;
@@ -744,6 +936,8 @@ policyForm.addEventListener('input', maybeUpdatePreview);
 policyForm.addEventListener('change', maybeUpdatePreview);
 uniforForm.addEventListener('input', maybeUpdatePreview);
 uniforForm.addEventListener('change', maybeUpdatePreview);
+investigationForm.addEventListener('input', maybeUpdatePreview);
+investigationForm.addEventListener('change', maybeUpdatePreview);
 
 renderPreview();
 
@@ -757,7 +951,7 @@ function formHasData(form) {
 }
 
 window.addEventListener('beforeunload', (e) => {
-  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm)) {
+  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm)) {
     e.preventDefault();
     e.returnValue = '';
   }
@@ -1191,7 +1385,7 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
 
 // Native form.reset() restores the hidden inputs' default values without firing input/change,
 // so each date picker's visible trigger label needs an explicit nudge afterward.
-[fordForm, policyForm, uniforForm].forEach(form => {
+[fordForm, policyForm, uniforForm, investigationForm].forEach(form => {
   form.addEventListener('reset', () => {
     setTimeout(() => {
       form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());

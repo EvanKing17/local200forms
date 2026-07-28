@@ -41,6 +41,12 @@
       <span class="picker-label">Local 200 Fact Sheet</span>
       <span class="picker-sub">Unifor — first stage appeal</span>
     </button>
+    <button class="form-card" data-form="investigation">
+      <div class="form-card-preview"><iframe tabindex="-1" title="Preview"></iframe></div>
+      <span class="picker-index">04</span>
+      <span class="picker-label">4.01 Investigation Form</span>
+      <span class="picker-sub">Workplace incident intake</span>
+    </button>
   </div>
 
   <div class="upload-box">
@@ -280,6 +286,177 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
           <textarea name="whatWeWant" rows="4">Withdrawal of the discipline from the grievor's record, full back pay for any hours affected, and written confirmation that scheduled relief breaks will be honored going forward.</textarea>
         </label>
       </fieldset>
+
+      <fieldset class="section">
+        <legend>Supervisor's Statement (page 2)</legend>
+        <label class="full">Supervisor's Statement
+          <textarea name="supervisorStatement" rows="3">Supervisor states the grievor left the trim line without requesting relief through the usual call button.</textarea>
+        </label>
+        <label class="full">Your Observation
+          <textarea name="yourObservation" rows="3">The call button on station 14 has been intermittently unresponsive for the past two weeks per multiple operator reports.</textarea>
+        </label>
+        <label class="full">Additional Information
+          <textarea name="additionalInfo" rows="3">Maintenance ticket #4471 was opened for the station 14 call button on 06/02/2026 and remains unresolved.</textarea>
+        </label>
+      </fieldset>
+
+      <fieldset class="section">
+        <legend>Investigation Questions (page 3)</legend>
+        <label class="full">Have you discussed the supervisor's disposition to the aggrieved? If not, please do so and detail below.
+          <span class="radio-row">
+            <label class="radio"><input type="radio" name="discussedDisposition" value="Yes" checked> Yes</label>
+            <label class="radio"><input type="radio" name="discussedDisposition" value="No"> No</label>
+          </span>
+        </label>
+        <label class="full">Details
+          <textarea name="dispositionDetail" rows="2">Discussed with the grievor on 06/10/2026; she disputes that the button was working.</textarea>
+        </label>
+
+        <label class="full">What other members are affected? (other than the aggrieved)
+          <textarea name="otherMembersAffected" rows="2">None reported so far, though other operators on station 14 have raised the same call-button issue informally.</textarea>
+        </label>
+        <label class="full">Name any Witnesses (if possible, get individual signed statements)
+          <textarea name="witnesses" rows="2">Line lead Sam Okafor observed the grievor attempting the call button prior to leaving her station.</textarea>
+        </label>
+        <label class="full">What has the past practice been in regard to similar violations?
+          <textarea name="pastPractice" rows="2">Verbal reminders have historically been used for first-time break-timing issues; written discipline is unusual for a first occurrence.</textarea>
+        </label>
+
+        <div class="grid grid-2">
+          <label>Has a violation of this nature been called to the Company's attention before?
+            <span class="radio-row">
+              <label class="radio"><input type="radio" name="priorViolation" value="Yes"> Yes</label>
+              <label class="radio"><input type="radio" name="priorViolation" value="No" checked> No</label>
+            </span>
+          </label>
+          <label>If so, when?
+            <input type="text" name="priorViolationWhen" autocomplete="off">
+          </label>
+        </div>
+        <label class="full">What action did the company take?
+          <textarea name="companyAction" rows="2"></textarea>
+        </label>
+
+        <div class="grid grid-2">
+          <label>Did the supervisor make any effort to settle this in the discussion?
+            <span class="radio-row">
+              <label class="radio"><input type="radio" name="settleEffort" value="Yes"> Yes</label>
+              <label class="radio"><input type="radio" name="settleEffort" value="No" checked> No</label>
+            </span>
+          </label>
+          <label>Did they make an offer?
+            <span class="radio-row">
+              <label class="radio"><input type="radio" name="madeOffer" value="Yes"> Yes</label>
+              <label class="radio"><input type="radio" name="madeOffer" value="No" checked> No</label>
+            </span>
+          </label>
+        </div>
+        <label class="full">What exactly were they willing to do?
+          <textarea name="willingToDo" rows="2"></textarea>
+        </label>
+      </fieldset>
+
+      <fieldset class="section">
+        <legend>Statements &amp; Submission (page 4)</legend>
+        <label class="full">Which of the supervisor's statements are true?
+          <textarea name="statementsTrue" rows="2">That the grievor left her station during working hours.</textarea>
+        </label>
+        <label class="full">Which are false?
+          <textarea name="statementsFalse" rows="2">That she made no attempt to request relief before leaving.</textarea>
+        </label>
+        <label class="full">What do you think a reasonable settlement would be?
+          <textarea name="reasonableSettlement" rows="2">Rescind the written warning and repair the call button.</textarea>
+        </label>
+        <label class="full">Any other suggestions or comments?
+          <textarea name="otherComments" rows="2"></textarea>
+        </label>
+
+        <div class="grid grid-2">
+          <label>Submitted By
+            <input type="text" name="submittedBy" autocomplete="off" value="Marcus Lee">
+          </label>
+          <label>Shift
+            <input type="text" name="shift" autocomplete="off" value="2nd">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="section">
+        <legend>Committee Comments (page 5)</legend>
+        <label class="full">Committeeperson's Comments on Second Stage
+          <textarea name="committeepersonComments" rows="3"></textarea>
+        </label>
+        <label class="full">Plant Chair's Comments on Third Stage
+          <textarea name="plantChairComments" rows="3"></textarea>
+        </label>
+      </fieldset>
+    </form>
+  </section>
+
+  <!-- ================= 4.01 INVESTIGATION FORM ================= -->
+  <section class="form-panel" id="form-investigation" aria-labelledby="form-investigation-heading">
+    <form id="investigationForm">
+      <div class="sheet-header">
+        <div class="sheet-header-text">
+          <h1 id="form-investigation-heading">4.01 Investigation Form</h1>
+        </div>
+        <div class="sheet-header-actions">
+          <button type="button" class="btn-secondary" id="investigationClear">Clear form</button>
+          <button type="submit" class="btn-primary">Generate PDF</button>
+        </div>
+      </div>
+
+      <fieldset class="section">
+        <div class="grid grid-4">
+          <label>Step
+            <input type="text" name="step" autocomplete="off" value="1">
+          </label>
+        </div>
+
+        <div class="grid grid-2">
+          <label>Name of Supervisor
+            <input type="text" name="supervisorName" autocomplete="off" value="Marcus Lee">
+          </label>
+          <label>Area
+            <input type="text" name="area" autocomplete="off" value="Trim & Final Assembly">
+          </label>
+        </div>
+
+        <div class="grid grid-2">
+          <label>Date of Infraction
+            <input type="date" name="dateInfraction" value="2026-06-09">
+          </label>
+          <label>Dept #
+            <input type="text" name="deptNum" autocomplete="off" value="8383">
+          </label>
+        </div>
+
+        <div class="grid grid-2">
+          <label>Name of Witnesses
+            <input type="text" name="witnessNames" autocomplete="off" value="Sam Okafor">
+          </label>
+          <label>Time
+            <input type="text" name="time" autocomplete="off" placeholder="e.g. 2:15 PM" value="2:15 PM">
+          </label>
+        </div>
+
+        <label class="full">Unifor Representative
+          <input type="text" name="uniforRep" autocomplete="off" value="Priya Anand">
+        </label>
+        <label class="full">HR Representative
+          <input type="text" name="hrRep" autocomplete="off" value="Diane Osei">
+        </label>
+
+        <label class="full">Investigation of Incident
+          <textarea name="investigation" rows="6">Grievor left station 14 during her scheduled shift without a relief operator present. Supervisor states this was without authorization; grievor states she attempted the call button for relief multiple times without response.</textarea>
+        </label>
+        <label class="full">Supervisor's Remarks
+          <textarea name="supervisorRemarks" rows="4">Grievor did not notify supervisor directly before leaving the line.</textarea>
+        </label>
+        <label class="full">Resolution
+          <textarea name="resolution" rows="4"></textarea>
+        </label>
+      </fieldset>
     </form>
   </section>
 
@@ -313,6 +490,7 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
+<script src="unifor-logo.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

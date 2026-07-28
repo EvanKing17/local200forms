@@ -15,5 +15,10 @@ window.FORMS_CONFIG_DATA = {
     "title": "Plant Committee Grievance Fact Sheet",
     "homeLabel": "Plant Committee Grievance Fact Sheet",
     "homeSub": ""
+  },
+  "investigation": {
+    "title": "4.01 Investigation Form",
+    "homeLabel": "4.01 Investigation Form",
+    "homeSub": ""
   }
 };
