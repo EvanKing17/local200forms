@@ -713,38 +713,45 @@ function buildUniforDoc(data) {
   y = drawUniforPageHeader(doc, marginX, W, data);
   y += 10;
 
+  // Checkboxes are drawn taller (15pt) than a text line, anchored to the question's first line —
+  // so the gap after a yes/no question needs extra room beyond the label's own line height,
+  // otherwise two consecutive checkbox rows (or a checkbox row and the next box) end up only a
+  // few points apart. YES_NO_LINE_GAP covers a line of wrapped label text plus that clearance.
+  const YES_NO_LINE_GAP = 16;
+  const YES_NO_TRAILING_GAP = 16;
+
   const q1Lines = yesNoQuestion(
     doc, marginX, y,
     "Have you discussed the supervisor's disposition to the aggrieved? If not, please do so and detail below.",
     data.discussedDisposition, marginX + 340, 300
   );
-  y += q1Lines * 12 + 8;
+  y += q1Lines * YES_NO_LINE_GAP + YES_NO_TRAILING_GAP;
   y = flowTextBox(doc, marginX, y, W, 'Details:', data.dispositionDetail, 44);
-  y += 10;
+  y += 14;
 
   y = flowTextBox(doc, marginX, y, W, 'What other members are affected? (other than the aggrieved)', data.otherMembersAffected, 40);
-  y += 10;
+  y += 14;
   y = flowTextBox(doc, marginX, y, W, 'Name any Witnesses (if possible, get individual signed statements)', data.witnesses, 40);
-  y += 10;
+  y += 14;
   y = flowTextBox(doc, marginX, y, W, 'What has the past practice been in regard to similar violations?', data.pastPractice, 40);
-  y += 10;
+  y += 14;
 
   const q2Lines = yesNoQuestion(doc, marginX, y, 'Has a violation of this nature been called to the Company’s attention before?', data.priorViolation, marginX + 340, 300);
-  y += q2Lines * 12 + 8;
+  y += q2Lines * YES_NO_LINE_GAP + YES_NO_TRAILING_GAP;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(0, 0, 0);
   doc.text('If so, when?', marginX, y);
   doc.setFont('helvetica', 'normal');
   doc.text(data.priorViolationWhen || '', marginX + 70, y);
-  y += 14;
+  y += 18;
   y = flowTextBox(doc, marginX, y, W, 'What action did the company take?', data.companyAction, 40);
-  y += 10;
+  y += 14;
 
   const q3Lines = yesNoQuestion(doc, marginX, y, 'Did the supervisor make any effort to settle this in the discussion?', data.settleEffort, marginX + 340, 300);
-  y += q3Lines * 12 + 8;
+  y += q3Lines * YES_NO_LINE_GAP + YES_NO_TRAILING_GAP;
   const q4Lines = yesNoQuestion(doc, marginX, y, 'Did they make an offer?', data.madeOffer, marginX + 340, 300);
-  y += q4Lines * 12 + 8;
+  y += q4Lines * YES_NO_LINE_GAP + YES_NO_TRAILING_GAP;
   flowTextBox(doc, marginX, y, W, 'What exactly were they willing to do?', data.willingToDo, 50);
 
   drawUniforFooter(doc, marginX, W, 3);

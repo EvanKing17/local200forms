@@ -382,7 +382,13 @@ button:focus-visible,
   flex-shrink: 0;
 }
 
-fieldset.section {
+/*
+ * Plain <div>, not <fieldset>/<legend> — browsers give <legend> a special border-straddling
+ * layout that isn't reliably overridable (display:block alone didn't fix it: the title still
+ * ignored the container's top padding and rendered flush with, or outside, the border). A div
+ * title inside a div section behaves like any other block element, no special-casing to fight.
+ */
+.section {
   background: var(--c-surface);
   border: 1px solid var(--c-border);
   border-top: none;
@@ -390,23 +396,18 @@ fieldset.section {
   margin: 0;
 }
 
-fieldset.section + fieldset.section { border-top: 1px solid var(--c-border); }
+.section + .section { border-top: 1px solid var(--c-border); }
 
-fieldset.section:last-of-type {
+.section:last-of-type {
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
-fieldset.section legend {
-  /* display:block strips the browser's special legend layout, which straddles the fieldset's
-     top border by default — with no border-top on this fieldset, that made the text appear
-     to float outside the card entirely instead of sitting inline as a normal section title. */
-  display: block;
+.section-title {
   font-size: 11.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--c-accent);
   font-weight: 600;
-  padding: 0;
   margin-bottom: 14px;
 }
 
