@@ -28,16 +28,19 @@ const DEFAULT_FORMS_CONFIG = {
 const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };
 
 function applyFormsConfig() {
+  // Checks for null/undefined specifically (not just falsy) so an intentionally-cleared field
+  // (empty string, from admin.html) actually clears the display instead of being skipped —
+  // only a genuinely *missing* key falls back to whatever's already in the static HTML.
   Object.entries(FORMS_CONFIG).forEach(([type, cfg]) => {
     const card = document.querySelector(`.form-card[data-form="${type}"]`);
     if (card) {
       const label = card.querySelector('.picker-label');
       const sub = card.querySelector('.picker-sub');
-      if (label && cfg.homeLabel) label.textContent = cfg.homeLabel;
-      if (sub && cfg.homeSub) sub.textContent = cfg.homeSub;
+      if (label && cfg.homeLabel != null) label.textContent = cfg.homeLabel;
+      if (sub && cfg.homeSub != null) sub.textContent = cfg.homeSub;
     }
     const heading = document.getElementById(`form-${type}-heading`);
-    if (heading && cfg.title) heading.textContent = cfg.title;
+    if (heading && cfg.title != null) heading.textContent = cfg.title;
   });
 }
 
@@ -166,8 +169,7 @@ function fitSingleLine(doc, text, maxWidth, baseSize, minSize = 6) {
 }
 
 /* Centered bold form title at the top of the page, wrapping (rather than overflowing) if it's long */
-function drawFormHeading(doc, text) {
-  const y = 40;
+function drawFormHeading(doc, text, y = 40) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
@@ -585,13 +587,8 @@ function buildUniforDoc(data) {
   doc.text('the Union | le syndicat', logoX + 32, y + 17);
 
   y += 40;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Local 200 Grievance Committee', 306, y, { align: 'center' });
-  y += 18;
-  doc.text('Fact Sheet', 306, y, { align: 'center' });
-  y += 14;
+  y = drawFormHeading(doc, FORMS_CONFIG.unifor.title, y);
+  y += 4;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(120, 120, 120);
