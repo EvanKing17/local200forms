@@ -407,11 +407,6 @@ function buildFordDoc(data) {
     { label: 'Pay Period', value: '', width: w4 },
   ], 34, 100);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(140, 140, 140);
-  doc.text('Generated locally — no data stored or transmitted.', marginX, 780);
-
   embedFormData(doc, 'ford', data);
   return doc;
 }
