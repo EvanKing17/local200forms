@@ -185,13 +185,18 @@ async function save() {
   }
 
   // Fallback for browsers without the File System Access API: trigger a normal download.
+  // The anchor must be attached to the document, and the object URL must outlive the "Save As"
+  // dialog if the browser is set to prompt for a location — revoking it immediately after click()
+  // can race that dialog and produce a truncated (sometimes 0-byte) file.
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = 'forms.config.json';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
   setStatus('Downloaded — replace forms.config.json in the project with this file, then commit.');
 }
 
