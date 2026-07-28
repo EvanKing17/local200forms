@@ -263,6 +263,11 @@ button:focus-visible,
   border: none;
   width: 100%;
   background: var(--c-col-bg);
+  transition: opacity 0.2s ease;
+}
+
+.preview-pane iframe.is-refreshing {
+  opacity: 0.4;
 }
 
 .preview-toggle {
@@ -643,11 +648,33 @@ input[type="radio"] { width: 15px; height: 15px; }
   color: var(--c-text);
 }
 
+.dp-month-btn {
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.dp-month-btn:hover { background: var(--c-surface-alt); }
+
 .dp-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
   padding: 0 4px;
+}
+
+.dp-grid-alt {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 4px;
+}
+
+.dp-grid-alt .dp-day {
+  width: auto;
+  height: 36px;
+  border-radius: var(--radius-sm);
 }
 
 .dp-dow {

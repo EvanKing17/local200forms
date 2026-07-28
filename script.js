@@ -44,6 +44,26 @@ function fmtDate(iso) {
   return `${m}/${d}/${y}`;
 }
 
+/* Strips any existing formatting ($, commas, ...) and returns a plain "0.00" string for the PDF */
+function formatCurrency(val) {
+  if (val === undefined || val === null || val === '') return '';
+  const num = parseFloat(String(val).replace(/[^0-9.-]/g, ''));
+  if (isNaN(num)) return String(val);
+  return num.toFixed(2);
+}
+
+/* Reformats a currency <input> in place, as "$0.00", once the user leaves the field */
+function formatCurrencyInput(el) {
+  const raw = el.value.replace(/[^0-9.-]/g, '');
+  if (raw === '' || raw === '-') { el.value = ''; return; }
+  const num = parseFloat(raw);
+  el.value = isNaN(num) ? '' : `$${num.toFixed(2)}`;
+}
+
+document.querySelectorAll('.currency-input').forEach(el => {
+  el.addEventListener('blur', () => formatCurrencyInput(el));
+});
+
 function download(doc, filename) {
   doc.save(filename);
 }
@@ -284,7 +304,7 @@ function buildFordDoc(data) {
     { label: 'Department Charge No', value: '', width: W / 3 },
   ]);
   y += 4;
-  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 46);
+  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 100);
   y += 8;
 
   // ---- Section C: Employee Relations Response (reserved) ----
@@ -298,7 +318,7 @@ function buildFordDoc(data) {
     { label: 'Number', value: '', width: W * 0.16 },
   ]);
   y += 4;
-  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 46);
+  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 100);
   y += 8;
 
   // ---- Section D: Payroll & Accounting Department (reserved) ----
@@ -312,7 +332,7 @@ function buildFordDoc(data) {
     { label: 'Pay Period', value: '', width: w4 },
   ]);
   y += 4;
-  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 46);
+  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 100);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -394,17 +414,18 @@ function buildUniforDoc(data) {
   y += 6;
 
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Seniority Date', value: fmtDate(data.seniorityDate), width: W * 0.35 },
-    { label: 'Classification', value: data.classification, width: W * 0.35 },
-    { label: 'Rate $', value: data.rate, width: W * 0.30 },
+    { label: 'Seniority Date', value: fmtDate(data.seniorityDate), width: W / 2 },
+    { label: 'Classification', value: data.classification, width: W / 2 },
   ]);
-  y += 6;
+  y += 4;
 
+  // Rate and COLA are always looked at together, so keep them adjacent
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Time in Classification', value: data.timeInClass, width: W / 2 },
-    { label: 'COLA $', value: data.cola, width: W / 2 },
+    { label: 'Time in Classification', value: data.timeInClass, width: W * 0.4 },
+    { label: 'Rate $', value: formatCurrency(data.rate), width: W * 0.3 },
+    { label: 'COLA $', value: formatCurrency(data.cola), width: W * 0.3 },
   ]);
-  y += 6;
+  y += 4;
 
   y = boxedGrid(doc, marginX, y, W, [
     { label: "Employee's Supervisor", value: data.supervisor, width: W / 2 },
@@ -494,13 +515,16 @@ function renderPreview() {
   const doc = entry.build(fd(entry.form));
   const blobUrl = URL.createObjectURL(doc.output('blob'));
 
+  // Fade out instead of an abrupt white reload flash while the new PDF loads in.
+  previewFrame.classList.add('is-refreshing');
+  previewFrame.onload = () => previewFrame.classList.remove('is-refreshing');
   previewFrame.src = blobUrl + '#toolbar=0&navpanes=0';
 
   if (previewUrl) URL.revokeObjectURL(previewUrl);
   previewUrl = blobUrl;
 }
 
-const updateActivePreview = debounce(renderPreview, 350);
+const updateActivePreview = debounce(renderPreview, 800);
 
 /* Live-refresh toggle: while off, edits no longer auto-render — a manual refresh button appears instead */
 const liveRefreshToggle = document.getElementById('liveRefreshToggle');
@@ -561,13 +585,22 @@ function isSameDay(a, b) {
 
 const DATEPICKER_FOCUSABLE = 'button:not([disabled])';
 
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 /*
  * Replaces a native <input type="date"> with a popover calendar (quick-picks, month grid,
  * keyboard focus-trap) matching the app's existing DatePicker component. A hidden input keeps
  * the same name/value contract (YYYY-MM-DD, built from local date parts — never parsed through
  * `new Date("YYYY-MM-DD")`, which reads as UTC midnight and can display a day early).
+ *
+ * Three drill-down views — years -> months -> days — so a field like Seniority Date (which can
+ * reach back to the 1980s) isn't stuck clicking "previous month" five hundred times. Clicking the
+ * month/year header from anywhere always jumps straight to the year grid for a fast year change;
+ * `options.startView` lets a specific field (Seniority Date) open directly into that year grid
+ * instead of the usual current-month day view.
  */
-function setupDatePicker(originalInput) {
+function setupDatePicker(originalInput, options = {}) {
+  const startView = options.startView || 'days';
   const name = originalInput.name;
   const originalId = originalInput.id;
   const placeholder = 'Select date';
@@ -608,8 +641,14 @@ function setupDatePicker(originalInput) {
   originalInput.replaceWith(wrapper);
 
   let viewMonth = parseDateKey(hidden.value) || new Date();
+  let view = 'days'; // 'days' | 'months' | 'years'
+  let yearRangeStart = 0;
   let open = false;
   let previouslyFocused = null;
+
+  function alignDecade(year) {
+    return Math.floor(year / 12) * 12;
+  }
 
   function selectedDate() { return parseDateKey(hidden.value); }
 
@@ -638,6 +677,91 @@ function setupDatePicker(originalInput) {
   }
 
   function renderPanel() {
+    if (view === 'years') renderYearsView();
+    else if (view === 'months') renderMonthsView();
+    else renderDaysView();
+  }
+
+  function goToYears() {
+    yearRangeStart = alignDecade(viewMonth.getFullYear());
+    view = 'years';
+    renderPanel();
+  }
+
+  function renderYearsView() {
+    const currentYear = viewMonth.getFullYear();
+    const selYear = selectedDate()?.getFullYear();
+    const todayYear = new Date().getFullYear();
+
+    panel.innerHTML = `
+      <div class="dp-nav">
+        <button type="button" class="dp-navbtn" data-decade="-1" aria-label="Previous 12 years">&#8249;</button>
+        <span class="dp-month">${yearRangeStart}–${yearRangeStart + 11}</span>
+        <button type="button" class="dp-navbtn" data-decade="1" aria-label="Next 12 years">&#8250;</button>
+      </div>
+      <div class="dp-grid dp-grid-alt">
+        ${Array.from({ length: 12 }, (_, i) => yearRangeStart + i).map(yr => {
+          const cls = ['dp-day'];
+          if (yr === selYear) cls.push('is-selected');
+          else if (yr === todayYear) cls.push('is-today');
+          return `<button type="button" class="${cls.join(' ')}" data-year="${yr}">${yr}</button>`;
+        }).join('')}
+      </div>
+    `;
+
+    panel.querySelectorAll('[data-decade]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        yearRangeStart += Number(btn.dataset.decade) * 12;
+        renderPanel();
+      });
+    });
+    panel.querySelectorAll('[data-year]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewMonth = new Date(Number(btn.dataset.year), viewMonth.getMonth(), 1);
+        view = 'months';
+        renderPanel();
+      });
+    });
+  }
+
+  function renderMonthsView() {
+    const year = viewMonth.getFullYear();
+    const selected = selectedDate();
+    const today = new Date();
+
+    panel.innerHTML = `
+      <div class="dp-nav">
+        <button type="button" class="dp-navbtn" data-yearstep="-1" aria-label="Previous year">&#8249;</button>
+        <button type="button" class="dp-month dp-month-btn" data-open-years>${year}</button>
+        <button type="button" class="dp-navbtn" data-yearstep="1" aria-label="Next year">&#8250;</button>
+      </div>
+      <div class="dp-grid dp-grid-alt">
+        ${MONTH_ABBR.map((label, i) => {
+          const cls = ['dp-day'];
+          if (selected && selected.getFullYear() === year && selected.getMonth() === i) cls.push('is-selected');
+          else if (today.getFullYear() === year && today.getMonth() === i) cls.push('is-today');
+          return `<button type="button" class="${cls.join(' ')}" data-month="${i}">${label}</button>`;
+        }).join('')}
+      </div>
+    `;
+
+    panel.querySelector('[data-open-years]').addEventListener('click', goToYears);
+    panel.querySelectorAll('[data-yearstep]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewMonth = new Date(viewMonth.getFullYear() + Number(btn.dataset.yearstep), viewMonth.getMonth(), 1);
+        renderPanel();
+      });
+    });
+    panel.querySelectorAll('[data-month]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewMonth = new Date(viewMonth.getFullYear(), Number(btn.dataset.month), 1);
+        view = 'days';
+        renderPanel();
+      });
+    });
+  }
+
+  function renderDaysView() {
     const today = new Date();
     const sel = selectedDate();
     const year = viewMonth.getFullYear();
@@ -672,7 +796,7 @@ function setupDatePicker(originalInput) {
       </div>
       <div class="dp-nav">
         <button type="button" class="dp-navbtn" data-nav="-1" aria-label="Previous month">&#8249;</button>
-        <span class="dp-month">${monthLabel}</span>
+        <button type="button" class="dp-month dp-month-btn" data-open-years title="Jump to a year">${monthLabel}</button>
         <button type="button" class="dp-navbtn" data-nav="1" aria-label="Next month">&#8250;</button>
       </div>
       <div class="dp-grid">
@@ -698,6 +822,7 @@ function setupDatePicker(originalInput) {
     });
     const clearBtn = panel.querySelector('[data-clear]');
     if (clearBtn) clearBtn.addEventListener('click', () => { setValue(null); close(); });
+    panel.querySelector('[data-open-years]').addEventListener('click', goToYears);
     panel.querySelectorAll('[data-nav]').forEach(btn => {
       btn.addEventListener('click', () => {
         viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + Number(btn.dataset.nav), 1);
@@ -727,6 +852,8 @@ function setupDatePicker(originalInput) {
     if (open) return;
     open = true;
     viewMonth = selectedDate() || new Date();
+    view = startView;
+    if (view === 'years') yearRangeStart = alignDecade(viewMonth.getFullYear());
     previouslyFocused = document.activeElement;
     panel.hidden = false;
     trigger.setAttribute('aria-expanded', 'true');
@@ -753,7 +880,10 @@ function setupDatePicker(originalInput) {
   updateTriggerLabel();
 }
 
-document.querySelectorAll('input[type="date"]').forEach(setupDatePicker);
+document.querySelectorAll('input[type="date"]').forEach(input => {
+  // Seniority can reach back decades, so start on the year grid instead of the current month.
+  setupDatePicker(input, { startView: input.name === 'seniorityDate' ? 'years' : 'days' });
+});
 
 // Native form.reset() restores the hidden inputs' default values without firing input/change,
 // so each date picker's visible trigger label needs an explicit nudge afterward.

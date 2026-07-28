@@ -138,58 +138,58 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
       <fieldset class="section">
         <div class="grid grid-3">
           <label>SP Number
-            <div class="inline-prefix"><span>SP-</span><input type="text" name="spNumber" autocomplete="off"></div>
+            <div class="inline-prefix"><span>SP-</span><input type="text" name="spNumber" autocomplete="off" value="1024"></div>
           </label>
           <label>Grievor's Name
-            <input type="text" name="grievorName" autocomplete="off">
+            <input type="text" name="grievorName" autocomplete="off" value="Jane Marie Doe">
           </label>
           <label>GID #
-            <input type="text" name="gid" autocomplete="off">
+            <input type="text" name="gid" autocomplete="off" value="G88452">
           </label>
         </div>
 
         <div class="grid grid-3">
           <label>Dept
-            <input type="text" name="dept" autocomplete="off">
+            <input type="text" name="dept" autocomplete="off" value="Trim & Final Assembly">
           </label>
           <label>Seniority Date
-            <input type="date" name="seniorityDate">
+            <input type="date" name="seniorityDate" value="1998-04-02">
           </label>
           <label>Classification
-            <input type="text" name="classification" autocomplete="off">
+            <input type="text" name="classification" autocomplete="off" value="Machine Repair Technician">
           </label>
         </div>
 
         <div class="grid grid-3">
-          <label>Rate $
-            <input type="text" name="rate" inputmode="decimal">
-          </label>
           <label>Time in Classification
-            <input type="text" name="timeInClass" autocomplete="off">
+            <input type="text" name="timeInClass" autocomplete="off" value="6 years, 3 months">
+          </label>
+          <label>Rate $
+            <input type="text" name="rate" class="currency-input" inputmode="decimal" placeholder="0.00" value="$34.87">
           </label>
           <label>COLA $
-            <input type="text" name="cola" inputmode="decimal">
+            <input type="text" name="cola" class="currency-input" inputmode="decimal" placeholder="0.00" value="$1.42">
           </label>
         </div>
 
         <div class="grid grid-3">
           <label>Employee's Supervisor
-            <input type="text" name="supervisor" autocomplete="off">
+            <input type="text" name="supervisor" autocomplete="off" value="Marcus Lee">
           </label>
           <label>General Supervisor
-            <input type="text" name="generalSupervisor" autocomplete="off">
+            <input type="text" name="generalSupervisor" autocomplete="off" value="Priya Anand">
           </label>
           <label>Superintendent
-            <input type="text" name="superintendent" autocomplete="off">
+            <input type="text" name="superintendent" autocomplete="off" value="Diane Osei">
           </label>
         </div>
 
         <div class="grid grid-3">
           <label>Date of Incident
-            <input type="date" name="uniforDateIncident">
+            <input type="date" name="uniforDateIncident" value="2026-06-09">
           </label>
           <label>Date Grievance Filed
-            <input type="date" name="uniforDateFiled">
+            <input type="date" name="uniforDateFiled" value="2026-06-10">
           </label>
           <label>Discipline on Record?
             <span class="radio-row">
@@ -200,24 +200,24 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
         </div>
 
         <label class="full">Who is involved in this grievance?
-          <textarea name="whoInvolved" rows="3"></textarea>
+          <textarea name="whoInvolved" rows="3">Jane Doe (grievor), shift supervisor Marcus Lee, and general supervisor Priya Anand.</textarea>
         </label>
 
         <div class="grid grid-2">
           <label>When did it happen?
-            <input type="text" name="whenHappened" autocomplete="off">
+            <input type="text" name="whenHappened" autocomplete="off" value="Approx. 2:15 PM, second shift">
           </label>
           <label>Where did it happen?
-            <input type="text" name="whereHappened" autocomplete="off">
+            <input type="text" name="whereHappened" autocomplete="off" value="Trim line, station 14">
           </label>
         </div>
 
         <label class="full">Why is this a grievance?
-          <textarea name="whyGrievance" rows="5"></textarea>
+          <textarea name="whyGrievance" rows="5">The grievor was denied her scheduled relief break and was disciplined for leaving her station to use the restroom, in violation of Article 78 and the plant's standard break scheduling practice.</textarea>
         </label>
 
         <label class="full">What do we want?
-          <textarea name="whatWeWant" rows="4"></textarea>
+          <textarea name="whatWeWant" rows="4">Withdrawal of the discipline from the grievor's record, full back pay for any hours affected, and written confirmation that scheduled relief breaks will be honored going forward.</textarea>
         </label>
       </fieldset>
     </form>
