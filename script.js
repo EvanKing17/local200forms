@@ -104,13 +104,13 @@ function download(doc, filename) {
  * (that's the user's own "always ask where to save files" browser setting); this just supplies
  * the suggested filename for whatever save behavior the browser is configured to use.
  */
+const MONTH_NAMES_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 function buildFilename(name, formTypeLabel) {
   const today = new Date();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
-  const yyyy = today.getFullYear();
+  const dateStr = `${MONTH_NAMES_FULL[today.getMonth()]} ${today.getDate()} ${today.getFullYear()}`;
   const safeName = (name || 'Unnamed').trim().replace(/[\\/:*?"<>|]/g, '') || 'Unnamed';
-  return `${safeName} - ${mm}${dd}${yyyy} ${formTypeLabel}.pdf`;
+  return `${safeName} - ${dateStr} ${formTypeLabel}.pdf`;
 }
 
 const FORM_SIGNATURE = 'local200forms-v1';
@@ -396,11 +396,8 @@ function buildFordDoc(data) {
 
   // Article Violation spans two grid columns, Date of Incident/Filed each take one, so the
   // dividers in this row land exactly on the dividers from the row above.
-  const articleVal = data.article
-    ? `Article ${data.article} and all other relevant articles of the agreement`
-    : 'and all other relevant articles of the agreement';
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Article Violation', value: articleVal, width: w4 * 2 },
+    { label: 'Article Violation', value: data.article, width: w4 * 2 },
     { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: w4 },
     { label: 'Date Filed', value: fmtDate(data.dateFiled), width: w4 },
   ]);
@@ -423,10 +420,11 @@ function buildFordDoc(data) {
   y = hy + 22;
 
   // ---- Section B: Department Response (reserved, left blank for department) ----
+  // Column widths are quarters of W, same unit as Section A/D, so the dividers line up down the page.
   y = drawResponseSection(doc, marginX, W, y, 'Section B:', ' Department Response', [
-    { label: 'Department Representative (print name)', value: '', width: W / 3 },
-    { label: 'Signature', value: '', width: W / 3 },
-    { label: 'Department Charge No', value: '', width: W / 3 },
+    { label: 'Department Representative (print name)', value: '', width: w4 * 2 },
+    { label: 'Signature', value: '', width: w4 },
+    { label: 'Department Charge No', value: '', width: w4 },
   ], 34, 100, {
     height: 30,
     draw(doc, x, y, w) {
@@ -441,11 +439,12 @@ function buildFordDoc(data) {
   });
 
   // ---- Section C: Employee Relations Response (reserved) ----
+  // Same quarter-width unit as every other grid row in this document.
   y = drawResponseSection(doc, marginX, W, y, 'Section C:', ' Employee Relations Response', [
-    { label: 'Employee Relations Representative (print name)', value: '', width: W * 0.34 },
-    { label: 'Signature', value: '', width: W * 0.34 },
-    { label: 'Grievance Stage', value: '', width: W * 0.16 },
-    { label: 'Number', value: '', width: W * 0.16 },
+    { label: 'Employee Relations Representative (print name)', value: '', width: w4 },
+    { label: 'Signature', value: '', width: w4 },
+    { label: 'Grievance Stage', value: '', width: w4 },
+    { label: 'Number', value: '', width: w4 },
   ], 34, 100);
 
   // ---- Section D: Payroll & Accounting Department (reserved) ----
@@ -496,11 +495,8 @@ function buildPolicyDoc(data) {
   ]);
   y += 4;
 
-  const articleVal = data.article
-    ? `Article ${data.article} and all other relevant articles of the agreement`
-    : 'and all other relevant articles of the agreement';
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Article Violation', value: articleVal, width: w4 * 2 },
+    { label: 'Article Violation', value: data.article, width: w4 * 2 },
     { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: w4 },
     { label: 'Date Filed', value: fmtDate(data.dateFiled), width: w4 },
   ]);
@@ -510,10 +506,11 @@ function buildPolicyDoc(data) {
   y += 8;
 
   // ---- Section B: Department Response (reserved, left blank for department) ----
+  // Column widths are quarters of W, same unit as Section A/D, so the dividers line up down the page.
   y = drawResponseSection(doc, marginX, W, y, 'Section B:', ' Department Response', [
-    { label: 'Department Representative (print name)', value: '', width: W / 3 },
-    { label: 'Signature', value: '', width: W / 3 },
-    { label: 'Department Charge No', value: '', width: W / 3 },
+    { label: 'Department Representative (print name)', value: '', width: w4 * 2 },
+    { label: 'Signature', value: '', width: w4 },
+    { label: 'Department Charge No', value: '', width: w4 },
   ], 34, 100, {
     height: 30,
     draw(doc, x, y, w) {
@@ -528,11 +525,12 @@ function buildPolicyDoc(data) {
   });
 
   // ---- Section C: Employee Relations Response (reserved) ----
+  // Same quarter-width unit as every other grid row in this document.
   y = drawResponseSection(doc, marginX, W, y, 'Section C:', ' Employee Relations Response', [
-    { label: 'Employee Relations Representative (print name)', value: '', width: W * 0.34 },
-    { label: 'Signature', value: '', width: W * 0.34 },
-    { label: 'Grievance Stage', value: '', width: W * 0.16 },
-    { label: 'Number', value: '', width: W * 0.16 },
+    { label: 'Employee Relations Representative (print name)', value: '', width: w4 },
+    { label: 'Signature', value: '', width: w4 },
+    { label: 'Grievance Stage', value: '', width: w4 },
+    { label: 'Number', value: '', width: w4 },
   ], 34, 100);
 
   embedFormData(doc, 'policy', data);

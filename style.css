@@ -477,14 +477,6 @@ input:focus, textarea:focus {
 }
 .inline-prefix input:focus { outline: none; background: var(--c-avatar-bg); }
 
-.prefix-note {
-  font-size: 10.5px;
-  color: var(--c-text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .radio-row {
   display: flex;
   gap: 14px;
