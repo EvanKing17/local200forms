@@ -189,25 +189,26 @@ function hourField(doc, x, y, w, label, value) {
   return y + boxH;
 }
 
-/* An empty square checkbox followed by its label */
+/* A square checkbox (y is its vertical center) followed by its label — sized generously so a
+   digital-signing tool's checkmark/X actually has room to land inside it */
 function checkboxText(doc, x, y, label) {
-  const size = 9;
+  const size = 15;
   doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.75);
-  doc.rect(x, y - size + 2, size, size);
+  doc.setLineWidth(1);
+  doc.rect(x, y - size / 2, size, size);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
   doc.setTextColor(0, 0, 0);
-  doc.text(label, x + size + 5, y + 1.5);
+  doc.text(label, x + size + 6, y + 3.5);
 }
 
 /* Draws an X through a checkbox drawn by checkboxText at the same x, y */
 function markCheckbox(doc, x, y) {
-  const size = 9;
-  const top = y - size + 2;
-  doc.setLineWidth(1);
-  doc.line(x + 1, top + 1, x + size - 1, top + size - 1);
-  doc.line(x + 1, top + size - 1, x + size - 1, top + 1);
+  const size = 15;
+  const top = y - size / 2;
+  doc.setLineWidth(1.3);
+  doc.line(x + 2, top + 2, x + size - 2, top + size - 2);
+  doc.line(x + 2, top + size - 2, x + size - 2, top + 2);
 }
 
 /* ============ FORD FORM ============ */
@@ -235,7 +236,7 @@ function buildFordDoc(data) {
     { label: 'Department', value: data.department, width: w4 },
     { label: 'Process Coach', value: data.processCoach, width: w4 },
   ]);
-  y += 6;
+  y += 4;
 
   const artW = W * 0.52, dateW = (W - artW) / 2;
   const articleVal = data.article
@@ -246,49 +247,48 @@ function buildFordDoc(data) {
     { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: dateW },
     { label: 'Date Filed', value: fmtDate(data.dateFiled), width: dateW },
   ]);
-  y += 6;
+  y += 4;
 
-  y = ensureSpace(doc, y, 40);
-  y = flowTextBox(doc, marginX, y + 8, W, 'Details of Incident:', data.details, 100);
-  y += 12;
+  // flowTextBox paginates itself if the value is long, so no pre-emptive page-break needed here
+  y = flowTextBox(doc, marginX, y + 6, W, 'Details of Incident:', data.details, 70);
+  y += 8;
 
-  y = ensureSpace(doc, y, 70);
   const hoursColW = W / 2 - 10;
   let hy = y;
   hourField(doc, marginX, hy, hoursColW, 'Hours at straight time:', data.hoursStraight);
   hourField(doc, marginX + hoursColW + 20, hy, hoursColW, 'Hours of #1 Shift Prem:', data.hoursShift1);
-  hy += 24;
+  hy += 22;
   hourField(doc, marginX, hy, hoursColW, 'Hours at time & one half:', data.hoursTimeHalf);
   hourField(doc, marginX + hoursColW + 20, hy, hoursColW, 'Hours of #3 Shift Prem:', data.hoursShift3);
-  hy += 24;
+  hy += 22;
   hourField(doc, marginX, hy, hoursColW, 'Hours at double time:', data.hoursDouble);
-  y = hy + 24;
+  y = hy + 22;
 
   // ---- Section B: Department Response (reserved, left blank for department) ----
-  y = ensureSpace(doc, y, 120);
+  y = ensureSpace(doc, y, 90);
   y = sectionBar(doc, marginX, y, W, 'Section B:', ' Department Response');
   y += 4;
 
-  const approveH = 34;
+  const approveH = 30;
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.75);
   doc.rect(marginX, y, W, approveH);
   doc.line(marginX + W * 0.42, y, marginX + W * 0.58, y + approveH);
   checkboxText(doc, marginX + 16, y + approveH / 2, 'Grievance Approved');
   checkboxText(doc, marginX + W * 0.62, y + approveH / 2, 'Grievance Denied');
-  y += approveH + 6;
+  y += approveH + 5;
 
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Department Representative (print name)', value: '', width: W / 3 },
     { label: 'Signature', value: '', width: W / 3 },
     { label: 'Department Charge No', value: '', width: W / 3 },
   ]);
-  y += 6;
-  y = flowTextBox(doc, marginX, y + 8, W, 'Comments:', '', 26);
-  y += 12;
+  y += 4;
+  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 46);
+  y += 8;
 
   // ---- Section C: Employee Relations Response (reserved) ----
-  y = ensureSpace(doc, y, 120);
+  y = ensureSpace(doc, y, 90);
   y = sectionBar(doc, marginX, y, W, 'Section C:', ' Employee Relations Response');
   y += 4;
   y = boxedGrid(doc, marginX, y, W, [
@@ -297,12 +297,12 @@ function buildFordDoc(data) {
     { label: 'Grievance Stage', value: '', width: W * 0.16 },
     { label: 'Number', value: '', width: W * 0.16 },
   ]);
-  y += 6;
-  y = flowTextBox(doc, marginX, y + 8, W, 'Comments:', '', 26);
-  y += 12;
+  y += 4;
+  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 46);
+  y += 8;
 
   // ---- Section D: Payroll & Accounting Department (reserved) ----
-  y = ensureSpace(doc, y, 110);
+  y = ensureSpace(doc, y, 90);
   y = sectionBar(doc, marginX, y, W, 'Section D:', ' Payroll & Accounting Department');
   y += 4;
   y = boxedGrid(doc, marginX, y, W, [
@@ -311,8 +311,8 @@ function buildFordDoc(data) {
     { label: 'Amount', value: '', width: w4 },
     { label: 'Pay Period', value: '', width: w4 },
   ]);
-  y += 6;
-  y = flowTextBox(doc, marginX, y + 8, W, 'Comments:', '', 26);
+  y += 4;
+  y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', 46);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -440,22 +440,20 @@ function buildUniforDoc(data) {
   doc.text(fmtDate(data.uniforDateFiled), marginX + W / 2 + 5, y + 24);
   y += disciplineH + 6;
 
-  y = ensureSpace(doc, y, 60);
-  y = flowTextBox(doc, marginX, y + 8, W, 'Who is involved in this grievance?', data.whoInvolved, 44);
-  y += 12;
+  // flowTextBox paginates itself if the value is long, so no pre-emptive page-break needed here
+  y = flowTextBox(doc, marginX, y + 6, W, 'Who is involved in this grievance?', data.whoInvolved, 44);
+  y += 8;
 
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'When did it happen?', value: data.whenHappened, width: W / 2 },
     { label: 'Where did it happen?', value: data.whereHappened, width: W / 2 },
   ]);
-  y += 6;
+  y += 4;
 
-  y = ensureSpace(doc, y, 90);
-  y = flowTextBox(doc, marginX, y + 8, W, 'Why is this a grievance?', data.whyGrievance, 70);
-  y += 12;
+  y = flowTextBox(doc, marginX, y + 6, W, 'Why is this a grievance?', data.whyGrievance, 70);
+  y += 8;
 
-  y = ensureSpace(doc, y, 60);
-  y = flowTextBox(doc, marginX, y + 8, W, 'What do we want?', data.whatWeWant, 56);
+  y = flowTextBox(doc, marginX, y + 6, W, 'What do we want?', data.whatWeWant, 56);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
