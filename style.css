@@ -964,15 +964,15 @@ input[type="radio"] { width: 15px; height: 15px; }
 .pdf-viewer-close:hover { background: rgba(255, 255, 255, 0.15); }
 
 /*
- * The page is opened with view=FitH, which fits it to the width of its viewport — so the
- * viewport is what sets the zoom. Left at full window width the page renders enormous on a
- * wide monitor, so the frame is capped just above the document's own 816px width and the rest
- * of the window stays as surround, the way a document viewer looks.
+ * The PDF is opened at zoom=100 (see openPdfViewer), but a viewer that ignores the zoom
+ * fragment falls back to fitting the page to the frame — so the frame is capped just above the
+ * document's own 816px width. Either way the page lands near actual size, with the rest of the
+ * window left as surround the way a document viewer looks.
  */
 .pdf-viewer iframe {
   flex: 1;
   width: 100%;
-  max-width: 940px;
+  max-width: 900px;
   border: none;
   background: #33312D;
 }

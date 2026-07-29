@@ -136,7 +136,10 @@ function openPdfViewer(doc, filename) {
 
   pdfViewerName.textContent = filename;
   // Toolbar left on — that's what gives the viewer its own print, zoom and page controls.
-  pdfViewerFrame.src = viewerUrl + '#navpanes=0&view=FitH';
+  // zoom=100 rather than view=FitH: FitH fits the page to whatever width the frame happens to
+  // be, so the window ends up deciding the magnification. 100% is a Letter page at its actual
+  // size. Viewers that ignore zoom fall back to fitting the frame, which is capped in CSS.
+  pdfViewerFrame.src = viewerUrl + '#navpanes=0&zoom=100';
   pdfViewer.hidden = false;
   document.body.style.overflow = 'hidden';
   document.getElementById('pdfViewerClose').focus();
