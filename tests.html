@@ -123,6 +123,12 @@ document.getElementById('host').addEventListener('load', () => {
     return;
   }
 
+  // The frame can load more than once — a service-worker update reloads it — so start each
+  // run from scratch rather than appending a second set of results to the first.
+  groups.length = 0;
+  passed = 0;
+  failed = 0;
+
   // Give the app a moment to lay out and size its fields
   setTimeout(() => { run(win, doc); render(); }, 400);
 });
@@ -226,6 +232,129 @@ function run(win, doc) {
     const sheets = doc.querySelectorAll('#uniforForm .dc-page').length;
     const marks = doc.querySelectorAll('#uniforForm .dc-break').length;
     return (sheets === 5 && marks === 0) || { detail: sheets + ' sheets, ' + marks + ' markers' };
+  });
+
+  const g6b = group('Enter moves to the next field');
+  function press(win, el, opts) {
+    el.dispatchEvent(new win.KeyboardEvent('keydown',
+      Object.assign({ key: 'Enter', bubbles: true, cancelable: true }, opts || {})));
+  }
+
+  check(g6b, 'Enter advances through the grid', () => {
+    win.showForm('ford');
+    const form = doc.getElementById('fordForm');
+    form.elements.employeeName.focus();
+    press(win, form.elements.employeeName);
+    return doc.activeElement === form.elements.globalId ||
+      { detail: 'landed on ' + (doc.activeElement && (doc.activeElement.name || doc.activeElement.className)) };
+  });
+
+  check(g6b, 'Shift+Enter goes back', () => {
+    const form = doc.getElementById('fordForm');
+    form.elements.department.focus();
+    press(win, form.elements.department, { shiftKey: true });
+    return doc.activeElement === form.elements.globalId ||
+      { detail: 'landed on ' + (doc.activeElement && doc.activeElement.name) };
+  });
+
+  check(g6b, 'Enter never submits', () => {
+    win.showForm('ford');
+    const form = doc.getElementById('fordForm');
+    let submitted = false;
+    const spy = () => { submitted = true; };
+    form.addEventListener('submit', spy);
+    form.elements.employeeName.focus();
+    press(win, form.elements.employeeName);
+    form.removeEventListener('submit', spy);
+    return !submitted || { detail: 'the form submitted' };
+  });
+
+  check(g6b, 'Enter in a paragraph box still makes a new line', () => {
+    const form = doc.getElementById('fordForm');
+    const box = form.elements.details;
+    box.focus();
+    const event = new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    box.dispatchEvent(event);
+    return event.defaultPrevented === false || { detail: 'Enter was intercepted in the details box' };
+  });
+
+  check(g6b, 'Ctrl+Enter leaves a paragraph box', () => {
+    const form = doc.getElementById('fordForm');
+    form.elements.details.focus();
+    press(win, form.elements.details, { ctrlKey: true });
+    return doc.activeElement !== form.elements.details ||
+      { detail: 'focus stayed in the box' };
+  });
+
+  check(g6b, 'The Preview button keeps Enter for itself', () => {
+    const button = doc.querySelector('#form-ford .dc-toolbar button[type=submit]');
+    button.focus();
+    const event = new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    button.dispatchEvent(event);
+    return event.defaultPrevented === false || { detail: 'Enter was swallowed on the submit button' };
+  });
+
+  /*
+   * The run order is pinned here rather than hard-coded in the app. It comes from document
+   * order, so it can't drift out of step with the markup the way a second list would — this
+   * is what fails loudly if anyone reorders a form.
+   */
+  const EXPECTED_ORDER = {
+    ford: ['employeeName','globalId','department','processCoach','article','dateIncident','dateFiled',
+           'details','hoursStraight','hoursShift1','hoursTimeHalf','hoursShift3','hoursDouble','hoursTriple'],
+    policy: ['employeeName','globalId','department','processCoach','article','dateIncident','dateFiled','details'],
+    unifor: ['spNumber','grievorName','gid','dept','classification','seniorityDate','timeInClass','rate','cola',
+             'discipline','supervisor','generalSupervisor','superintendent','uniforDateIncident','uniforDateFiled',
+             'whoInvolved','whenHappened','whereHappened','whyGrievance','whatWeWant','supervisorStatement',
+             'yourObservation','additionalInfo','discussedDisposition','dispositionDetail','otherMembersAffected',
+             'witnesses','pastPractice','priorViolation','priorViolationWhen','companyAction','settleEffort',
+             'madeOffer','willingToDo','statementsTrue','statementsFalse','reasonableSettlement','otherComments',
+             'submittedBy','shift','committeepersonComments','plantChairComments'],
+    investigation: ['step','supervisorName','area','deptNum','dateInfraction','time','witnessNames',
+                    'uniforRep','hrRep','investigation','supervisorRemarks','resolution'],
+  };
+
+  function fieldNames(win, form) {
+    return win.navigableFields(form).map(el => {
+      if (el.name) return el.name;
+      const picker = el.closest('.datepicker');
+      const hidden = picker && picker.querySelector('input[type=hidden]');
+      return hidden ? hidden.name : el.className.split(' ')[0];
+    });
+  }
+
+  FORMS.forEach(f => {
+    check(g6b, f.type + ' runs in document order, start to finish', () => {
+      win.showForm(f.type);
+      const actual = fieldNames(win, doc.getElementById(f.form));
+      const want = EXPECTED_ORDER[f.type];
+      if (actual.length !== want.length) return { detail: want.length + ' expected, ' + actual.length + ' found' };
+      const first = actual.findIndex((n, i) => n !== want[i]);
+      return first === -1 || { detail: 'differs at ' + first + ': expected ' + want[first] + ', got ' + actual[first] };
+    });
+  });
+
+  check(g6b, 'Every editable field is reachable by Enter', () => {
+    // Catches a selector in FIELD_ORDER drifting away from the markup, which is how the SP
+    // number fell out of the run order when its wrapper element changed.
+    const missed = [];
+    FORMS.forEach(f => {
+      win.showForm(f.type);
+      const form = doc.getElementById(f.form);
+      const reachable = new Set(win.navigableFields(form));
+      form.querySelectorAll('input[type=text], textarea').forEach(el => {
+        if (el.closest('.datepicker')) return;          // represented by its trigger button
+        if (!reachable.has(el)) missed.push(f.type + '.' + (el.name || el.className));
+      });
+    });
+    return missed.length === 0 || { detail: 'unreachable: ' + missed.join(', ') };
+  });
+
+  check(g6b, 'A radio group is one stop, not two', () => {
+    win.showForm('unifor');
+    const form = doc.getElementById('uniforForm');
+    const stops = win.navigableFields(form).filter(f => f.name === 'discipline');
+    return stops.length === 1 || { detail: stops.length + ' stops for one group' };
   });
 
   const g7 = group('Drafts');

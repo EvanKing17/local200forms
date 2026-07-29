@@ -25,6 +25,9 @@ because the page on screen *is* the page that comes out.
 - **Re-open a finished PDF.** Upload a PDF this app made and it fills the form
   back in — it recognises its own files from data embedded invisibly in them.
   A scan, or a form from anywhere else, is rejected.
+- **Enter moves to the next field**, and Shift+Enter back — these were spreadsheets
+  before they were this, and the muscle memory is real. In the big narrative
+  boxes Enter makes a new paragraph, and Ctrl+Enter moves on.
 - **Ctrl+P prints the form itself**, without the toolbar or the app around it.
 
 ## Install it

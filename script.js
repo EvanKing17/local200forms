@@ -1615,16 +1615,78 @@ document.querySelectorAll(DC_AUTOGROW).forEach(el => {
   autoGrow(el);
 });
 
-/*
- * Single-line grid cells are textareas so their text wraps like the PDF's does, but they stand in
- * for what were <input>s — Enter should submit the form, not insert a line the PDF won't show.
+/* ============ Enter moves to the next field ============
+ *
+ * These forms were spreadsheets before they were this, so Enter means "next cell" to everyone
+ * who has ever filled one in. Shift+Enter goes back, the same way it does in Excel.
+ *
+ * The big narrative boxes are the exception: Details of Incident, the statements, the committee
+ * comments all need real paragraphs, so Enter inserts a line there and Ctrl+Enter moves on.
+ * Enter never submits — that's what the Preview PDF button is for, and quietly opening a PDF
+ * because someone hit Enter out of habit is exactly the surprise this is meant to remove.
  */
-document.querySelectorAll('.dc-value').forEach(el => {
-  el.addEventListener('keydown', e => {
-    if (e.key !== 'Enter' || e.shiftKey) return;
-    e.preventDefault();
-    el.form?.requestSubmit();
+const FIELD_ORDER = [
+  '.dc-value',
+  '.dc-textarea',
+  '.dc-value-input',
+  '.dc-hour-cell input',
+  '.dc-sp-value input',
+  '.dc-step input',
+  '.dc-inline-field input',
+  '.datepicker-trigger',
+  '.dc-radio input',
+].join(',');
+
+/* Radios are a single stop per group, as they are when tabbing */
+function navigableFields(form) {
+  const seenRadioGroups = new Set();
+  return Array.from(form.querySelectorAll(FIELD_ORDER)).filter(el => {
+    if (el.disabled || el.closest('[hidden]')) return false;
+    if (el.type !== 'radio') return true;
+    const checked = form.elements[el.name] && form.elements[el.name].value;
+    // land on the checked one, or the first if nothing is chosen yet
+    const isStop = checked ? el.value === checked : !seenRadioGroups.has(el.name);
+    seenRadioGroups.add(el.name);
+    return isStop;
   });
+}
+
+function moveToAdjacentField(form, from, step) {
+  const fields = navigableFields(form);
+  const index = fields.indexOf(from);
+  if (index === -1) return false;
+  const next = fields[index + step];
+  if (!next) return false;                       // stop at the ends rather than wrapping
+  next.focus();
+  // Select on arrival so the field can be overtyped, like a spreadsheet cell — but never in a
+  // paragraph box, where selecting everything means the next keystroke wipes the account.
+  if (next.select && !next.classList.contains('dc-textarea')) next.select();
+  return true;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.altKey || e.metaKey) return;
+
+  const el = e.target;
+  const form = el.form || (el.closest && el.closest('form'));
+  if (!form) return;
+  if (!form.classList.contains('dc-page') && !form.classList.contains('dc-sheets')) return;
+
+  // Don't steal Enter from the date panel while it's open
+  if (el.closest('.datepicker-panel')) return;
+
+  // Paragraph boxes keep Enter for what it does everywhere else; Ctrl+Enter moves on
+  const isProseBox = el.classList && el.classList.contains('dc-textarea');
+  if (isProseBox && !e.ctrlKey) return;
+
+  const fields = navigableFields(form);
+  const index = fields.indexOf(el);
+  // Anything else that can hold focus — the Preview PDF button, which the toolbar associates
+  // with this form — keeps Enter for its own purpose.
+  if (index === -1 && !isProseBox) return;
+
+  e.preventDefault();
+  moveToAdjacentField(form, el, e.shiftKey ? -1 : 1);
 });
 
 /* ============ Admin mode: rename the forms for everyone ============
