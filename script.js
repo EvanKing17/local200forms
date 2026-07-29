@@ -1985,3 +1985,62 @@ const refreshPageBreaks = debounce(() => {
   form.addEventListener('input', refreshPageBreaks);
   form.addEventListener('change', refreshPageBreaks);
 });
+
+/* ============ Installable / offline ============
+ *
+ * Registers the service worker that precaches the app, so it runs with no connection — which
+ * matters on a plant floor, and on a work network that may filter whatever it likes. jsPDF is
+ * served from this repo rather than a CDN for the same reason.
+ *
+ * Guarded on protocol: service workers need https (or localhost), so opening index.html
+ * straight off disk simply skips this rather than throwing.
+ */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(registration => {
+      // A waiting worker means a newer build is cached and ready behind this one
+      function offerUpdate(worker) {
+        if (!worker) return;
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner(worker);
+        });
+      }
+      if (registration.waiting && navigator.serviceWorker.controller) showUpdateBanner(registration.waiting);
+      registration.addEventListener('updatefound', () => offerUpdate(registration.installing));
+    }).catch(() => { /* offline support is a bonus; the app works fine without it */ });
+
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      location.reload();
+    });
+  });
+}
+
+/*
+ * An update is offered rather than applied: reloading underneath someone who is part-way
+ * through a grievance would throw away what they'd typed.
+ */
+function showUpdateBanner(worker) {
+  if (document.getElementById('updateBanner')) return;
+  const banner = document.createElement('div');
+  banner.className = 'update-banner';
+  banner.id = 'updateBanner';
+  banner.innerHTML = '<span>A newer version is ready.</span>';
+
+  const reload = document.createElement('button');
+  reload.type = 'button';
+  reload.className = 'btn-primary';
+  reload.textContent = 'Reload';
+  reload.addEventListener('click', () => worker.postMessage('skip-waiting'));
+
+  const later = document.createElement('button');
+  later.type = 'button';
+  later.className = 'btn-secondary';
+  later.textContent = 'Later';
+  later.addEventListener('click', () => banner.remove());
+
+  banner.append(reload, later);
+  document.body.appendChild(banner);
+}
