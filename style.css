@@ -1429,3 +1429,94 @@ input[type="radio"] { width: 15px; height: 15px; }
   padding: 7px 14px;
 }
 .update-banner .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* ---------- Print ----------
+ * The document view is laid out at the PDF's own scale (816px = 8.5in at 96dpi), so printing
+ * the page directly gives the same geometry as the generated PDF. Ctrl+P is the obvious thing
+ * to reach for once the form on screen looks like the form on paper, so it prints the document
+ * and nothing else — no toolbar, no page-break markers, no app chrome.
+ */
+@media print {
+  @page { size: letter; margin: 0; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+  }
+
+  .home-view,
+  .dc-toolbar,
+  .back-to-forms,
+  .skeleton,
+  .update-banner,
+  .pdf-viewer,
+  .dc-break { display: none !important; }
+
+  .workspace { padding: 0 !important; }
+  .form-panel { display: none !important; }
+  .form-panel.active { display: block !important; }
+
+  .dc-page {
+    width: 816px;              /* 8.5in — the padding below is the PDF's own 40pt margin */
+    max-width: none;
+    margin: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  /* Each sheet of a multi-page form is its own sheet of paper */
+  .dc-sheets { gap: 0; }
+  .dc-sheets .dc-page { break-after: page; }
+  .dc-sheets .dc-page:last-child { break-after: auto; }
+
+  /* Never split a field, a box or a question across two sheets */
+  .dc-field-grid,
+  .dc-hour-cell,
+  .dc-box,
+  .dc-question,
+  .dc-checkbox-field,
+  .dc-approve-row { break-inside: avoid; }
+
+  /* Without this the section bands print as white and the form loses its structure */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Fields are auto-sized to their content, so nothing should clip or scroll on paper */
+  textarea, input, .dc-value, .dc-textarea {
+    overflow: visible !important;
+    background: transparent !important;
+  }
+}
+
+/* ---------- Toolbar status: draft saved, and missing-field notices ---------- */
+.dc-saved,
+.dc-notice {
+  margin-right: auto;              /* sit at the left, opposite the buttons */
+  align-self: center;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.dc-saved.is-visible,
+.dc-notice.is-visible { opacity: 1; }
+
+.dc-saved { color: var(--c-text-faint); }
+
+.dc-notice {
+  color: #8a5a00;
+  background: #fdf6e3;
+  border: 1px solid #f0dfae;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-saved, .dc-notice { transition: none; }
+}

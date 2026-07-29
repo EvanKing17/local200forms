@@ -1123,7 +1123,14 @@ function formHasData(form) {
   });
 }
 
+/*
+ * The "are you sure you want to leave" prompt only applies when drafts can't be saved. With
+ * autosave working there's nothing to lose by closing the tab, and the prompt is just a dialog
+ * in the way. If storage is unavailable — private browsing, or a locked-down profile — the
+ * warning is the only protection left, so it comes back.
+ */
 window.addEventListener('beforeunload', (e) => {
+  if (draftsAvailable()) return;
   if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm)) {
     e.preventDefault();
     e.returnValue = '';
@@ -1162,7 +1169,10 @@ function clearForm(form) {
   });
   form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
-  if (currentFormType) updatePageBreaks(currentFormType);
+  if (currentFormType) {
+    discardDraft(currentFormType);
+    updatePageBreaks(currentFormType);
+  }
 }
 
 /* Fills a form's fields (including custom date pickers) from a plain {name: value} object */
@@ -1188,8 +1198,14 @@ function showForm(type, data) {
   panels.forEach(p => p.classList.remove('active'));
   document.getElementById('form-' + type).classList.add('active');
   const entry = FORM_BUILDERS[type];
-  if (data) populateForm(entry.form, data);
-  else entry.form.reset();
+  if (data) {
+    populateForm(entry.form, data);
+  } else {
+    entry.form.reset();
+    // Hand back whatever was last typed into this form on this device
+    const draft = readDraft(type);
+    if (draft) populateForm(entry.form, draft.data);
+  }
   document.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   // scrollHeight reads 0 while the panel is hidden, so size the textareas now that it's visible
   entry.form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
@@ -2044,3 +2060,162 @@ function showUpdateBanner(worker) {
   banner.append(reload, later);
   document.body.appendChild(banner);
 }
+
+/* ============ Drafts ============
+ *
+ * Every form saves as it's typed, on this device only — nothing is transmitted, same as the
+ * PDFs. Reopening a form restores what was there, so closing the tab, losing the phone to a
+ * backgrounded-app kill, or the battery dying part-way through a grievance costs nothing.
+ *
+ * Restoring is silent rather than prompted: it's the rep's own work on their own device, and a
+ * dialog asking permission to hand back what they just typed is friction for its own sake.
+ * "Clear form" is the way out, and it discards the draft too.
+ */
+const DRAFT_PREFIX = 'local200forms:draft:';
+
+/* A function, not a const, so it can't be read before it's initialised — this block sits at the
+   end of the file but the form lifecycle above it calls in. */
+let draftStorageOk = null;
+
+function draftsAvailable() {
+  if (draftStorageOk === null) {
+    try {
+      const probe = DRAFT_PREFIX + 'probe';
+      localStorage.setItem(probe, '1');
+      localStorage.removeItem(probe);
+      draftStorageOk = true;
+    } catch {
+      draftStorageOk = false;   // private browsing, or storage disabled
+    }
+  }
+  return draftStorageOk;
+}
+
+function draftKey(type) {
+  return DRAFT_PREFIX + type;
+}
+
+function saveDraft(type) {
+  if (!draftsAvailable()) return;
+  const entry = FORM_BUILDERS[type];
+  if (!entry) return;
+  const data = fd(entry.form);
+  const hasContent = Object.values(data).some(v => v !== '');
+  try {
+    if (hasContent) localStorage.setItem(draftKey(type), JSON.stringify({ savedAt: Date.now(), data }));
+    else localStorage.removeItem(draftKey(type));
+  } catch {
+    return;   // quota, most likely; the form still works, it just won't persist
+  }
+  if (hasContent) showSavedIndicator(type);
+}
+
+function readDraft(type) {
+  if (!draftsAvailable()) return null;
+  try {
+    const raw = localStorage.getItem(draftKey(type));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.data ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function discardDraft(type) {
+  if (!draftsAvailable()) return;
+  try { localStorage.removeItem(draftKey(type)); } catch { /* nothing to do */ }
+  const indicator = document.querySelector(`#form-${type} .dc-saved`);
+  if (indicator) indicator.classList.remove('is-visible');
+}
+
+/* A quiet "Saved" in the toolbar, so it's clear the work is being kept without a dialog */
+let savedIndicatorTimers = {};
+
+function showSavedIndicator(type) {
+  const toolbar = document.querySelector(`#form-${type} .dc-toolbar`);
+  if (!toolbar) return;
+  let indicator = toolbar.querySelector('.dc-saved');
+  if (!indicator) {
+    indicator = document.createElement('span');
+    indicator.className = 'dc-saved';
+    indicator.textContent = 'Saved';
+    toolbar.insertBefore(indicator, toolbar.firstChild);
+  }
+  indicator.classList.add('is-visible');
+  clearTimeout(savedIndicatorTimers[type]);
+  savedIndicatorTimers[type] = setTimeout(() => indicator.classList.remove('is-visible'), 1600);
+}
+
+const queueDraftSave = debounce(() => {
+  if (currentFormType) saveDraft(currentFormType);
+}, 600);
+
+Object.keys(FORM_BUILDERS).forEach(type => {
+  FORM_BUILDERS[type].form.addEventListener('input', queueDraftSave);
+  FORM_BUILDERS[type].form.addEventListener('change', queueDraftSave);
+});
+
+/* Save immediately on the way out, rather than losing whatever the debounce is still holding */
+window.addEventListener('pagehide', () => {
+  if (currentFormType) saveDraft(currentFormType);
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && currentFormType) saveDraft(currentFormType);
+});
+
+/* ============ Missing-field notice ============
+ *
+ * Deliberately does not block. Printing a blank form to fill in by hand is a real thing reps
+ * do, so refusing to produce a PDF without a name would break a legitimate use. But filing a
+ * grievance with no grievor on it is a genuine mistake, so it gets said out loud once, and the
+ * preview opens regardless.
+ */
+const KEY_FIELD = {
+  ford: { name: 'employeeName', label: 'Employee Name' },
+  policy: { name: 'employeeName', label: 'Employee Name' },
+  unifor: { name: 'grievorName', label: "Grievor's Name" },
+  investigation: { name: 'supervisorName', label: 'Name of Supervisor' },
+};
+
+function noticeFor(type) {
+  const toolbar = document.querySelector(`#form-${type} .dc-toolbar`);
+  if (!toolbar) return null;
+  let notice = toolbar.querySelector('.dc-notice');
+  if (!notice) {
+    notice = document.createElement('span');
+    notice.className = 'dc-notice';
+    notice.setAttribute('role', 'status');
+    toolbar.insertBefore(notice, toolbar.firstChild);
+  }
+  return notice;
+}
+
+let noticeTimers = {};
+
+function checkKeyField(type) {
+  const field = KEY_FIELD[type];
+  const notice = noticeFor(type);
+  if (!field || !notice) return;
+
+  const entry = FORM_BUILDERS[type];
+  const value = (fd(entry.form)[field.name] || '').trim();
+  if (value) { notice.classList.remove('is-visible'); return; }
+
+  notice.textContent = `${field.label} is empty`;
+  notice.classList.add('is-visible');
+  clearTimeout(noticeTimers[type]);
+  noticeTimers[type] = setTimeout(() => notice.classList.remove('is-visible'), 5000);
+}
+
+Object.keys(FORM_BUILDERS).forEach(type => {
+  FORM_BUILDERS[type].form.addEventListener('submit', () => checkKeyField(type));
+});
+
+/*
+ * Test surface for tests.html. Top-level `const` declarations live in script scope rather than
+ * on `window`, so anything a test needs to reach has to be handed over deliberately. Keeping
+ * that to one named object makes the contract obvious, instead of tests quietly depending on
+ * whichever internals happen to be function declarations.
+ */
+window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX };
