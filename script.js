@@ -231,10 +231,68 @@ function yesNoQuestion(doc, x, y, label, value, checkboxX, labelMaxWidth) {
   return lines.length;
 }
 
-/* Dark header bar: bold black-on-white "Section X:" style label matching the printed originals */
+/*
+ * Palette from the Grievance Form Style Guide. The screen and the PDF draw from this one set of
+ * values so the document view and the printed output are the same document, not two designs that
+ * happen to resemble each other — see the matching --dc-* custom properties in style.css.
+ */
+const DC = {
+  primary: [0, 40, 85],        // #002855 — section bands, rules, checked boxes
+  bandSub: [217, 223, 229],    // white at 85% over the band, matching the guide's opacity
+  ink: [42, 40, 36],           // #2A2824 — field values
+  inkSoft: [58, 56, 47],       // #3A382F — body copy inside text boxes
+  label: [121, 110, 101],      // #796E65 — field labels
+  labelSoft: [138, 132, 120],  // #8A8478 — document subtitle
+  border: [217, 212, 204],     // #D9D4CC — box borders
+  divider: [228, 225, 220],    // #E4E1DC — dividers between cells inside a grid
+  boxBorder: [163, 156, 143],  // #A39C8F — unchecked checkbox border
+};
+
+const DC_RADIUS = 2.5;  // the guide's 3px corner radius, in points
+
+/* The guide's 0.06em label tracking. jsPDF char spacing is absolute, so it's derived per size. */
+function setLabelStyle(doc, size = 6.5) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(size);
+  doc.setTextColor(...DC.label);
+  doc.setCharSpace(size * 0.06);
+}
+
+function clearLabelStyle(doc) {
+  doc.setCharSpace(0);
+}
+
+/*
+ * Document header lockup: title over a subtitle, on a rule in the primary colour.
+ * Left-aligned per the style guide (the older centered heading is drawFormHeading).
+ */
+function drawDocHeader(doc, x, y, w, title, subtitle) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(...DC.ink);
+  const titleLines = doc.splitTextToSize(title, w);
+  titleLines.forEach((line, i) => doc.text(line, x, y + i * 18));
+  let cy = y + (titleLines.length - 1) * 18;
+
+  if (subtitle) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.25);
+    doc.setTextColor(...DC.labelSoft);
+    cy += 12;
+    doc.text(subtitle, x, cy);
+  }
+
+  cy += 10;
+  doc.setDrawColor(...DC.primary);
+  doc.setLineWidth(1.5);
+  doc.line(x, cy, x + w, cy);
+  return cy + 16;
+}
+
+/* Section band: bold label plus a lighter continuation, white on the primary colour */
 function sectionBar(doc, x, y, w, boldLabel, restLabel) {
   const h = 18;
-  doc.setFillColor(20, 20, 20);
+  doc.setFillColor(...DC.primary);
   doc.rect(x, y, w, h, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
@@ -242,6 +300,7 @@ function sectionBar(doc, x, y, w, boldLabel, restLabel) {
   doc.text(boldLabel, x + 8, y + 12);
   const bw = doc.getTextWidth(boldLabel);
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...DC.bandSub);
   doc.text(restLabel, x + 8 + bw, y + 12);
   return y + h;
 }
@@ -253,9 +312,12 @@ function sectionBar(doc, x, y, w, boldLabel, restLabel) {
 function prepareGridCells(doc, cells) {
   const labelFontSize = 6.5, valueFontSize = 9.5;
   return cells.map(c => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(labelFontSize);
+    // Measured with the same bold face + tracking the label is drawn with, or the wrap
+    // point would be computed against a narrower string than actually gets rendered.
+    setLabelStyle(doc, labelFontSize);
     const labelLines = doc.splitTextToSize(c.label.toUpperCase(), c.width - 8).slice(0, 2);
+    clearLabelStyle(doc);
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(valueFontSize);
     const valueLines = doc.splitTextToSize(c.value || '', c.width - 10);
     return { ...c, labelLines, valueLines };
@@ -283,25 +345,29 @@ function measureBoxedGrid(doc, cells, minH = 34) {
  */
 function drawResponseSection(doc, marginX, W, y, boldLabel, restLabel, gridCells, gridMinH, commentsMinH, extra) {
   const gridH = measureBoxedGrid(doc, gridCells, gridMinH);
-  const extraH = extra ? extra.height + 5 : 0;
-  const totalH = 18 + 4 + extraH + gridH + 4 + 6 + commentsMinH;
+  const extraH = extra ? extra.height : 0;
+  const totalH = 18 + extraH + gridH + 10 + 6 + commentsMinH;
   y = ensureSpace(doc, y, totalH);
 
+  // Band, then whatever sits directly under it, all flush — one component, no seams.
   y = sectionBar(doc, marginX, y, W, boldLabel, restLabel);
-  y += 4;
   if (extra) {
     extra.draw(doc, marginX, y, W);
-    y += extra.height + 5;
+    y += extra.height;
   }
-  y = boxedGrid(doc, marginX, y, W, gridCells, gridMinH);
-  y += 4;
+  y = boxedGrid(doc, marginX, y, W, gridCells, gridMinH, true);
+  y += 10;
   y = flowTextBox(doc, marginX, y + 6, W, 'Comments:', '', commentsMinH);
-  y += 8;
+  y += 14;
   return y;
 }
 
-function boxedGrid(doc, x, y, w, cells, minH = 34) {
-  const labelFontSize = 6.5, valueFontSize = 9.5;
+/*
+ * `attached` means this grid sits flush under a section band, so its top edge is the band's
+ * bottom edge and only the lower corners are rounded.
+ */
+function boxedGrid(doc, x, y, w, cells, minH = 34, attached = false) {
+  const valueFontSize = 9.5;
   const prepared = prepareGridCells(doc, cells);
   const { h, labelBlockH } = gridHeightFromPrepared(prepared, minH);
 
@@ -312,19 +378,27 @@ function boxedGrid(doc, x, y, w, cells, minH = 34) {
     y = 40;
   }
 
-  doc.setDrawColor(0, 0, 0);
+  doc.setDrawColor(...DC.border);
   doc.setLineWidth(0.75);
-  doc.rect(x, y, w, h);
+  if (attached) doc.rect(x, y, w, h);
+  else doc.roundedRect(x, y, w, h, DC_RADIUS, DC_RADIUS);
+
+  // Dividers are lighter than the outer border, per the guide's continuous-grid treatment.
   let cx = x;
+  doc.setDrawColor(...DC.divider);
   prepared.forEach((c, i) => {
     if (i > 0) doc.line(cx, y, cx, y + h);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(labelFontSize);
-    doc.setTextColor(80, 80, 80);
+    cx += c.width;
+  });
+
+  cx = x;
+  prepared.forEach(c => {
+    setLabelStyle(doc);
     doc.text(c.labelLines, cx + 5, y + 9);
+    clearLabelStyle(doc);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(valueFontSize);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(...DC.ink);
     doc.text(c.valueLines, cx + 5, y + labelBlockH + 12);
     cx += c.width;
   });
@@ -348,10 +422,10 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
       doc.addPage();
       currentY = 40;
     }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
-    doc.text(first ? label : label.replace(/:\s*$/, '') + ' (continued):', x, currentY);
+    const text = first ? label : label.replace(/:\s*$/, '') + ' (continued):';
+    setLabelStyle(doc);
+    doc.text(text.replace(/:\s*$/, '').toUpperCase(), x, currentY);
+    clearLabelStyle(doc);
     const boxY = currentY + 6;
     const availH = PAGE_BOTTOM - boxY;
     const maxLines = Math.max(1, Math.floor((availH - 10) / lineHeight));
@@ -359,12 +433,12 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
     const linesThisBox = Math.max(1, Math.min(remaining, maxLines));
     // Clamped to availH as a hard floor: the box can never be drawn past the page edge.
     const boxH = Math.min(availH, Math.max(minH, linesThisBox * lineHeight + 10));
-    doc.setDrawColor(0, 0, 0);
+    doc.setDrawColor(...DC.border);
     doc.setLineWidth(0.75);
-    doc.rect(x, boxY, w, boxH);
+    doc.roundedRect(x, boxY, w, boxH, DC_RADIUS, DC_RADIUS);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(fontSize);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(...DC.inkSoft);
     doc.text(allLines.slice(idx, idx + linesThisBox), x + 5, boxY + 14);
     idx += linesThisBox;
     currentY = boxY + boxH;
@@ -377,53 +451,62 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
   return currentY;
 }
 
-/*
- * An hours field: bold label, then a small bordered box right-aligned within the column.
- * The value is centered and the box grows (font shrinks first) rather than clipping.
- */
-function hourField(doc, x, y, w, label, value) {
-  const boxW = 70;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
-  doc.text(label, x, y + 13);
+const HOUR_CELL_H = 32;
 
-  const boxX = x + w - boxW;
+/*
+ * An hours cell in the guide's labelled-field style: its own bordered box with the label
+ * above the value, rather than a label sitting outside a separate value box.
+ */
+function hourCell(doc, x, y, w, label, value) {
+  doc.setDrawColor(...DC.border);
+  doc.setLineWidth(0.75);
+  doc.roundedRect(x, y, w, HOUR_CELL_H, DC_RADIUS, DC_RADIUS);
+
+  setLabelStyle(doc);
+  doc.text(doc.splitTextToSize(label.toUpperCase(), w - 10)[0], x + 6, y + 11);
+  clearLabelStyle(doc);
+
   const val = (value || '').toString();
   doc.setFont('helvetica', 'normal');
-  fitSingleLine(doc, val, boxW - 8, 9.5, 6.5);
-  const lines = doc.getTextWidth(val) > boxW - 8 ? doc.splitTextToSize(val, boxW - 8) : [val];
-  const boxH = Math.max(18, lines.length * 11 + 6);
-
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.75);
-  doc.rect(boxX, y, boxW, boxH);
-  doc.setTextColor(0, 0, 0);
-  const startY = y + (boxH - (lines.length - 1) * 11) / 2 + 3.5;
-  lines.forEach((ln, i) => doc.text(ln, boxX + boxW / 2, startY + i * 11, { align: 'center' }));
-  return y + boxH;
+  fitSingleLine(doc, val, w - 12, 9.5, 6.5);
+  doc.setTextColor(...DC.ink);
+  doc.text(val, x + 6, y + 24);
+  return y + HOUR_CELL_H;
 }
 
 /* A square checkbox (y is its vertical center) followed by its label — sized generously so a
-   digital-signing tool's checkmark/X actually has room to land inside it */
+   digital-signing tool's checkmark/X actually has room to land inside it.
+   The 15pt box and its label offsets are deliberately unchanged from the printed originals;
+   only the colours follow the style guide. */
+const CHECKBOX_SIZE = 15;
+
 function checkboxText(doc, x, y, label) {
-  const size = 15;
-  doc.setDrawColor(0, 0, 0);
+  const size = CHECKBOX_SIZE;
+  doc.setDrawColor(...DC.boxBorder);
   doc.setLineWidth(1);
   doc.rect(x, y - size / 2, size, size);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(...DC.ink);
   doc.text(label, x + size + 6, y + 3.5);
 }
 
-/* Draws an X through a checkbox drawn by checkboxText at the same x, y */
+/* Fills a checkbox drawn by checkboxText at the same x, y and draws a white checkmark in it */
 function markCheckbox(doc, x, y) {
-  const size = 15;
+  const size = CHECKBOX_SIZE;
   const top = y - size / 2;
-  doc.setLineWidth(1.3);
-  doc.line(x + 2, top + 2, x + size - 2, top + size - 2);
-  doc.line(x + 2, top + size - 2, x + size - 2, top + 2);
+  doc.setFillColor(...DC.primary);
+  doc.setDrawColor(...DC.primary);
+  doc.setLineWidth(1);
+  doc.rect(x, top, size, size, 'FD');
+
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(1.6);
+  doc.setLineCap('round');
+  doc.setLineJoin('round');
+  doc.lines([[2.6, 3.2], [5.6, -7.2]], x + 3.4, top + 7.6);
+  doc.setLineCap('butt');
+  doc.setLineJoin('miter');
 }
 
 /* ============ FORD FORM ============ */
@@ -433,10 +516,10 @@ function buildFordDoc(data) {
 
   const marginX = 40;
   const W = 532;
-  let y = drawFormHeading(doc, FORMS_CONFIG.ford.title);
+  let y = drawDocHeader(doc, marginX, 54, W, FORMS_CONFIG.ford.title);
 
+  // The band sits flush on the grid below it (no gap), so the two read as one component.
   y = sectionBar(doc, marginX, y, W, 'Section A:', ' Employee Details & Grievance Summary');
-  y += 4;
 
   const w4 = W / 4;
   y = boxedGrid(doc, marginX, y, W, [
@@ -444,8 +527,8 @@ function buildFordDoc(data) {
     { label: 'Global ID', value: data.globalId, width: w4 },
     { label: 'Department', value: data.department, width: w4 },
     { label: 'Process Coach', value: data.processCoach, width: w4 },
-  ]);
-  y += 4;
+  ], 34, true);
+  y += 10;
 
   // Article Violation spans two grid columns, Date of Incident/Filed each take one, so the
   // dividers in this row land exactly on the dividers from the row above.
@@ -454,24 +537,27 @@ function buildFordDoc(data) {
     { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: w4 },
     { label: 'Date Filed', value: fmtDate(data.dateFiled), width: w4 },
   ]);
-  y += 4;
+  y += 10;
 
   // flowTextBox paginates itself if the value is long, so no pre-emptive page-break needed here
   y = flowTextBox(doc, marginX, y + 6, W, 'Details of Incident:', data.details, 70);
-  y += 8;
+  y += 14;
 
-  y = ensureSpace(doc, y, 70);
-  const hoursColW = W / 2 - 10;
-  let hy = y;
-  hourField(doc, marginX, hy, hoursColW, 'Hours at straight time:', data.hoursStraight);
-  hourField(doc, marginX + hoursColW + 20, hy, hoursColW, 'Hours of #1 Shift Prem:', data.hoursShift1);
-  hy += 22;
-  hourField(doc, marginX, hy, hoursColW, 'Hours at time & one half:', data.hoursTimeHalf);
-  hourField(doc, marginX + hoursColW + 20, hy, hoursColW, 'Hours of #3 Shift Prem:', data.hoursShift3);
-  hy += 22;
-  hourField(doc, marginX, hy, hoursColW, 'Hours at double time:', data.hoursDouble);
-  hourField(doc, marginX + hoursColW + 20, hy, hoursColW, 'Hours at triple time:', data.hoursTriple);
-  y = hy + 22;
+  // Two columns so the gap between them lands on the 4-column grid's centre divider above.
+  const hoursGap = 10;
+  const hoursColW = (W - hoursGap) / 2;
+  const HOURS = [
+    ['Hours at straight time', data.hoursStraight, 'Hours of #1 Shift Prem', data.hoursShift1],
+    ['Hours at time & one half', data.hoursTimeHalf, 'Hours of #3 Shift Prem', data.hoursShift3],
+    ['Hours at double time', data.hoursDouble, 'Hours at triple time', data.hoursTriple],
+  ];
+  y = ensureSpace(doc, y, HOURS.length * (HOUR_CELL_H + hoursGap));
+  HOURS.forEach(([lLabel, lValue, rLabel, rValue]) => {
+    hourCell(doc, marginX, y, hoursColW, lLabel, lValue);
+    hourCell(doc, marginX + hoursColW + hoursGap, y, hoursColW, rLabel, rValue);
+    y += HOUR_CELL_H + hoursGap;
+  });
+  y += 4;
 
   // ---- Section B: Department Response (reserved, left blank for department) ----
   // Column widths are quarters of W, same unit as Section A/D, so the dividers line up down the page.
@@ -483,9 +569,10 @@ function buildFordDoc(data) {
     height: 30,
     draw(doc, x, y, w) {
       const approveH = 30;
-      doc.setDrawColor(0, 0, 0);
+      doc.setDrawColor(...DC.border);
       doc.setLineWidth(0.75);
       doc.rect(x, y, w, approveH);
+      doc.setDrawColor(...DC.divider);
       doc.line(x + w * 0.42, y, x + w * 0.58, y + approveH);
       checkboxText(doc, x + 16, y + approveH / 2, 'Grievance Approved');
       checkboxText(doc, x + w * 0.62, y + approveH / 2, 'Grievance Denied');
@@ -523,7 +610,7 @@ fordForm.addEventListener('submit', (e) => {
 });
 
 document.getElementById('fordClear').addEventListener('click', () => {
-  fordForm.reset();
+  clearForm(fordForm);
 });
 
 /* ============ POLICY GRIEVANCE FORM ============ */
@@ -535,10 +622,9 @@ function buildPolicyDoc(data) {
 
   const marginX = 40;
   const W = 532;
-  let y = drawFormHeading(doc, FORMS_CONFIG.policy.title);
+  let y = drawDocHeader(doc, marginX, 54, W, FORMS_CONFIG.policy.title);
 
   y = sectionBar(doc, marginX, y, W, 'Section A:', ' Employee Details & Grievance Summary');
-  y += 4;
 
   const w4 = W / 4;
   y = boxedGrid(doc, marginX, y, W, [
@@ -546,18 +632,18 @@ function buildPolicyDoc(data) {
     { label: 'Global ID', value: data.globalId, width: w4 },
     { label: 'Department', value: data.department, width: w4 },
     { label: 'Process Coach', value: data.processCoach, width: w4 },
-  ]);
-  y += 4;
+  ], 34, true);
+  y += 10;
 
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Article Violation', value: data.article, width: w4 * 2 },
     { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: w4 },
     { label: 'Date Filed', value: fmtDate(data.dateFiled), width: w4 },
   ]);
-  y += 4;
+  y += 10;
 
   y = flowTextBox(doc, marginX, y + 6, W, 'Details of Incident:', data.details, 70);
-  y += 8;
+  y += 14;
 
   // ---- Section B: Department Response (reserved, left blank for department) ----
   // Column widths are quarters of W, same unit as Section A/D, so the dividers line up down the page.
@@ -569,9 +655,10 @@ function buildPolicyDoc(data) {
     height: 30,
     draw(doc, x, y, w) {
       const approveH = 30;
-      doc.setDrawColor(0, 0, 0);
+      doc.setDrawColor(...DC.border);
       doc.setLineWidth(0.75);
       doc.rect(x, y, w, approveH);
+      doc.setDrawColor(...DC.divider);
       doc.line(x + w * 0.42, y, x + w * 0.58, y + approveH);
       checkboxText(doc, x + 16, y + approveH / 2, 'Grievance Approved');
       checkboxText(doc, x + w * 0.62, y + approveH / 2, 'Grievance Denied');
@@ -601,7 +688,7 @@ policyForm.addEventListener('submit', (e) => {
 });
 
 document.getElementById('policyClear').addEventListener('click', () => {
-  policyForm.reset();
+  clearForm(policyForm);
 });
 
 /* ============ UNIFOR FORM ============ */
@@ -820,7 +907,7 @@ uniforForm.addEventListener('submit', (e) => {
 });
 
 document.getElementById('uniforClear').addEventListener('click', () => {
-  uniforForm.reset();
+  clearForm(uniforForm);
 });
 
 /* ============ 4.01 INVESTIGATION FORM ============ */
@@ -887,7 +974,7 @@ investigationForm.addEventListener('submit', (e) => {
 });
 
 document.getElementById('investigationClear').addEventListener('click', () => {
-  investigationForm.reset();
+  clearForm(investigationForm);
 });
 
 /* ============ Live preview ============ */
@@ -904,7 +991,7 @@ const FORM_BUILDERS = {
 let currentFormType = null;
 
 function renderPreview() {
-  if (!currentFormType) return;
+  if (!currentFormType || currentFormType === 'ford') return;
   const entry = FORM_BUILDERS[currentFormType];
   const doc = entry.build(fd(entry.form));
   const blobUrl = URL.createObjectURL(doc.output('blob'));
@@ -972,22 +1059,22 @@ function showHome() {
   homeView.hidden = false;
   workspace.hidden = true;
   previewToggle.style.display = 'none';
-  refreshHomePreviews();
 }
 
-/* Renders each homepage card's small preview thumbnail from that form's current field values */
-const homePreviewUrls = {};
-
-function refreshHomePreviews() {
-  Object.entries(FORM_BUILDERS).forEach(([type, entry]) => {
-    const iframe = document.querySelector(`.form-card[data-form="${type}"] .form-card-preview iframe`);
-    if (!iframe) return;
-    const doc = entry.build(fd(entry.form));
-    const blobUrl = URL.createObjectURL(doc.output('blob'));
-    iframe.src = blobUrl + '#toolbar=0&navpanes=0&view=FitH';
-    if (homePreviewUrls[type]) URL.revokeObjectURL(homePreviewUrls[type]);
-    homePreviewUrls[type] = blobUrl;
+/*
+ * Empties every field in a form. Deliberately not form.reset() — reset restores each field's
+ * *default*, which for these forms is the sample content written into the HTML, so a button
+ * labelled "Clear form" would put the sample data back instead of clearing anything.
+ */
+function clearForm(form) {
+  Array.from(form.elements).forEach(el => {
+    if (el.type === 'radio' || el.type === 'checkbox') el.checked = false;
+    else if (el.type === 'hidden' && el.closest('.datepicker')) el.closest('.datepicker').setValue('');
+    else if (el.tagName === 'TEXTAREA' || el.type === 'text' || el.type === 'date') el.value = '';
   });
+  form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
+  form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
+  renderPreview();
 }
 
 /* Fills a form's fields (including custom date pickers) from a plain {name: value} object */
@@ -1010,14 +1097,17 @@ function showForm(type, data) {
   currentFormType = type;
   homeView.hidden = true;
   workspace.hidden = false;
-  previewToggle.style.display = '';
+  workspace.classList.toggle('ford-fullwidth', type === 'ford');
+  previewToggle.style.display = type === 'ford' ? 'none' : '';
   panels.forEach(p => p.classList.remove('active'));
   document.getElementById('form-' + type).classList.add('active');
   const entry = FORM_BUILDERS[type];
   if (data) populateForm(entry.form, data);
   else entry.form.reset();
   document.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
-  renderPreview();
+  // scrollHeight reads 0 while the panel is hidden, so size the textareas now that it's visible
+  entry.form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
+  if (type !== 'ford') renderPreview();
 }
 
 document.querySelectorAll('.form-card').forEach(card => {
@@ -1396,7 +1486,38 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
   form.addEventListener('reset', () => {
     setTimeout(() => {
       form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
+      form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
       renderPreview();
     }, 0);
+  });
+});
+
+/*
+ * Document-view fields size to their content, so a value that wraps onto a second line pushes
+ * the page down exactly as it pushes the PDF down — this is what keeps the two in agreement.
+ */
+function autoGrow(el) {
+  // Collapse to 0 rather than 'auto' first — on a textarea, 'auto' resolves to the rows
+  // attribute's height, so scrollHeight would never read below it and the box could only grow.
+  el.style.height = '0px';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+const DC_AUTOGROW = '.dc-textarea, .dc-value';
+
+document.querySelectorAll(DC_AUTOGROW).forEach(el => {
+  el.addEventListener('input', () => autoGrow(el));
+  autoGrow(el);
+});
+
+/*
+ * Single-line grid cells are textareas so their text wraps like the PDF's does, but they stand in
+ * for what were <input>s — Enter should submit the form, not insert a line the PDF won't show.
+ */
+document.querySelectorAll('.dc-value').forEach(el => {
+  el.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    e.preventDefault();
+    el.form?.requestSubmit();
   });
 });

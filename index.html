@@ -24,25 +24,21 @@
 
   <div class="form-cards">
     <button class="form-card" data-form="ford">
-      <div class="form-card-preview"><iframe tabindex="-1" title="Preview"></iframe></div>
       <span class="picker-index">01</span>
       <span class="picker-label">Grievance Investigation &amp; Claim Form</span>
       <span class="picker-sub">Ford — Section A intake</span>
     </button>
     <button class="form-card" data-form="policy">
-      <div class="form-card-preview"><iframe tabindex="-1" title="Preview"></iframe></div>
       <span class="picker-index">02</span>
       <span class="picker-label">Policy Grievance Form</span>
       <span class="picker-sub">Ford — policy grievance</span>
     </button>
     <button class="form-card" data-form="unifor">
-      <div class="form-card-preview"><iframe tabindex="-1" title="Preview"></iframe></div>
       <span class="picker-index">03</span>
       <span class="picker-label">Local 200 Fact Sheet</span>
       <span class="picker-sub">Unifor — first stage appeal</span>
     </button>
     <button class="form-card" data-form="investigation">
-      <div class="form-card-preview"><iframe tabindex="-1" title="Preview"></iframe></div>
       <span class="picker-index">04</span>
       <span class="picker-label">4.01 Investigation Form</span>
       <span class="picker-sub">Workplace incident intake</span>
@@ -64,79 +60,180 @@
   <button type="button" class="back-to-forms" id="backToForms">&#8249; Back to Forms</button>
 
 
-  <!-- ================= FORD FORM ================= -->
+  <!-- ================= FORD FORM (WYSIWYG document view) =================
+       Mirrors buildFordDoc() block for block: same sections in the same order, at the same
+       proportions. Sections B-D are shown because they print, but are filled in on paper by
+       the department, so they render as empty boxes with no controls. -->
   <section class="form-panel active" id="form-ford" aria-labelledby="form-ford-heading">
-    <form id="fordForm">
-      <div class="sheet-header">
-        <div class="sheet-header-text">
-          <h1 id="form-ford-heading">Grievance Investigation &amp; Claim Form</h1>
-        </div>
-        <div class="sheet-header-actions">
-          <button type="button" class="btn-secondary" id="fordClear">Clear form</button>
-          <button type="submit" class="btn-primary">Generate PDF</button>
-        </div>
+    <div class="dc-toolbar">
+      <button type="button" class="btn-secondary" id="fordClear">Clear form</button>
+      <button type="submit" class="btn-primary" form="fordForm">Generate PDF</button>
+    </div>
+
+    <form id="fordForm" class="dc-page">
+      <div class="dc-doc-title" id="form-ford-heading">Grievance Investigation &amp; Claim Form</div>
+      <div class="dc-doc-rule"></div>
+
+      <div class="dc-band"><span>Section A:</span><span class="dc-band-sub"> Employee Details &amp; Grievance Summary</span></div>
+      <div class="dc-field-grid dc-cols-4 dc-attached">
+        <label>
+          <span class="dc-field-label">Employee Name</span>
+          <textarea class="dc-value" name="employeeName" rows="1" autocomplete="off">Evan Robert King Thompson MacGregor</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Global ID</span>
+          <textarea class="dc-value" name="globalId" rows="1" autocomplete="off">002173535</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Department</span>
+          <textarea class="dc-value" name="department" rows="1" autocomplete="off">8383 - Heads Godzilla Motorline</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Process Coach</span>
+          <textarea class="dc-value" name="processCoach" rows="1" autocomplete="off">Wes Macauley, Johnny Appleseed</textarea>
+        </label>
       </div>
 
-      <div class="section">
-        <div class="section-title">Section A — Employee Details &amp; Grievance Summary</div>
-        <div class="grid grid-4">
-          <label>Employee Name
-            <input type="text" name="employeeName" autocomplete="off" value="Evan Robert King Thompson MacGregor">
-          </label>
-          <label>Global ID
-            <input type="text" name="globalId" autocomplete="off" value="002173535">
-          </label>
-          <label>Department
-            <input type="text" name="department" autocomplete="off" value="8383 - Heads Godzilla Motorline">
-          </label>
-          <label>Process Coach
-            <input type="text" name="processCoach" autocomplete="off" value="Wes Macauley, Johnny Appleseed">
-          </label>
-        </div>
+      <!-- Article Violation spans two of the four columns above, so the dividers line up -->
+      <div class="dc-field-grid dc-cols-211 dc-standalone dc-block">
+        <label>
+          <span class="dc-field-label">Article Violation</span>
+          <textarea class="dc-value" name="article" rows="1" autocomplete="off" placeholder="e.g. Article 78">Article 14.02, 10.06(a)(i)(2), 4.01</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Date of Incident</span>
+          <input type="date" name="dateIncident" value="2026-07-14">
+        </label>
+        <label>
+          <span class="dc-field-label">Date Filed</span>
+          <input type="date" name="dateFiled" value="2026-07-29">
+        </label>
+      </div>
 
-        <div class="grid grid-3">
-          <label>Article Violation
-            <input type="text" name="article" autocomplete="off" placeholder="e.g. Article 78" value="Article 14.02, 10.06(a)(i)(2), 4.01">
-          </label>
-          <label>Date of Incident
-            <input type="date" name="dateIncident" value="2026-07-14">
-          </label>
-          <label>Date Filed
-            <input type="date" name="dateFiled" value="2026-07-29">
-          </label>
-        </div>
-
-        <label class="full">Details of Incident
-          <textarea name="details" rows="9" placeholder="What happened, in your own words — who, what, when, where, and why it violates the agreement.">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin eget imperdiet justo. Nulla facilisi. Fusce molestie in nunc ac sollicitudin. Nullam non lorem at dolor tincidunt ornare. Curabitur hendrerit posuere vehicula. Nullam varius dapibus elementum. Maecenas non dapibus justo.
+      <div class="dc-block">
+        <div class="dc-field-label dc-box-label">Details of Incident</div>
+        <div class="dc-box dc-details">
+          <textarea class="dc-textarea" name="details" placeholder="What happened, in your own words — who, what, when, where, and why it violates the agreement.">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin eget imperdiet justo. Nulla facilisi. Fusce molestie in nunc ac sollicitudin. Nullam non lorem at dolor tincidunt ornare. Curabitur hendrerit posuere vehicula. Nullam varius dapibus elementum. Maecenas non dapibus justo.
 
 Fusce convallis arcu eu dapibus porta. Cras et eleifend lorem, vel posuere ante. Pellentesque a pharetra lectus, sed malesuada libero. Maecenas in feugiat odio. Maecenas fringilla ligula a est tempus vehicula. Pellentesque volutpat consequat sapien quis sollicitudin. Cras posuere faucibus blandit. Donec placerat ullamcorper lacus, ac luctus leo gravida sit amet. Donec accumsan luctus diam a posuere.
 
 Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phasellus semper malesuada aliquam. Quisque orci risus, dictum vitae urna id, sollicitudin efficitur purus. Fusce rutrum scelerisque justo sit amet vestibulum. Etiam gravida, nisi eu rutrum facilisis, mi eros finibus magna.</textarea>
-        </label>
+        </div>
+      </div>
 
-        <div class="grid grid-4 hours-grid">
-          <label>Hours at straight time
-            <input type="text" name="hoursStraight" inputmode="decimal" value="8">
-          </label>
-          <label>Hours at time &amp; one half
-            <input type="text" name="hoursTimeHalf" inputmode="decimal" value="8">
-          </label>
-          <label>Hours at double time
-            <input type="text" name="hoursDouble" inputmode="decimal" value="8">
-          </label>
-          <label>Hours at triple time
-            <input type="text" name="hoursTriple" inputmode="decimal" value="8">
-          </label>
-          <label>Hours of #1 Shift Prem
-            <input type="text" name="hoursShift1" inputmode="decimal" value="8">
-          </label>
-          <label>Hours of #3 Shift Prem
-            <input type="text" name="hoursShift3" inputmode="decimal" value="8">
-          </label>
+      <div class="dc-hours">
+        <label class="dc-hour-cell">
+          <span class="dc-field-label">Hours at straight time</span>
+          <input type="text" name="hoursStraight" inputmode="decimal" value="8">
+        </label>
+        <label class="dc-hour-cell">
+          <span class="dc-field-label">Hours of #1 Shift Prem</span>
+          <input type="text" name="hoursShift1" inputmode="decimal" value="8">
+        </label>
+        <label class="dc-hour-cell">
+          <span class="dc-field-label">Hours at time &amp; one half</span>
+          <input type="text" name="hoursTimeHalf" inputmode="decimal" value="8">
+        </label>
+        <label class="dc-hour-cell">
+          <span class="dc-field-label">Hours of #3 Shift Prem</span>
+          <input type="text" name="hoursShift3" inputmode="decimal" value="8">
+        </label>
+        <label class="dc-hour-cell">
+          <span class="dc-field-label">Hours at double time</span>
+          <input type="text" name="hoursDouble" inputmode="decimal" value="8">
+        </label>
+        <label class="dc-hour-cell">
+          <span class="dc-field-label">Hours at triple time</span>
+          <input type="text" name="hoursTriple" inputmode="decimal" value="8">
+        </label>
+      </div>
+
+      <!-- ---- Section B: filled in by the department ---- -->
+      <div class="dc-reserved" aria-hidden="true">
+        <div class="dc-band"><span>Section B:</span><span class="dc-band-sub"> Department Response</span></div>
+        <div class="dc-approve-row">
+          <svg class="dc-diagonal" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line x1="42" y1="0" x2="58" y2="100" stroke="#E4E1DC" vector-effect="non-scaling-stroke"></line>
+          </svg>
+          <span class="dc-check dc-check-approved">Grievance Approved</span>
+          <span class="dc-check dc-check-denied">Grievance Denied</span>
+        </div>
+        <div class="dc-field-grid dc-cols-211 dc-attached">
+          <div class="dc-cell">
+            <span class="dc-field-label">Department Representative</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Department Charge No</span>
+            <div class="dc-value-blank"></div>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Comments</div>
+          <div class="dc-box dc-comments"></div>
+        </div>
+      </div>
+
+      <!-- ---- Section C: filled in by employee relations ---- -->
+      <div class="dc-reserved" aria-hidden="true">
+        <div class="dc-band"><span>Section C:</span><span class="dc-band-sub"> Employee Relations Response</span></div>
+        <div class="dc-field-grid dc-cols-4 dc-attached">
+          <div class="dc-cell">
+            <span class="dc-field-label">Emp. Relations Rep.</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Grievance Stage</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Number</span>
+            <div class="dc-value-blank"></div>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Comments</div>
+          <div class="dc-box dc-comments"></div>
+        </div>
+      </div>
+
+      <!-- ---- Section D: filled in by payroll ---- -->
+      <div class="dc-reserved" aria-hidden="true">
+        <div class="dc-band"><span>Section D:</span><span class="dc-band-sub"> Payroll &amp; Accounting Department</span></div>
+        <div class="dc-field-grid dc-cols-4 dc-attached">
+          <div class="dc-cell">
+            <span class="dc-field-label">Rate</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Hours</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Amount</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Pay Period</span>
+            <div class="dc-value-blank"></div>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Comments</div>
+          <div class="dc-box dc-comments"></div>
         </div>
       </div>
     </form>
   </section>
+
 
   <!-- ================= POLICY GRIEVANCE FORM ================= -->
   <section class="form-panel" id="form-policy" aria-labelledby="form-policy-heading">

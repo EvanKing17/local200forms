@@ -155,23 +155,6 @@ button:focus-visible,
   box-shadow: 0 2px 12px rgba(37, 99, 235, 0.12);
 }
 
-.form-card-preview {
-  width: 100%;
-  aspect-ratio: 8.5 / 11;
-  overflow: hidden;
-  border-radius: var(--radius-sm);
-  background: var(--c-col-bg);
-  border: 1px solid var(--c-border);
-  margin-bottom: 10px;
-}
-
-.form-card-preview iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  pointer-events: none;
-}
-
 .picker-index {
   font-size: 11px;
   color: var(--c-text-faint);
@@ -775,4 +758,291 @@ input[type="radio"] { width: 15px; height: 15px; }
     max-width: none;
     transform: translateY(-50%);
   }
+}
+
+/* ================= WYSIWYG document view (Ford form) =================
+ * Geometry is derived from the PDF, not chosen independently: the PDF is a US Letter page
+ * 612pt wide, rendered here at 816px, so 1pt = 1.3333px and every size below is a direct
+ * conversion of the value buildFordDoc() draws with. Change one and you must change both,
+ * or the "what you see" stops being "what you get".
+ *
+ *   page 612pt / margin 40pt / content 532pt      ->  816px / 53.333px / 709.333px
+ *   band 18pt, grid min 34pt, hour cell 32pt      ->  24px / 45.333px / 42.667px
+ *   label 6.5pt, value 9.5pt, body line 11pt      ->  8.667px / 12.667px / 14.667px
+ *
+ * Colours are the same style-guide palette as the DC constant in script.js.
+ */
+:root {
+  --dc-primary: #002855;
+  --dc-band-sub: #D9DFE5;
+  --dc-ink: #2A2824;
+  --dc-ink-soft: #3A382F;
+  --dc-label: #796E65;
+  --dc-label-soft: #8A8478;
+  --dc-border: #D9D4CC;
+  --dc-divider: #E4E1DC;
+  --dc-box-border: #A39C8F;
+  --dc-field-bg: #F7F6F4;
+
+  --dc-pad: 53.333px;      /* 40pt page margin */
+  --dc-gap: 13.333px;      /* 10pt gap between blocks */
+  --dc-cell-x: 6.667px;    /* 5pt cell text inset */
+  --dc-label-h: 12px;      /* 9pt label block */
+  --dc-line: 14.667px;     /* 11pt value line height */
+}
+
+.workspace.ford-fullwidth { grid-template-columns: 1fr; }
+.workspace.ford-fullwidth .preview-pane { display: none; }
+
+.dc-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: 816px;
+  margin: 0 auto 16px;
+  padding: 12px 0;
+  background: var(--c-bg);
+}
+
+.dc-page {
+  width: 816px;
+  max-width: 100%;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #CBC4BC;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: var(--dc-pad);
+  font-family: Helvetica, Arial, sans-serif;
+  color: var(--dc-ink);
+}
+
+/* ---- header lockup ---- */
+.dc-doc-title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 24px;
+  color: var(--dc-ink);
+}
+
+.dc-doc-rule {
+  border-bottom: 2px solid var(--dc-primary);
+  margin-top: 13.333px;
+  margin-bottom: 21.333px;
+}
+
+/* ---- section band ---- */
+.dc-band {
+  background: var(--dc-primary);
+  color: #fff;
+  height: 24px;
+  line-height: 24px;
+  padding: 0 10.667px;
+  font-size: 12.667px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dc-band .dc-band-sub { font-weight: 400; color: var(--dc-band-sub); }
+
+/* ---- field grid ----
+ * Cell height math mirrors boxedGrid(): 12px label block + 8px + N value lines + 8px,
+ * floored at 45.333px, so a value that wraps grows the row by exactly one 14.667px line
+ * in both the page and the PDF.
+ */
+.dc-field-grid {
+  display: grid;
+  border: 1px solid var(--dc-border);
+  min-height: 45.333px;
+}
+.dc-field-grid.dc-attached { border-top: none; }          /* sits flush under a band */
+.dc-field-grid.dc-standalone { border-radius: 3px; }
+
+.dc-cols-4 { grid-template-columns: repeat(4, 1fr); }
+.dc-cols-211 { grid-template-columns: 2fr 1fr 1fr; }
+
+.dc-field-grid > label,
+.dc-field-grid > .dc-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0;                 /* the base `label` rule sets a 6px gap; spacing here is explicit */
+  margin: 0;
+  padding: 0 var(--dc-cell-x) 8px;
+  border-right: 1px solid var(--dc-divider);
+  min-width: 0;
+}
+.dc-field-grid > label:last-child,
+.dc-field-grid > .dc-cell:last-child { border-right: none; }
+
+.dc-field-label {
+  font-size: 8.667px;
+  font-weight: 700;
+  line-height: var(--dc-label-h);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A textarea, not an input, so long values wrap onto a second line exactly as they do in
+   the PDF rather than scrolling out of sight. Enter is suppressed in script.js. */
+.dc-value {
+  margin-top: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12.667px;
+  line-height: var(--dc-line);
+  color: var(--dc-ink);
+  resize: none;
+  overflow: hidden;
+  display: block;
+}
+.dc-value:focus { outline: none; background: var(--dc-field-bg); }
+
+/* The date picker keeps its popup, but its trigger is stripped to plain document text so a
+   date cell is indistinguishable from any other value on the page. */
+.dc-field-grid .datepicker { margin-top: 8px; }
+
+.dc-field-grid .datepicker-trigger {
+  border: none;
+  background: transparent;
+  padding: 0;
+  min-height: 0;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12.667px;
+  line-height: var(--dc-line);
+  color: var(--dc-ink);
+}
+.dc-field-grid .datepicker-trigger:focus-visible {
+  outline: none;
+  background: var(--dc-field-bg);
+}
+.dc-field-grid .datepicker-trigger svg { width: 13px; height: 13px; }
+
+/* ---- labelled text box (Details of Incident, Comments) ---- */
+.dc-block { margin-top: var(--dc-gap); }
+
+.dc-box-label { margin-bottom: 8px; }
+
+.dc-box {
+  border: 1px solid var(--dc-border);
+  border-radius: 3px;
+  padding: 9px 7px 4px;
+}
+
+.dc-textarea {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12.667px;
+  line-height: 16px;          /* 12pt, matching flowTextBox */
+  color: var(--dc-ink-soft);
+  resize: none;
+  overflow: hidden;
+  min-height: 80px;
+}
+.dc-textarea:focus { outline: none; }
+
+.dc-box.dc-details { min-height: 93.333px; }   /* 70pt */
+.dc-box.dc-comments { min-height: 133.333px; } /* 100pt */
+
+/* ---- hours grid: two columns, so the gap lands on the 4-column grid's centre divider ---- */
+.dc-hours {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--dc-gap);
+  margin-top: var(--dc-gap);
+}
+
+.dc-hour-cell {
+  height: 42.667px;
+  border: 1px solid var(--dc-border);
+  border-radius: 3px;
+  padding: 4px 8px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;                 /* see the note on .dc-field-grid > label */
+}
+
+.dc-hour-cell .dc-field-label { line-height: var(--dc-label-h); }
+
+.dc-hour-cell input {
+  margin-top: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: 100%;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12.667px;
+  line-height: var(--dc-line);
+  color: var(--dc-ink);
+}
+.dc-hour-cell input:focus { outline: none; background: var(--dc-field-bg); }
+
+/* ---- department-use sections: shown because they print, but not editable here ---- */
+.dc-reserved { margin-top: var(--dc-gap); }
+
+.dc-approve-row {
+  position: relative;
+  height: 40px;                                  /* 30pt */
+  border: 1px solid var(--dc-border);
+  border-top: none;
+  display: flex;
+  align-items: center;
+}
+
+.dc-approve-row .dc-diagonal {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.dc-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;                                      /* 6pt label offset */
+  font-size: 12.667px;
+  color: var(--dc-ink);
+  position: absolute;
+}
+.dc-check::before {
+  content: "";
+  width: 20px;                                   /* 15pt — unchanged from the printed form */
+  height: 20px;
+  border: 1.33px solid var(--dc-box-border);
+  flex-shrink: 0;
+}
+.dc-check-approved { left: 21.333px; }
+.dc-check-denied { left: 62%; }
+
+/* Empty cells the department fills in on paper — same box, no control inside */
+.dc-cell .dc-value-blank {
+  margin-top: 8px;
+  min-height: var(--dc-line);
+}
+
+@media (max-width: 900px) {
+  .dc-page { padding: 24px 20px; }
+  .dc-toolbar { padding: 12px 0; }
+  .dc-cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .dc-cols-211 { grid-template-columns: 1fr; }
+  .dc-field-grid > label,
+  .dc-field-grid > .dc-cell {
+    border-right: none;
+    border-bottom: 1px solid var(--dc-divider);
+  }
+  .dc-hours { grid-template-columns: 1fr; }
 }
