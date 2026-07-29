@@ -73,11 +73,35 @@ function fd(form) {
   return data;
 }
 
-function fmtDate(iso) {
-  if (!iso) return '';
+/*
+ * Date spellings for one ISO date, fullest first: "December 31 2027", "Dec 31 2027",
+ * "12/31/2027". Dates read better spelled out, but a cell is only so wide — fmtDateFit picks
+ * the fullest one that actually fits so a long month can't overflow or get wrapped in half.
+ */
+function dateVariants(iso) {
+  if (!iso) return [''];
   const [y, m, d] = iso.split('-');
-  if (!y) return iso;
-  return `${m}/${d}/${y}`;
+  const monthIndex = parseInt(m, 10) - 1;
+  if (!y || !MONTH_NAMES_FULL[monthIndex]) return [iso];
+  const day = parseInt(d, 10);
+  return [
+    `${MONTH_NAMES_FULL[monthIndex]} ${day} ${y}`,
+    `${MONTH_NAMES_SHORT[monthIndex]} ${day} ${y}`,
+    `${m}/${d}/${y}`,
+  ];
+}
+
+/* The full spelling — for places with room to spare, or no width to measure against */
+function fmtDate(iso) {
+  return dateVariants(iso)[0];
+}
+
+/* The fullest spelling that fits maxWidth on one line at the grid's value size */
+function fmtDateFit(doc, iso, maxWidth) {
+  const variants = dateVariants(iso);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  return variants.find(v => doc.getTextWidth(v) <= maxWidth) || variants[variants.length - 1];
 }
 
 /* Strips any existing formatting ($, commas, ...) and returns a plain "0.00" string for the PDF */
@@ -110,6 +134,7 @@ function download(doc, filename) {
  * the suggested filename for whatever save behavior the browser is configured to use.
  */
 const MONTH_NAMES_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_NAMES_SHORT = MONTH_NAMES_FULL.map(m => m.slice(0, 3));
 
 function buildFilename(name, formTypeLabel) {
   const today = new Date();
@@ -309,31 +334,43 @@ function sectionBar(doc, x, y, w, boldLabel, restLabel) {
  * One continuous bordered row split into cells by thin divider lines.
  * Height grows automatically to fit whatever the label/value need — nothing is ever truncated.
  */
+/*
+ * Grid cell metrics, in points. CELL_X is generous enough that a wide first or last glyph
+ * can't touch the cell border or a rounded corner, and CELL_TOP keeps labels off the section
+ * band above them. The matching CSS in style.css converts each of these at 1pt = 1.3333px.
+ */
+const CELL_X = 7;          // text inset from the cell's left edge
+const CELL_TOP = 12;       // cell top to the bottom of a one-line label block
+const CELL_LABEL_GAP = 6;  // label block to the first value line
+const CELL_BOTTOM = 6;     // last value line to the cell's bottom edge
+const CELL_LINE = 11;      // value line height
+const CELL_MIN_H = 35;
+
 function prepareGridCells(doc, cells) {
   const labelFontSize = 6.5, valueFontSize = 9.5;
   return cells.map(c => {
     // Measured with the same bold face + tracking the label is drawn with, or the wrap
     // point would be computed against a narrower string than actually gets rendered.
     setLabelStyle(doc, labelFontSize);
-    const labelLines = doc.splitTextToSize(c.label.toUpperCase(), c.width - 8).slice(0, 2);
+    const labelLines = doc.splitTextToSize(c.label.toUpperCase(), c.width - CELL_X * 2).slice(0, 2);
     clearLabelStyle(doc);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(valueFontSize);
-    const valueLines = doc.splitTextToSize(c.value || '', c.width - 10);
+    const valueLines = doc.splitTextToSize(c.value || '', c.width - CELL_X * 2);
     return { ...c, labelLines, valueLines };
   });
 }
 
 function gridHeightFromPrepared(prepared, minH) {
-  const lineHeight = 11;
   const maxLabelLines = Math.max(1, ...prepared.map(p => p.labelLines.length));
   const maxValueLines = Math.max(1, ...prepared.map(p => p.valueLines.length));
-  const labelBlockH = 9 + (maxLabelLines - 1) * 7.5;
-  return { h: Math.max(minH, labelBlockH + 6 + maxValueLines * lineHeight + 6), labelBlockH };
+  const labelBlockH = CELL_TOP + (maxLabelLines - 1) * 7.5;
+  const h = labelBlockH + CELL_LABEL_GAP + maxValueLines * CELL_LINE + CELL_BOTTOM;
+  return { h: Math.max(minH, h), labelBlockH };
 }
 
 /* Measures the height boxedGrid(doc, x, y, w, cells, minH) would draw, without drawing it */
-function measureBoxedGrid(doc, cells, minH = 34) {
+function measureBoxedGrid(doc, cells, minH = CELL_MIN_H) {
   return gridHeightFromPrepared(prepareGridCells(doc, cells), minH).h;
 }
 
@@ -366,7 +403,7 @@ function drawResponseSection(doc, marginX, W, y, boldLabel, restLabel, gridCells
  * `attached` means this grid sits flush under a section band, so its top edge is the band's
  * bottom edge and only the lower corners are rounded.
  */
-function boxedGrid(doc, x, y, w, cells, minH = 34, attached = false) {
+function boxedGrid(doc, x, y, w, cells, minH = CELL_MIN_H, attached = false) {
   const valueFontSize = 9.5;
   const prepared = prepareGridCells(doc, cells);
   const { h, labelBlockH } = gridHeightFromPrepared(prepared, minH);
@@ -394,12 +431,12 @@ function boxedGrid(doc, x, y, w, cells, minH = 34, attached = false) {
   cx = x;
   prepared.forEach(c => {
     setLabelStyle(doc);
-    doc.text(c.labelLines, cx + 5, y + 9);
+    doc.text(c.labelLines, cx + CELL_X, y + 10.5);
     clearLabelStyle(doc);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(valueFontSize);
     doc.setTextColor(...DC.ink);
-    doc.text(c.valueLines, cx + 5, y + labelBlockH + 12);
+    doc.text(c.valueLines, cx + CELL_X, y + labelBlockH + CELL_LABEL_GAP + 8);
     cx += c.width;
   });
   return y + h;
@@ -413,7 +450,7 @@ function boxedGrid(doc, x, y, w, cells, minH = 34, attached = false) {
 function flowTextBox(doc, x, y, w, label, value, minH = 26) {
   const fontSize = 9.5, lineHeight = 12;
   doc.setFontSize(fontSize);
-  const allLines = doc.splitTextToSize(value || '', w - 10);
+  const allLines = doc.splitTextToSize(value || '', w - CELL_X * 2);
   let idx = 0, currentY = y, first = true;
   do {
     // If even the minimum box height won't fit before the page edge, start fresh on a new page
@@ -439,7 +476,7 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(fontSize);
     doc.setTextColor(...DC.inkSoft);
-    doc.text(allLines.slice(idx, idx + linesThisBox), x + 5, boxY + 14);
+    doc.text(allLines.slice(idx, idx + linesThisBox), x + CELL_X, boxY + 14);
     idx += linesThisBox;
     currentY = boxY + boxH;
     first = false;
@@ -451,7 +488,7 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
   return currentY;
 }
 
-const HOUR_CELL_H = 32;
+const HOUR_CELL_H = 36;
 
 /*
  * An hours cell in the guide's labelled-field style: its own bordered box with the label
@@ -463,14 +500,14 @@ function hourCell(doc, x, y, w, label, value) {
   doc.roundedRect(x, y, w, HOUR_CELL_H, DC_RADIUS, DC_RADIUS);
 
   setLabelStyle(doc);
-  doc.text(doc.splitTextToSize(label.toUpperCase(), w - 10)[0], x + 6, y + 11);
+  doc.text(doc.splitTextToSize(label.toUpperCase(), w - CELL_X * 2)[0], x + CELL_X, y + 10.5);
   clearLabelStyle(doc);
 
   const val = (value || '').toString();
   doc.setFont('helvetica', 'normal');
-  fitSingleLine(doc, val, w - 12, 9.5, 6.5);
+  fitSingleLine(doc, val, w - CELL_X * 2, 9.5, 6.5);
   doc.setTextColor(...DC.ink);
-  doc.text(val, x + 6, y + 24);
+  doc.text(val, x + CELL_X, y + 26);
   return y + HOUR_CELL_H;
 }
 
@@ -534,8 +571,8 @@ function buildFordDoc(data) {
   // dividers in this row land exactly on the dividers from the row above.
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Article Violation', value: data.article, width: w4 * 2 },
-    { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: w4 },
-    { label: 'Date Filed', value: fmtDate(data.dateFiled), width: w4 },
+    { label: 'Date of Incident', value: fmtDateFit(doc, data.dateIncident, w4 - CELL_X * 2), width: w4 },
+    { label: 'Date Filed', value: fmtDateFit(doc, data.dateFiled, w4 - CELL_X * 2), width: w4 },
   ]);
   y += 10;
 
@@ -637,8 +674,8 @@ function buildPolicyDoc(data) {
 
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Article Violation', value: data.article, width: w4 * 2 },
-    { label: 'Date of Incident', value: fmtDate(data.dateIncident), width: w4 },
-    { label: 'Date Filed', value: fmtDate(data.dateFiled), width: w4 },
+    { label: 'Date of Incident', value: fmtDateFit(doc, data.dateIncident, w4 - CELL_X * 2), width: w4 },
+    { label: 'Date Filed', value: fmtDateFit(doc, data.dateFiled, w4 - CELL_X * 2), width: w4 },
   ]);
   y += 10;
 
@@ -718,7 +755,7 @@ function buildUniforDoc(data) {
   y += 6;
 
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Seniority Date', value: fmtDate(data.seniorityDate), width: W / 2 },
+    { label: 'Seniority Date', value: fmtDateFit(doc, data.seniorityDate, W / 2 - CELL_X * 2), width: W / 2 },
     { label: 'Classification', value: data.classification, width: W / 2 },
   ]);
   y += 4;
@@ -739,7 +776,7 @@ function buildUniforDoc(data) {
 
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Superintendent', value: data.superintendent, width: W / 2 },
-    { label: 'Date of Incident', value: fmtDate(data.uniforDateIncident), width: W / 2 },
+    { label: 'Date of Incident', value: fmtDateFit(doc, data.uniforDateIncident, W / 2 - CELL_X * 2), width: W / 2 },
   ]);
   y += 6;
 
@@ -940,7 +977,7 @@ function buildInvestigationDoc(data) {
   ]);
   y += 4;
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Date of Infraction', value: fmtDate(data.dateInfraction), width: W / 2 },
+    { label: 'Date of Infraction', value: fmtDateFit(doc, data.dateInfraction, W / 2 - CELL_X * 2), width: W / 2 },
     { label: 'Dept #', value: data.deptNum, width: W / 2 },
   ]);
   y += 4;
@@ -1250,7 +1287,8 @@ function setupDatePicker(originalInput, options = {}) {
     const sel = selectedDate();
     const span = trigger.querySelector('.datepicker-value');
     if (sel) {
-      span.textContent = sel.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      // Spelled out to match what the PDF prints (see dateVariants)
+      span.textContent = `${MONTH_NAMES_FULL[sel.getMonth()]} ${sel.getDate()} ${sel.getFullYear()}`;
       span.classList.remove('is-placeholder');
     } else {
       span.textContent = placeholder;

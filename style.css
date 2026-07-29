@@ -767,7 +767,7 @@ input[type="radio"] { width: 15px; height: 15px; }
  * or the "what you see" stops being "what you get".
  *
  *   page 612pt / margin 40pt / content 532pt      ->  816px / 53.333px / 709.333px
- *   band 18pt, grid min 34pt, hour cell 32pt      ->  24px / 45.333px / 42.667px
+ *   band 18pt, grid min 35pt, hour cell 36pt      ->  24px / 46.667px / 48px
  *   label 6.5pt, value 9.5pt, body line 11pt      ->  8.667px / 12.667px / 14.667px
  *
  * Colours are the same style-guide palette as the DC constant in script.js.
@@ -786,9 +786,12 @@ input[type="radio"] { width: 15px; height: 15px; }
 
   --dc-pad: 53.333px;      /* 40pt page margin */
   --dc-gap: 13.333px;      /* 10pt gap between blocks */
-  --dc-cell-x: 6.667px;    /* 5pt cell text inset */
-  --dc-label-h: 12px;      /* 9pt label block */
-  --dc-line: 14.667px;     /* 11pt value line height */
+  --dc-cell-x: 9.333px;    /* 7pt  CELL_X — text inset from the cell edge */
+  --dc-cell-top: 6px;      /* the top of the 12pt CELL_TOP label block */
+  --dc-label-h: 10px;      /* the rest of it: the label's own line box */
+  --dc-label-gap: 8px;     /* 6pt  CELL_LABEL_GAP */
+  --dc-cell-bottom: 8px;   /* 6pt  CELL_BOTTOM */
+  --dc-line: 14.667px;     /* 11pt CELL_LINE — value line height */
 }
 
 .workspace.ford-fullwidth { grid-template-columns: 1fr; }
@@ -848,14 +851,14 @@ input[type="radio"] { width: 15px; height: 15px; }
 .dc-band .dc-band-sub { font-weight: 400; color: var(--dc-band-sub); }
 
 /* ---- field grid ----
- * Cell height math mirrors boxedGrid(): 12px label block + 8px + N value lines + 8px,
- * floored at 45.333px, so a value that wraps grows the row by exactly one 14.667px line
+ * Cell height math mirrors boxedGrid(): 16px label block + 8px + N value lines + 8px,
+ * floored at 46.667px, so a value that wraps grows the row by exactly one 14.667px line
  * in both the page and the PDF.
  */
 .dc-field-grid {
   display: grid;
   border: 1px solid var(--dc-border);
-  min-height: 45.333px;
+  min-height: 46.667px;                                  /* 35pt CELL_MIN_H */
 }
 .dc-field-grid.dc-attached { border-top: none; }          /* sits flush under a band */
 .dc-field-grid.dc-standalone { border-radius: 3px; }
@@ -869,7 +872,7 @@ input[type="radio"] { width: 15px; height: 15px; }
   flex-direction: column;
   gap: 0;                 /* the base `label` rule sets a 6px gap; spacing here is explicit */
   margin: 0;
-  padding: 0 var(--dc-cell-x) 8px;
+  padding: var(--dc-cell-top) var(--dc-cell-x) var(--dc-cell-bottom);
   border-right: 1px solid var(--dc-divider);
   min-width: 0;
 }
@@ -889,13 +892,16 @@ input[type="radio"] { width: 15px; height: 15px; }
 }
 
 /* A textarea, not an input, so long values wrap onto a second line exactly as they do in
-   the PDF rather than scrolling out of sight. Enter is suppressed in script.js. */
+   the PDF rather than scrolling out of sight. Enter is suppressed in script.js.
+   The 2px inset (cancelled by an equal negative margin) keeps the text starting on the
+   cell's inset while leaving the field itself a little wider, so wide first/last glyphs
+   aren't shaved off by the textarea's own clipping box. */
 .dc-value {
-  margin-top: 8px;
-  width: 100%;
+  margin: var(--dc-label-gap) -2px 0;
+  width: calc(100% + 4px);
   border: none;
   background: transparent;
-  padding: 0;
+  padding: 0 2px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 12.667px;
   line-height: var(--dc-line);
@@ -904,11 +910,11 @@ input[type="radio"] { width: 15px; height: 15px; }
   overflow: hidden;
   display: block;
 }
-.dc-value:focus { outline: none; background: var(--dc-field-bg); }
+.dc-value:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
 
 /* The date picker keeps its popup, but its trigger is stripped to plain document text so a
    date cell is indistinguishable from any other value on the page. */
-.dc-field-grid .datepicker { margin-top: 8px; }
+.dc-field-grid .datepicker { margin-top: var(--dc-label-gap); }
 
 .dc-field-grid .datepicker-trigger {
   border: none;
@@ -934,7 +940,7 @@ input[type="radio"] { width: 15px; height: 15px; }
 .dc-box {
   border: 1px solid var(--dc-border);
   border-radius: 3px;
-  padding: 9px 7px 4px;
+  padding: 9px var(--dc-cell-x) 4px;
 }
 
 .dc-textarea {
@@ -965,10 +971,10 @@ input[type="radio"] { width: 15px; height: 15px; }
 }
 
 .dc-hour-cell {
-  height: 42.667px;
+  height: 48px;                                          /* 36pt HOUR_CELL_H */
   border: 1px solid var(--dc-border);
   border-radius: 3px;
-  padding: 4px 8px;
+  padding: var(--dc-cell-top) var(--dc-cell-x);
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -978,17 +984,17 @@ input[type="radio"] { width: 15px; height: 15px; }
 .dc-hour-cell .dc-field-label { line-height: var(--dc-label-h); }
 
 .dc-hour-cell input {
-  margin-top: 8px;
+  margin: var(--dc-label-gap) -2px 0;
+  width: calc(100% + 4px);
   border: none;
   background: transparent;
-  padding: 0;
-  width: 100%;
+  padding: 0 2px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 12.667px;
   line-height: var(--dc-line);
   color: var(--dc-ink);
 }
-.dc-hour-cell input:focus { outline: none; background: var(--dc-field-bg); }
+.dc-hour-cell input:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
 
 /* ---- department-use sections: shown because they print, but not editable here ---- */
 .dc-reserved { margin-top: var(--dc-gap); }
@@ -1030,7 +1036,7 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 /* Empty cells the department fills in on paper — same box, no control inside */
 .dc-cell .dc-value-blank {
-  margin-top: 8px;
+  margin-top: var(--dc-label-gap);
   min-height: var(--dc-line);
 }
 
