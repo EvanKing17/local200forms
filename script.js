@@ -1283,7 +1283,10 @@ function setupDatePicker(originalInput, options = {}) {
   const startView = options.startView || 'days';
   const name = originalInput.name;
   const originalId = originalInput.id;
-  const placeholder = 'Select date';
+  // Empty rather than "Select date": the field's own label already says it's a date, and the
+  // calendar icon is what makes it look clickable. An unset date now reads like any other
+  // blank field on the page.
+  const placeholder = '';
 
   const hidden = document.createElement('input');
   hidden.type = 'hidden';
