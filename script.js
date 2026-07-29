@@ -387,10 +387,12 @@ function sectionBar(doc, x, y, w, boldLabel, restLabel) {
   doc.setFontSize(9.5);
   doc.setTextColor(255, 255, 255);
   doc.text(boldLabel, x + 8, y + 12);
-  const bw = doc.getTextWidth(boldLabel);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...DC.bandSub);
-  doc.text(restLabel, x + 8 + bw, y + 12);
+  if (restLabel) {
+    const bw = doc.getTextWidth(boldLabel);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...DC.bandSub);
+    doc.text(restLabel, x + 8 + bw, y + 12);
+  }
   return y + h;
 }
 
@@ -523,11 +525,16 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
       doc.addPage();
       currentY = 40;
     }
-    const text = first ? label : label.replace(/:\s*$/, '') + ' (continued):';
-    setLabelStyle(doc);
-    doc.text(text.replace(/:\s*$/, '').toUpperCase(), x, currentY);
-    clearLabelStyle(doc);
-    const boxY = currentY + 6;
+    // An empty label means the box is already named by the section band above it, so the
+    // label line is skipped entirely rather than left as a blank gap.
+    let boxY = currentY;
+    if (label) {
+      const text = first ? label : label.replace(/:\s*$/, '') + ' (continued):';
+      setLabelStyle(doc);
+      doc.text(text.replace(/:\s*$/, '').toUpperCase(), x, currentY);
+      clearLabelStyle(doc);
+      boxY = currentY + 6;
+    }
     const availH = PAGE_BOTTOM - boxY;
     const maxLines = Math.max(1, Math.floor((availH - 10) / lineHeight));
     const remaining = allLines.length - idx;
@@ -1054,8 +1061,8 @@ function buildInvestigationDoc(data) {
 
   const w4 = W / 4;
 
-  // ---- Section A: where and when ----
-  y = sectionBar(doc, marginX, y, W, 'Section A:', ' Incident Details');
+  // ---- Details: where, when, and who was in the room ----
+  y = sectionBar(doc, marginX, y, W, 'Details', '');
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Name of Supervisor', value: data.supervisorName, width: w4 * 2 },
     { label: 'Area', value: data.area, width: w4 },
@@ -1067,24 +1074,24 @@ function buildInvestigationDoc(data) {
     { label: 'Time', value: data.time, width: w4 },
     { label: 'Name of Witnesses', value: data.witnessNames, width: w4 * 2 },
   ]);
-  y += 14;
-
-  // ---- Section B: who was in the room ----
-  y = sectionBar(doc, marginX, y, W, 'Section B:', ' Present at Investigation');
+  y += 10;
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Unifor Representative', value: data.uniforRep, width: w4 * 2 },
     { label: 'HR Representative', value: data.hrRep, width: w4 * 2 },
-  ], CELL_MIN_H, true);
+  ]);
   y += 14;
 
-  // ---- Section C: the account ----
-  y = sectionBar(doc, marginX, y, W, 'Section C:', ' Investigation & Resolution');
+  // ---- Investigation: the account, and the supervisor's answer to it ----
+  y = sectionBar(doc, marginX, y, W, 'Investigation', '');
   y += 12;
   y = flowTextBox(doc, marginX, y, W, 'Investigation of Incident:', data.investigation, 160);
   y += 14;
   y = flowTextBox(doc, marginX, y, W, "Supervisor's Remarks:", data.supervisorRemarks, 120);
   y += 14;
-  flowTextBox(doc, marginX, y, W, 'Resolution:', data.resolution, 100);
+
+  // ---- Resolution: one box, already named by the band, so no label of its own ----
+  y = sectionBar(doc, marginX, y, W, 'Resolution', '');
+  flowTextBox(doc, marginX, y + 8, W, '', data.resolution, 100);
 
   embedFormData(doc, 'investigation', data);
   return doc;
