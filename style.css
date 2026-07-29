@@ -779,12 +779,16 @@ input[type="radio"] { width: 15px; height: 15px; }
   padding: 9px var(--dc-cell-x) 4px;
 }
 
+/* The 2px inset, cancelled by an equal negative margin, is the same trick .dc-value uses:
+   the text still starts on the box's own inset, but the field is wider than its text, so the
+   textarea's clipping edge can't shave the left side of the first letter. */
 .dc-textarea {
   display: block;
-  width: 100%;
+  width: calc(100% + 4px);
+  margin: 0 -2px;
   border: none;
   background: transparent;
-  padding: 0;
+  padding: 0 2px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 12.667px;
   line-height: 16px;          /* 12pt, matching flowTextBox */
@@ -1094,14 +1098,8 @@ input[type="radio"] { width: 15px; height: 15px; }
   margin-bottom: 18px;
 }
 
-/* Label over value, no fill — the grey chip this used to be read as page furniture
-   rather than as part of the form. */
-.dc-sp {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
+/* Just the number, no label and no fill — the "SP-" prefix already says what it is, and the
+   grey chip this used to be read as page furniture rather than as part of the form. */
 .dc-sp-value {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 14.667px;

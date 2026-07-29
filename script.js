@@ -256,11 +256,8 @@ function drawUniforLogo(doc, rightEdgeX, topY, width = 110) {
 /* SP number + logo, repeated at the top of every Unifor Fact Sheet page. Returns the y to start content at. */
 function drawUniforPageHeader(doc, marginX, W, data) {
   const y = 44;
-  // Label above the number, in the same field style as the rest of the document — the grey
-  // fill this used to have made it read as a UI chip rather than part of the form.
-  setLabelStyle(doc);
-  doc.text('SP NUMBER', marginX, y + 4);
-  clearLabelStyle(doc);
+  // Just the number, no label — the "SP-" prefix already says what it is, and the grey fill
+  // this used to sit on read as a UI chip rather than part of the form.
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...DC.ink);
