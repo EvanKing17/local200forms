@@ -67,7 +67,7 @@
   <section class="form-panel active" id="form-ford" aria-labelledby="form-ford-heading">
     <div class="dc-toolbar">
       <button type="button" class="btn-secondary" id="fordClear">Clear form</button>
-      <button type="submit" class="btn-primary" form="fordForm">Generate PDF</button>
+      <button type="submit" class="btn-primary" form="fordForm">Preview PDF</button>
     </div>
 
     <form id="fordForm" class="dc-page">
@@ -244,7 +244,7 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
         </div>
         <div class="sheet-header-actions">
           <button type="button" class="btn-secondary" id="policyClear">Clear form</button>
-          <button type="submit" class="btn-primary">Generate PDF</button>
+          <button type="submit" class="btn-primary">Preview PDF</button>
         </div>
       </div>
 
@@ -294,7 +294,7 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
         </div>
         <div class="sheet-header-actions">
           <button type="button" class="btn-secondary" id="uniforClear">Clear form</button>
-          <button type="submit" class="btn-primary">Generate PDF</button>
+          <button type="submit" class="btn-primary">Preview PDF</button>
         </div>
       </div>
 
@@ -499,7 +499,7 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
         </div>
         <div class="sheet-header-actions">
           <button type="button" class="btn-secondary" id="investigationClear">Clear form</button>
-          <button type="submit" class="btn-primary">Generate PDF</button>
+          <button type="submit" class="btn-primary">Preview PDF</button>
         </div>
       </div>
 
@@ -584,6 +584,21 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
 <button type="button" class="preview-toggle" id="previewToggle" aria-expanded="false" aria-controls="previewPane">
   Preview
 </button>
+
+<!-- Full-screen PDF preview. The iframe is the browser's own PDF viewer, so its toolbar
+     handles zoom and page navigation; Download is ours because the native one would name the
+     file after the blob URL rather than the grievance. -->
+<div class="pdf-viewer" id="pdfViewer" hidden role="dialog" aria-modal="true" aria-labelledby="pdfViewerName">
+  <div class="pdf-viewer-bar">
+    <span class="pdf-viewer-name" id="pdfViewerName"></span>
+    <div class="pdf-viewer-actions">
+      <button type="button" class="btn-secondary" id="pdfViewerPrint">Print</button>
+      <button type="button" class="btn-primary" id="pdfViewerDownload">Download</button>
+      <button type="button" class="pdf-viewer-close" id="pdfViewerClose" aria-label="Close preview">&times;</button>
+    </div>
+  </div>
+  <iframe id="pdfViewerFrame" title="PDF preview"></iframe>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>

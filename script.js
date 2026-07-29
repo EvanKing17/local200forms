@@ -128,6 +128,60 @@ function download(doc, filename) {
   doc.save(filename);
 }
 
+/* ============ Full-screen PDF preview ============ */
+const pdfViewer = document.getElementById('pdfViewer');
+const pdfViewerFrame = document.getElementById('pdfViewerFrame');
+const pdfViewerName = document.getElementById('pdfViewerName');
+let viewerDoc = null;
+let viewerFilename = '';
+let viewerUrl = null;
+
+function openPdfViewer(doc, filename) {
+  viewerDoc = doc;
+  viewerFilename = filename;
+  if (viewerUrl) URL.revokeObjectURL(viewerUrl);
+  viewerUrl = URL.createObjectURL(doc.output('blob'));
+
+  pdfViewerName.textContent = filename;
+  // Toolbar left on — that's what gives the viewer its own print, zoom and page controls.
+  pdfViewerFrame.src = viewerUrl + '#navpanes=0&view=FitH';
+  pdfViewer.hidden = false;
+  document.body.style.overflow = 'hidden';
+  document.getElementById('pdfViewerClose').focus();
+}
+
+function closePdfViewer() {
+  pdfViewer.hidden = true;
+  // Drop the src before revoking, or the viewer can blank out mid-teardown
+  pdfViewerFrame.removeAttribute('src');
+  document.body.style.overflow = '';
+  if (viewerUrl) {
+    URL.revokeObjectURL(viewerUrl);
+    viewerUrl = null;
+  }
+  viewerDoc = null;
+}
+
+document.getElementById('pdfViewerClose').addEventListener('click', closePdfViewer);
+
+document.getElementById('pdfViewerDownload').addEventListener('click', () => {
+  if (viewerDoc) download(viewerDoc, viewerFilename);
+});
+
+document.getElementById('pdfViewerPrint').addEventListener('click', () => {
+  // Printing an embedded PDF is inconsistent across browsers, so fall back to opening the
+  // file in its own tab where the viewer's own print button is always available.
+  try {
+    pdfViewerFrame.contentWindow.print();
+  } catch {
+    window.open(viewerUrl, '_blank', 'noopener');
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !pdfViewer.hidden) closePdfViewer();
+});
+
 /*
  * "NAME - MMDDYYYY FORMTYPE.pdf" — a real Save As dialog isn't something a page can force open
  * (that's the user's own "always ask where to save files" browser setting); this just supplies
@@ -643,7 +697,7 @@ fordForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildFordDoc(data);
-  download(doc, buildFilename(data.employeeName, 'Grievance Claim'));
+  openPdfViewer(doc, buildFilename(data.employeeName, 'Grievance Claim'));
 });
 
 document.getElementById('fordClear').addEventListener('click', () => {
@@ -721,7 +775,7 @@ policyForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildPolicyDoc(data);
-  download(doc, buildFilename(data.employeeName, 'Policy Grievance'));
+  openPdfViewer(doc, buildFilename(data.employeeName, 'Policy Grievance'));
 });
 
 document.getElementById('policyClear').addEventListener('click', () => {
@@ -940,7 +994,7 @@ uniforForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildUniforDoc(data);
-  download(doc, buildFilename(data.grievorName, 'Fact Sheet'));
+  openPdfViewer(doc, buildFilename(data.grievorName, 'Fact Sheet'));
 });
 
 document.getElementById('uniforClear').addEventListener('click', () => {
@@ -1007,7 +1061,7 @@ investigationForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildInvestigationDoc(data);
-  download(doc, buildFilename(data.supervisorName, 'Investigation Form'));
+  openPdfViewer(doc, buildFilename(data.supervisorName, 'Investigation Form'));
 });
 
 document.getElementById('investigationClear').addEventListener('click', () => {
