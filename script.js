@@ -49,15 +49,7 @@ function applyFormsConfig() {
   });
 }
 
-/* ============ Mobile preview toggle ============ */
 const workspace = document.getElementById('workspace');
-const previewToggle = document.getElementById('previewToggle');
-
-previewToggle.addEventListener('click', () => {
-  const open = workspace.classList.toggle('preview-open');
-  previewToggle.textContent = open ? 'Edit' : 'Preview';
-  previewToggle.setAttribute('aria-expanded', String(open));
-});
 
 /* ============ Helpers ============ */
 function debounce(fn, delay) {
@@ -1068,63 +1060,6 @@ document.getElementById('investigationClear').addEventListener('click', () => {
   clearForm(investigationForm);
 });
 
-/* ============ Live preview ============ */
-const previewFrame = document.getElementById('pdfPreview');
-let previewUrl = null;
-
-const FORM_BUILDERS = {
-  ford: { form: fordForm, build: buildFordDoc, label: 'Grievance Claim' },
-  policy: { form: policyForm, build: buildPolicyDoc, label: 'Policy Grievance' },
-  unifor: { form: uniforForm, build: buildUniforDoc, label: 'Fact Sheet' },
-  investigation: { form: investigationForm, build: buildInvestigationDoc, label: 'Investigation Form' },
-};
-
-let currentFormType = null;
-
-function renderPreview() {
-  if (!currentFormType || currentFormType === 'ford') return;
-  const entry = FORM_BUILDERS[currentFormType];
-  const doc = entry.build(fd(entry.form));
-  const blobUrl = URL.createObjectURL(doc.output('blob'));
-
-  // Fade out instead of an abrupt white reload flash while the new PDF loads in.
-  // Leave the toolbar on (zoom, page nav, print/download) — navpanes=0 hides the thumbnail
-  // sidebar, and view=FitH scales the page to fit the preview pane's width on load.
-  previewFrame.classList.add('is-refreshing');
-  previewFrame.onload = () => previewFrame.classList.remove('is-refreshing');
-  previewFrame.src = blobUrl + '#navpanes=0&view=FitH';
-
-  if (previewUrl) URL.revokeObjectURL(previewUrl);
-  previewUrl = blobUrl;
-}
-
-const updateActivePreview = debounce(renderPreview, 800);
-
-/* Live-refresh toggle: while off, edits no longer auto-render — a manual refresh button appears instead */
-const liveRefreshToggle = document.getElementById('liveRefreshToggle');
-const manualRefreshBtn = document.getElementById('manualRefreshBtn');
-
-function maybeUpdatePreview() {
-  if (liveRefreshToggle.checked) updateActivePreview();
-}
-
-liveRefreshToggle.addEventListener('change', () => {
-  manualRefreshBtn.hidden = liveRefreshToggle.checked;
-  if (liveRefreshToggle.checked) renderPreview();
-});
-
-manualRefreshBtn.addEventListener('click', renderPreview);
-
-fordForm.addEventListener('input', maybeUpdatePreview);
-fordForm.addEventListener('change', maybeUpdatePreview);
-policyForm.addEventListener('input', maybeUpdatePreview);
-policyForm.addEventListener('change', maybeUpdatePreview);
-uniforForm.addEventListener('input', maybeUpdatePreview);
-uniforForm.addEventListener('change', maybeUpdatePreview);
-investigationForm.addEventListener('input', maybeUpdatePreview);
-investigationForm.addEventListener('change', maybeUpdatePreview);
-
-renderPreview();
 
 /* ============ Unsaved-changes guard ============ */
 function formHasData(form) {
@@ -1142,6 +1077,16 @@ window.addEventListener('beforeunload', (e) => {
   }
 });
 
+/* ============ Form registry ============ */
+const FORM_BUILDERS = {
+  ford: { form: fordForm, build: buildFordDoc, label: 'Grievance Claim' },
+  policy: { form: policyForm, build: buildPolicyDoc, label: 'Policy Grievance' },
+  unifor: { form: uniforForm, build: buildUniforDoc, label: 'Fact Sheet' },
+  investigation: { form: investigationForm, build: buildInvestigationDoc, label: 'Investigation Form' },
+};
+
+let currentFormType = null;
+
 /* ============ Home / fill-form view routing ============ */
 const homeView = document.getElementById('homeView');
 
@@ -1149,7 +1094,6 @@ function showHome() {
   currentFormType = null;
   homeView.hidden = false;
   workspace.hidden = true;
-  previewToggle.style.display = 'none';
 }
 
 /*
@@ -1165,7 +1109,6 @@ function clearForm(form) {
   });
   form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
-  renderPreview();
 }
 
 /* Fills a form's fields (including custom date pickers) from a plain {name: value} object */
@@ -1188,8 +1131,6 @@ function showForm(type, data) {
   currentFormType = type;
   homeView.hidden = true;
   workspace.hidden = false;
-  workspace.classList.toggle('ford-fullwidth', type === 'ford');
-  previewToggle.style.display = type === 'ford' ? 'none' : '';
   panels.forEach(p => p.classList.remove('active'));
   document.getElementById('form-' + type).classList.add('active');
   const entry = FORM_BUILDERS[type];
@@ -1198,7 +1139,6 @@ function showForm(type, data) {
   document.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   // scrollHeight reads 0 while the panel is hidden, so size the textareas now that it's visible
   entry.form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
-  if (type !== 'ford') renderPreview();
 }
 
 document.querySelectorAll('.form-card').forEach(card => {
@@ -1579,7 +1519,6 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
     setTimeout(() => {
       form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
       form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
-      renderPreview();
     }, 0);
   });
 });
@@ -1840,3 +1779,76 @@ document.getElementById('adminPublish').addEventListener('click', async () => {
     publishBtn.disabled = false;
   }
 });
+
+/* ============ Unifor sheet chrome ============ */
+/* The logo is bundled as base64 (unifor-logo.js) rather than a file, so the document view and
+   the PDF draw the same bytes and neither needs a network request. */
+document.querySelectorAll('[data-unifor-logo]').forEach(img => {
+  if (window.UNIFOR_LOGO_PNG) img.src = window.UNIFOR_LOGO_PNG;
+});
+
+/* Pages 2-5 repeat the SP number from page 1, the same way drawUniforPageHeader does */
+const spInput = uniforForm.elements.spNumber;
+const spMirrors = document.querySelectorAll('[data-sp-mirror]');
+
+function syncSpNumber() {
+  const text = 'SP-' + (spInput.value || '');
+  spMirrors.forEach(el => { el.textContent = text; });
+}
+
+if (spInput) {
+  spInput.addEventListener('input', syncSpNumber);
+  uniforForm.addEventListener('reset', () => setTimeout(syncSpNumber, 0));
+  syncSpNumber();
+}
+
+/* ============ Loading skeleton ============
+ *
+ * Sized from the real cards rather than a generic placeholder template — one bar per form, at
+ * that card's measured height — so it can't drift from the content. Add a fifth form and the
+ * skeleton grows on its own.
+ *
+ * It only covers a wait that genuinely exists. Everything in this app is static except jsPDF,
+ * which is ~350KB from a CDN, and until it lands "Preview PDF" can't do anything. Once the
+ * cards are real and jsPDF has arrived, the skeleton goes away. Switching between forms isn't
+ * covered because nothing is loading there — the panels are already in the document, and a
+ * skeleton over an instant transition would be an animation pretending to be work.
+ */
+const skeleton = document.getElementById('skeleton');
+const cardGrid = document.querySelector('.form-cards');
+
+function buildSkeleton() {
+  if (!skeleton || !cardGrid) return;
+  const cards = cardGrid.querySelectorAll('.form-card');
+  if (!cards.length) return;
+
+  skeleton.innerHTML = '';
+  cards.forEach(card => {
+    const bar = document.createElement('div');
+    bar.className = 'skel-card';
+    bar.style.height = card.getBoundingClientRect().height + 'px';
+    skeleton.appendChild(bar);
+  });
+  skeleton.hidden = false;
+  cardGrid.classList.add('is-loading');
+}
+
+function appReady() {
+  if (skeleton) skeleton.hidden = true;
+  if (cardGrid) cardGrid.classList.remove('is-loading');
+  document.body.classList.add('is-ready');
+}
+
+if (window.jspdf) {
+  appReady();
+} else {
+  buildSkeleton();
+  const poll = setInterval(() => {
+    if (!window.jspdf) return;
+    clearInterval(poll);
+    appReady();
+  }, 60);
+  // Don't strand the page behind a skeleton if the CDN is blocked — show it anyway and let
+  // the PDF buttons report the failure themselves.
+  setTimeout(() => { clearInterval(poll); appReady(); }, 8000);
+}

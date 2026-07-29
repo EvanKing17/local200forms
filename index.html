@@ -4,23 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grievance Forms</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<header class="topbar">
-  <div class="brand">
-    <span class="brand-mark">§</span>
-    <div class="brand-text">
-      <span class="brand-title">Grievance Forms</span>
-    </div>
-  </div>
-</header>
 
 <!-- ================= HOME: FORM LIBRARY ================= -->
 <div class="home-view" id="homeView">
   <h1 class="home-title">Forms</h1>
   <p class="home-sub">Pick a form to fill in, or upload a PDF this app already generated to pick up where you left off.</p>
+
+  <div class="skeleton" id="skeleton" hidden aria-hidden="true"></div>
 
   <div class="form-cards">
     <button class="form-card" data-form="ford">
@@ -235,355 +229,527 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
   </section>
 
 
-  <!-- ================= POLICY GRIEVANCE FORM ================= -->
+
+  <!-- ================= POLICY GRIEVANCE FORM (document view) =================
+       buildPolicyDoc() is the Ford document without the hours grid or Section D. -->
   <section class="form-panel" id="form-policy" aria-labelledby="form-policy-heading">
-    <form id="policyForm">
-      <div class="sheet-header">
-        <div class="sheet-header-text">
-          <h1 id="form-policy-heading">Policy Grievance Form</h1>
-        </div>
-        <div class="sheet-header-actions">
-          <button type="button" class="btn-secondary" id="policyClear">Clear form</button>
-          <button type="submit" class="btn-primary">Preview PDF</button>
+    <div class="dc-toolbar">
+      <button type="button" class="btn-secondary" id="policyClear">Clear form</button>
+      <button type="submit" class="btn-primary" form="policyForm">Preview PDF</button>
+    </div>
+
+    <form id="policyForm" class="dc-page">
+      <div class="dc-doc-title" id="form-policy-heading">Policy Grievance Form</div>
+      <div class="dc-doc-rule"></div>
+
+      <div class="dc-band"><span>Section A:</span><span class="dc-band-sub"> Employee Details &amp; Grievance Summary</span></div>
+      <div class="dc-field-grid dc-cols-4 dc-attached">
+        <label>
+          <span class="dc-field-label">Employee Name</span>
+          <textarea class="dc-value" name="employeeName" rows="1" autocomplete="off">Evan Robert King Thompson MacGregor</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Global ID</span>
+          <textarea class="dc-value" name="globalId" rows="1" autocomplete="off">002173535</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Department</span>
+          <textarea class="dc-value" name="department" rows="1" autocomplete="off">8383 - Heads Godzilla Motorline</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Process Coach</span>
+          <textarea class="dc-value" name="processCoach" rows="1" autocomplete="off">Wes Macauley, Johnny Appleseed</textarea>
+        </label>
+      </div>
+
+      <div class="dc-field-grid dc-cols-211 dc-standalone dc-block">
+        <label>
+          <span class="dc-field-label">Article Violation</span>
+          <textarea class="dc-value" name="article" rows="1" autocomplete="off" placeholder="e.g. Article 78">Article 8.01, 3.02</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Date of Incident</span>
+          <input type="date" name="dateIncident" value="2026-07-14">
+        </label>
+        <label>
+          <span class="dc-field-label">Date Filed</span>
+          <input type="date" name="dateFiled" value="2026-07-29">
+        </label>
+      </div>
+
+      <div class="dc-block">
+        <div class="dc-field-label dc-box-label">Details of Incident</div>
+        <div class="dc-box dc-details">
+          <textarea class="dc-textarea" name="details" placeholder="What happened, in your own words — who, what, when, where, and why it violates the agreement.">The posted attendance policy was applied inconsistently across shifts, resulting in a written warning issued to the grievor for an absence that would not have been counted under the policy as applied to other employees in the same classification. This is a policy grievance affecting the interpretation and application of the attendance policy generally, not an individual pay or hours dispute.</textarea>
         </div>
       </div>
 
-      <div class="section">
-        <div class="section-title">Section A — Employee Details &amp; Grievance Summary</div>
-        <div class="grid grid-4">
-          <label>Employee Name
-            <input type="text" name="employeeName" autocomplete="off" value="Evan Robert King Thompson MacGregor">
-          </label>
-          <label>Global ID
-            <input type="text" name="globalId" autocomplete="off" value="002173535">
-          </label>
-          <label>Department
-            <input type="text" name="department" autocomplete="off" value="8383 - Heads Godzilla Motorline">
-          </label>
-          <label>Process Coach
-            <input type="text" name="processCoach" autocomplete="off" value="Wes Macauley, Johnny Appleseed">
-          </label>
+      <div class="dc-reserved" aria-hidden="true">
+        <div class="dc-band"><span>Section B:</span><span class="dc-band-sub"> Department Response</span></div>
+        <div class="dc-approve-row">
+          <svg class="dc-diagonal" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line x1="42" y1="0" x2="58" y2="100" stroke="#E4E1DC" vector-effect="non-scaling-stroke"></line>
+          </svg>
+          <span class="dc-check dc-check-approved">Grievance Approved</span>
+          <span class="dc-check dc-check-denied">Grievance Denied</span>
         </div>
-
-        <div class="grid grid-3">
-          <label>Article Violation
-            <input type="text" name="article" autocomplete="off" placeholder="e.g. Article 78" value="Article 8.01, 3.02">
-          </label>
-          <label>Date of Incident
-            <input type="date" name="dateIncident" value="2026-07-14">
-          </label>
-          <label>Date Filed
-            <input type="date" name="dateFiled" value="2026-07-29">
-          </label>
+        <div class="dc-field-grid dc-cols-211 dc-attached">
+          <div class="dc-cell">
+            <span class="dc-field-label">Department Representative</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Department Charge No</span>
+            <div class="dc-value-blank"></div>
+          </div>
         </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Comments</div>
+          <div class="dc-box dc-comments"></div>
+        </div>
+      </div>
 
-        <label class="full">Details of Incident
-          <textarea name="details" rows="9" placeholder="What happened, in your own words — who, what, when, where, and why it violates the agreement.">The posted attendance policy was applied inconsistently across shifts, resulting in a written warning issued to the grievor for an absence that would not have been counted under the policy as applied to other employees in the same classification. This is a policy grievance affecting the interpretation and application of the attendance policy generally, not an individual pay or hours dispute.</textarea>
-        </label>
+      <div class="dc-reserved" aria-hidden="true">
+        <div class="dc-band"><span>Section C:</span><span class="dc-band-sub"> Employee Relations Response</span></div>
+        <div class="dc-field-grid dc-cols-4 dc-attached">
+          <div class="dc-cell">
+            <span class="dc-field-label">Emp. Relations Rep.</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Grievance Stage</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <div class="dc-cell">
+            <span class="dc-field-label">Number</span>
+            <div class="dc-value-blank"></div>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Comments</div>
+          <div class="dc-box dc-comments"></div>
+        </div>
       </div>
     </form>
   </section>
 
-  <!-- ================= UNIFOR FORM ================= -->
+  <!-- ================= UNIFOR FACT SHEET (document view) =================
+       buildUniforDoc() calls addPage() at fixed points, so this form's page breaks aren't
+       computed — they're part of the design. Each sheet below is one printed page, with the
+       same repeated SP header and "pg. N / 5" footer the PDF draws. -->
   <section class="form-panel" id="form-unifor" aria-labelledby="form-unifor-heading">
-    <form id="uniforForm">
-      <div class="sheet-header">
-        <div class="sheet-header-text">
-          <h1 id="form-unifor-heading">Local 200 Grievance Committee Fact Sheet</h1>
-          <p class="sheet-note">For local union use only — accompanies first stage grievance appealed to Bargaining Committee</p>
-        </div>
-        <div class="sheet-header-actions">
-          <button type="button" class="btn-secondary" id="uniforClear">Clear form</button>
-          <button type="submit" class="btn-primary">Preview PDF</button>
-        </div>
-      </div>
+    <div class="dc-toolbar">
+      <button type="button" class="btn-secondary" id="uniforClear">Clear form</button>
+      <button type="submit" class="btn-primary" form="uniforForm">Preview PDF</button>
+    </div>
 
-      <div class="section">
-        <div class="grid grid-3">
-          <label>SP Number
-            <div class="inline-prefix"><span>SP-</span><input type="text" name="spNumber" autocomplete="off" value="1024"></div>
-          </label>
-          <label>Grievor's Name
-            <input type="text" name="grievorName" autocomplete="off" value="Jane Marie Doe">
-          </label>
-          <label>GID #
-            <input type="text" name="gid" autocomplete="off" value="G88452">
-          </label>
+    <form id="uniforForm" class="dc-sheets">
+      <!-- ---- Page 1 ---- -->
+      <div class="dc-page">
+        <div class="dc-page-head">
+          <span class="dc-sp">SP-<input type="text" name="spNumber" autocomplete="off" value="1024" size="6"></span>
+          <img class="dc-logo" alt="Unifor" data-unifor-logo>
         </div>
 
-        <div class="grid grid-3">
-          <label>Dept
-            <input type="text" name="dept" autocomplete="off" value="Trim & Final Assembly">
+        <div class="dc-doc-title dc-centered" id="form-unifor-heading">Local 200 Grievance Committee Fact Sheet</div>
+        <p class="dc-doc-note">For Local Union Use Only</p>
+        <p class="dc-doc-note">This form to accompany First Stage Grievance appealed to Bargaining Committee</p>
+
+        <div class="dc-field-grid dc-standalone dc-block" style="grid-template-columns: 45fr 25fr 30fr;">
+          <label>
+            <span class="dc-field-label">Grievor's Name</span>
+            <textarea class="dc-value" name="grievorName" rows="1" autocomplete="off">Jane Marie Doe</textarea>
           </label>
-          <label>Seniority Date
+          <label>
+            <span class="dc-field-label">GID #</span>
+            <textarea class="dc-value" name="gid" rows="1" autocomplete="off">G88452</textarea>
+          </label>
+          <label>
+            <span class="dc-field-label">Dept</span>
+            <textarea class="dc-value" name="dept" rows="1" autocomplete="off">Trim &amp; Final Assembly</textarea>
+          </label>
+        </div>
+
+        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+          <label>
+            <span class="dc-field-label">Seniority Date</span>
             <input type="date" name="seniorityDate" value="1998-04-02">
           </label>
-          <label>Classification
-            <input type="text" name="classification" autocomplete="off" value="Machine Repair Technician">
+          <label>
+            <span class="dc-field-label">Classification</span>
+            <textarea class="dc-value" name="classification" rows="1" autocomplete="off">Machine Repair Technician</textarea>
           </label>
         </div>
 
-        <div class="grid grid-3">
-          <label>Time in Classification
-            <input type="text" name="timeInClass" autocomplete="off" value="6 years, 3 months">
+        <div class="dc-field-grid dc-standalone dc-block" style="grid-template-columns: 40fr 30fr 30fr;">
+          <label>
+            <span class="dc-field-label">Time in Classification</span>
+            <textarea class="dc-value" name="timeInClass" rows="1" autocomplete="off">6 years, 3 months</textarea>
           </label>
-          <label>Rate $
-            <input type="text" name="rate" class="currency-input" inputmode="decimal" placeholder="0.00" value="$34.87">
+          <label>
+            <span class="dc-field-label">Rate $</span>
+            <input type="text" class="dc-value-input currency-input" name="rate" inputmode="decimal" placeholder="0.00" value="$34.87">
           </label>
-          <label>COLA $
-            <input type="text" name="cola" class="currency-input" inputmode="decimal" placeholder="0.00" value="$1.42">
-          </label>
-        </div>
-
-        <div class="grid grid-3">
-          <label>Employee's Supervisor
-            <input type="text" name="supervisor" autocomplete="off" value="Marcus Lee">
-          </label>
-          <label>General Supervisor
-            <input type="text" name="generalSupervisor" autocomplete="off" value="Priya Anand">
-          </label>
-          <label>Superintendent
-            <input type="text" name="superintendent" autocomplete="off" value="Diane Osei">
+          <label>
+            <span class="dc-field-label">COLA $</span>
+            <input type="text" class="dc-value-input currency-input" name="cola" inputmode="decimal" placeholder="0.00" value="$1.42">
           </label>
         </div>
 
-        <div class="grid grid-3">
-          <label>Date of Incident
+        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+          <label>
+            <span class="dc-field-label">Employee's Supervisor</span>
+            <textarea class="dc-value" name="supervisor" rows="1" autocomplete="off">Marcus Lee</textarea>
+          </label>
+          <label>
+            <span class="dc-field-label">General Supervisor</span>
+            <textarea class="dc-value" name="generalSupervisor" rows="1" autocomplete="off">Priya Anand</textarea>
+          </label>
+        </div>
+
+        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+          <label>
+            <span class="dc-field-label">Superintendent</span>
+            <textarea class="dc-value" name="superintendent" rows="1" autocomplete="off">Diane Osei</textarea>
+          </label>
+          <label>
+            <span class="dc-field-label">Date of Incident</span>
             <input type="date" name="uniforDateIncident" value="2026-06-09">
           </label>
-          <label>Date Grievance Filed
+        </div>
+
+        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+          <div class="dc-cell">
+            <span class="dc-field-label">Discipline on Record?</span>
+            <span class="dc-radio-row">
+              <label class="dc-radio"><input type="radio" name="discipline" value="Yes"> Yes</label>
+              <label class="dc-radio"><input type="radio" name="discipline" value="No" checked> No</label>
+            </span>
+          </div>
+          <label>
+            <span class="dc-field-label">Date Grievance Filed</span>
             <input type="date" name="uniforDateFiled" value="2026-06-10">
           </label>
-          <label>Discipline on Record?
-            <span class="radio-row">
-              <label class="radio"><input type="radio" name="discipline" value="Yes"> Yes</label>
-              <label class="radio"><input type="radio" name="discipline" value="No" checked> No</label>
-            </span>
+        </div>
+
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Who is involved in this grievance?</div>
+          <div class="dc-box" style="min-height:58.667px">
+            <textarea class="dc-textarea" name="whoInvolved" style="min-height:44px">Jane Doe (grievor), shift supervisor Marcus Lee, and general supervisor Priya Anand.</textarea>
+          </div>
+        </div>
+
+        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+          <label>
+            <span class="dc-field-label">When did it happen?</span>
+            <textarea class="dc-value" name="whenHappened" rows="1" autocomplete="off">Approx. 2:15 PM, second shift</textarea>
+          </label>
+          <label>
+            <span class="dc-field-label">Where did it happen?</span>
+            <textarea class="dc-value" name="whereHappened" rows="1" autocomplete="off">Trim line, station 14</textarea>
           </label>
         </div>
 
-        <label class="full">Who is involved in this grievance?
-          <textarea name="whoInvolved" rows="3">Jane Doe (grievor), shift supervisor Marcus Lee, and general supervisor Priya Anand.</textarea>
-        </label>
-
-        <div class="grid grid-2">
-          <label>When did it happen?
-            <input type="text" name="whenHappened" autocomplete="off" value="Approx. 2:15 PM, second shift">
-          </label>
-          <label>Where did it happen?
-            <input type="text" name="whereHappened" autocomplete="off" value="Trim line, station 14">
-          </label>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Why is this a grievance?</div>
+          <div class="dc-box dc-details">
+            <textarea class="dc-textarea" name="whyGrievance">The grievor was denied her scheduled relief break and was disciplined for leaving her station to use the restroom, in violation of Article 78 and the plant's standard break scheduling practice.</textarea>
+          </div>
         </div>
 
-        <label class="full">Why is this a grievance?
-          <textarea name="whyGrievance" rows="5">The grievor was denied her scheduled relief break and was disciplined for leaving her station to use the restroom, in violation of Article 78 and the plant's standard break scheduling practice.</textarea>
-        </label>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">What do we want?</div>
+          <div class="dc-box" style="min-height:74.667px">
+            <textarea class="dc-textarea" name="whatWeWant" style="min-height:60px">Withdrawal of the discipline from the grievor's record, full back pay for any hours affected, and written confirmation that scheduled relief breaks will be honored going forward.</textarea>
+          </div>
+        </div>
 
-        <label class="full">What do we want?
-          <textarea name="whatWeWant" rows="4">Withdrawal of the discipline from the grievor's record, full back pay for any hours affected, and written confirmation that scheduled relief breaks will be honored going forward.</textarea>
-        </label>
+        <div class="dc-page-foot"><span>Unifor Local 200</span><span>PRIVATE</span><span>pg. 1 / 5</span></div>
       </div>
 
-      <div class="section">
-        <div class="section-title">Supervisor's Statement (page 2)</div>
-        <label class="full">Supervisor's Statement
-          <textarea name="supervisorStatement" rows="3">Supervisor states the grievor left the trim line without requesting relief through the usual call button.</textarea>
-        </label>
-        <label class="full">Your Observation
-          <textarea name="yourObservation" rows="3">The call button on station 14 has been intermittently unresponsive for the past two weeks per multiple operator reports.</textarea>
-        </label>
-        <label class="full">Additional Information
-          <textarea name="additionalInfo" rows="3">Maintenance ticket #4471 was opened for the station 14 call button on 06/02/2026 and remains unresolved.</textarea>
-        </label>
+      <!-- ---- Page 2 ---- -->
+      <div class="dc-page">
+        <div class="dc-page-head">
+          <span class="dc-sp" data-sp-mirror>SP-1024</span>
+          <img class="dc-logo" alt="Unifor" data-unifor-logo>
+        </div>
+
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Supervisor's Statement</div>
+          <div class="dc-box" style="min-height:226.667px">
+            <textarea class="dc-textarea" name="supervisorStatement" style="min-height:212px">Supervisor states the grievor left the trim line without requesting relief through the usual call button.</textarea>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Your Observation</div>
+          <div class="dc-box" style="min-height:226.667px">
+            <textarea class="dc-textarea" name="yourObservation" style="min-height:212px">The call button on station 14 has been intermittently unresponsive for the past two weeks per multiple operator reports.</textarea>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Additional Information</div>
+          <div class="dc-box" style="min-height:226.667px">
+            <textarea class="dc-textarea" name="additionalInfo" style="min-height:212px">Maintenance ticket #4471 was opened for the station 14 call button on 06/02/2026 and remains unresolved.</textarea>
+          </div>
+        </div>
+
+        <div class="dc-page-foot"><span>Unifor Local 200</span><span>PRIVATE</span><span>pg. 2 / 5</span></div>
       </div>
 
-      <div class="section">
-        <div class="section-title">Investigation Questions (page 3)</div>
-        <label class="full">Have you discussed the supervisor's disposition to the aggrieved? If not, please do so and detail below.
-          <span class="radio-row">
-            <label class="radio"><input type="radio" name="discussedDisposition" value="Yes" checked> Yes</label>
-            <label class="radio"><input type="radio" name="discussedDisposition" value="No"> No</label>
+      <!-- ---- Page 3 ---- -->
+      <div class="dc-page">
+        <div class="dc-page-head">
+          <span class="dc-sp" data-sp-mirror>SP-1024</span>
+          <img class="dc-logo" alt="Unifor" data-unifor-logo>
+        </div>
+
+        <div class="dc-question">
+          <span class="dc-question-text">Have you discussed the supervisor's disposition to the aggrieved? If not, please do so and detail below.</span>
+          <span class="dc-radio-row">
+            <label class="dc-radio"><input type="radio" name="discussedDisposition" value="Yes" checked> Yes</label>
+            <label class="dc-radio"><input type="radio" name="discussedDisposition" value="No"> No</label>
           </span>
-        </label>
-        <label class="full">Details
-          <textarea name="dispositionDetail" rows="2">Discussed with the grievor on 06/10/2026; she disputes that the button was working.</textarea>
-        </label>
-
-        <label class="full">What other members are affected? (other than the aggrieved)
-          <textarea name="otherMembersAffected" rows="2">None reported so far, though other operators on station 14 have raised the same call-button issue informally.</textarea>
-        </label>
-        <label class="full">Name any Witnesses (if possible, get individual signed statements)
-          <textarea name="witnesses" rows="2">Line lead Sam Okafor observed the grievor attempting the call button prior to leaving her station.</textarea>
-        </label>
-        <label class="full">What has the past practice been in regard to similar violations?
-          <textarea name="pastPractice" rows="2">Verbal reminders have historically been used for first-time break-timing issues; written discipline is unusual for a first occurrence.</textarea>
-        </label>
-
-        <div class="grid grid-2">
-          <label>Has a violation of this nature been called to the Company's attention before?
-            <span class="radio-row">
-              <label class="radio"><input type="radio" name="priorViolation" value="Yes"> Yes</label>
-              <label class="radio"><input type="radio" name="priorViolation" value="No" checked> No</label>
-            </span>
-          </label>
-          <label>If so, when?
-            <input type="text" name="priorViolationWhen" autocomplete="off">
-          </label>
         </div>
-        <label class="full">What action did the company take?
-          <textarea name="companyAction" rows="2"></textarea>
-        </label>
-
-        <div class="grid grid-2">
-          <label>Did the supervisor make any effort to settle this in the discussion?
-            <span class="radio-row">
-              <label class="radio"><input type="radio" name="settleEffort" value="Yes"> Yes</label>
-              <label class="radio"><input type="radio" name="settleEffort" value="No" checked> No</label>
-            </span>
-          </label>
-          <label>Did they make an offer?
-            <span class="radio-row">
-              <label class="radio"><input type="radio" name="madeOffer" value="Yes"> Yes</label>
-              <label class="radio"><input type="radio" name="madeOffer" value="No" checked> No</label>
-            </span>
-          </label>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Details</div>
+          <div class="dc-box" style="min-height:58.667px">
+            <textarea class="dc-textarea" name="dispositionDetail" style="min-height:44px">Discussed with the grievor on 06/10/2026; she disputes that the button was working.</textarea>
+          </div>
         </div>
-        <label class="full">What exactly were they willing to do?
-          <textarea name="willingToDo" rows="2"></textarea>
-        </label>
+
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">What other members are affected? (other than the aggrieved)</div>
+          <div class="dc-box" style="min-height:53.333px">
+            <textarea class="dc-textarea" name="otherMembersAffected" style="min-height:40px">None reported so far, though other operators on station 14 have raised the same call-button issue informally.</textarea>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Name any Witnesses (if possible, get individual signed statements)</div>
+          <div class="dc-box" style="min-height:53.333px">
+            <textarea class="dc-textarea" name="witnesses" style="min-height:40px">Line lead Sam Okafor observed the grievor attempting the call button prior to leaving her station.</textarea>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">What has the past practice been in regard to similar violations?</div>
+          <div class="dc-box" style="min-height:53.333px">
+            <textarea class="dc-textarea" name="pastPractice" style="min-height:40px">Verbal reminders have historically been used for first-time break-timing issues; written discipline is unusual for a first occurrence.</textarea>
+          </div>
+        </div>
+
+        <div class="dc-question">
+          <span class="dc-question-text">Has a violation of this nature been called to the Company's attention before?</span>
+          <span class="dc-radio-row">
+            <label class="dc-radio"><input type="radio" name="priorViolation" value="Yes"> Yes</label>
+            <label class="dc-radio"><input type="radio" name="priorViolation" value="No" checked> No</label>
+          </span>
+        </div>
+        <div class="dc-inline-field">
+          <span class="dc-inline-label">If so, when?</span>
+          <input type="text" name="priorViolationWhen" autocomplete="off">
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">What action did the company take?</div>
+          <div class="dc-box" style="min-height:53.333px">
+            <textarea class="dc-textarea" name="companyAction" style="min-height:40px"></textarea>
+          </div>
+        </div>
+
+        <div class="dc-question">
+          <span class="dc-question-text">Did the supervisor make any effort to settle this in the discussion?</span>
+          <span class="dc-radio-row">
+            <label class="dc-radio"><input type="radio" name="settleEffort" value="Yes"> Yes</label>
+            <label class="dc-radio"><input type="radio" name="settleEffort" value="No" checked> No</label>
+          </span>
+        </div>
+        <div class="dc-question">
+          <span class="dc-question-text">Did they make an offer?</span>
+          <span class="dc-radio-row">
+            <label class="dc-radio"><input type="radio" name="madeOffer" value="Yes"> Yes</label>
+            <label class="dc-radio"><input type="radio" name="madeOffer" value="No" checked> No</label>
+          </span>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">What exactly were they willing to do?</div>
+          <div class="dc-box" style="min-height:66.667px">
+            <textarea class="dc-textarea" name="willingToDo" style="min-height:52px"></textarea>
+          </div>
+        </div>
+
+        <div class="dc-page-foot"><span>Unifor Local 200</span><span>PRIVATE</span><span>pg. 3 / 5</span></div>
       </div>
 
-      <div class="section">
-        <div class="section-title">Statements &amp; Submission (page 4)</div>
-        <label class="full">Which of the supervisor's statements are true?
-          <textarea name="statementsTrue" rows="2">That the grievor left her station during working hours.</textarea>
-        </label>
-        <label class="full">Which are false?
-          <textarea name="statementsFalse" rows="2">That she made no attempt to request relief before leaving.</textarea>
-        </label>
-        <label class="full">What do you think a reasonable settlement would be?
-          <textarea name="reasonableSettlement" rows="2">Rescind the written warning and repair the call button.</textarea>
-        </label>
-        <label class="full">Any other suggestions or comments?
-          <textarea name="otherComments" rows="2"></textarea>
-        </label>
+      <!-- ---- Page 4 ---- -->
+      <div class="dc-page">
+        <div class="dc-page-head">
+          <span class="dc-sp" data-sp-mirror>SP-1024</span>
+          <img class="dc-logo" alt="Unifor" data-unifor-logo>
+        </div>
 
-        <div class="grid grid-2">
-          <label>Submitted By
-            <input type="text" name="submittedBy" autocomplete="off" value="Marcus Lee">
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Which of the supervisor's statements are true?</div>
+          <div class="dc-box" style="min-height:61.333px">
+            <textarea class="dc-textarea" name="statementsTrue" style="min-height:47px">That the grievor left her station during working hours.</textarea>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Which are false?</div>
+          <div class="dc-box" style="min-height:61.333px">
+            <textarea class="dc-textarea" name="statementsFalse" style="min-height:47px">That she made no attempt to request relief before leaving.</textarea>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">What do you think a reasonable settlement would be?</div>
+          <div class="dc-box" style="min-height:66.667px">
+            <textarea class="dc-textarea" name="reasonableSettlement" style="min-height:52px">Rescind the written warning and repair the call button.</textarea>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Any other suggestions or comments?</div>
+          <div class="dc-box" style="min-height:66.667px">
+            <textarea class="dc-textarea" name="otherComments" style="min-height:52px"></textarea>
+          </div>
+        </div>
+
+        <div class="dc-field-grid dc-standalone dc-block" style="grid-template-columns: 65fr 35fr;">
+          <label>
+            <span class="dc-field-label">Submitted By</span>
+            <textarea class="dc-value" name="submittedBy" rows="1" autocomplete="off">Marcus Lee</textarea>
           </label>
-          <label>Shift
-            <input type="text" name="shift" autocomplete="off" value="2nd">
+          <label>
+            <span class="dc-field-label">Shift</span>
+            <textarea class="dc-value" name="shift" rows="1" autocomplete="off">2nd</textarea>
           </label>
         </div>
+
+        <div class="dc-signature" aria-hidden="true">
+          <span class="dc-inline-label">Grievor's Signature:</span>
+          <span class="dc-signature-line"></span>
+        </div>
+
+        <p class="dc-fine-print">NOTE: These facts are basic requirements to the grievance procedure. They must be filled out. Additional facts may be filled in on space available, or attached separately.</p>
+
+        <div class="dc-page-foot"><span>Unifor Local 200</span><span>PRIVATE</span><span>pg. 4 / 5</span></div>
       </div>
 
-      <div class="section">
-        <div class="section-title">Committee Comments (page 5)</div>
-        <label class="full">Committeeperson's Comments on Second Stage
-          <textarea name="committeepersonComments" rows="3"></textarea>
-        </label>
-        <label class="full">Plant Chair's Comments on Third Stage
-          <textarea name="plantChairComments" rows="3"></textarea>
-        </label>
+      <!-- ---- Page 5 ---- -->
+      <div class="dc-page">
+        <div class="dc-page-head">
+          <span class="dc-sp" data-sp-mirror>SP-1024</span>
+          <img class="dc-logo" alt="Unifor" data-unifor-logo>
+        </div>
+
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Committeeperson's Comments on Second Stage</div>
+          <div class="dc-box" style="min-height:373.333px">
+            <textarea class="dc-textarea" name="committeepersonComments" style="min-height:359px"></textarea>
+          </div>
+        </div>
+        <div class="dc-block">
+          <div class="dc-field-label dc-box-label">Plant Chair's Comments on Third Stage</div>
+          <div class="dc-box" style="min-height:373.333px">
+            <textarea class="dc-textarea" name="plantChairComments" style="min-height:359px"></textarea>
+          </div>
+        </div>
+
+        <div class="dc-page-foot"><span>Unifor Local 200</span><span>PRIVATE</span><span>pg. 5 / 5</span></div>
       </div>
     </form>
   </section>
 
-  <!-- ================= 4.01 INVESTIGATION FORM ================= -->
+  <!-- ================= 4.01 INVESTIGATION FORM (document view) ================= -->
   <section class="form-panel" id="form-investigation" aria-labelledby="form-investigation-heading">
-    <form id="investigationForm">
-      <div class="sheet-header">
-        <div class="sheet-header-text">
-          <h1 id="form-investigation-heading">4.01 Investigation Form</h1>
-        </div>
-        <div class="sheet-header-actions">
-          <button type="button" class="btn-secondary" id="investigationClear">Clear form</button>
-          <button type="submit" class="btn-primary">Preview PDF</button>
-        </div>
+    <div class="dc-toolbar">
+      <button type="button" class="btn-secondary" id="investigationClear">Clear form</button>
+      <button type="submit" class="btn-primary" form="investigationForm">Preview PDF</button>
+    </div>
+
+    <form id="investigationForm" class="dc-page">
+      <div class="dc-head-row">
+        <div class="dc-doc-title" id="form-investigation-heading">4.01 Investigation Form</div>
+        <label class="dc-step">
+          <span class="dc-inline-label">Step:</span>
+          <input type="text" name="step" autocomplete="off" value="1">
+        </label>
+      </div>
+      <div class="dc-doc-rule"></div>
+
+      <div class="dc-field-grid dc-cols-2 dc-standalone">
+        <label>
+          <span class="dc-field-label">Name of Supervisor</span>
+          <textarea class="dc-value" name="supervisorName" rows="1" autocomplete="off">Marcus Lee</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Area</span>
+          <textarea class="dc-value" name="area" rows="1" autocomplete="off">Trim &amp; Final Assembly</textarea>
+        </label>
       </div>
 
-      <div class="section">
-        <div class="grid grid-4">
-          <label>Step
-            <input type="text" name="step" autocomplete="off" value="1">
-          </label>
+      <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+        <label>
+          <span class="dc-field-label">Date of Infraction</span>
+          <input type="date" name="dateInfraction" value="2026-06-09">
+        </label>
+        <label>
+          <span class="dc-field-label">Dept #</span>
+          <textarea class="dc-value" name="deptNum" rows="1" autocomplete="off">8383</textarea>
+        </label>
+      </div>
+
+      <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+        <label>
+          <span class="dc-field-label">Name of Witnesses</span>
+          <textarea class="dc-value" name="witnessNames" rows="1" autocomplete="off">Sam Okafor</textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Time</span>
+          <textarea class="dc-value" name="time" rows="1" autocomplete="off" placeholder="e.g. 2:15 PM">2:15 PM</textarea>
+        </label>
+      </div>
+
+      <div class="dc-field-grid dc-standalone dc-block" style="grid-template-columns: 1fr;">
+        <label>
+          <span class="dc-field-label">Unifor Representative</span>
+          <textarea class="dc-value" name="uniforRep" rows="1" autocomplete="off">Priya Anand</textarea>
+        </label>
+      </div>
+
+      <div class="dc-field-grid dc-standalone dc-block" style="grid-template-columns: 1fr;">
+        <label>
+          <span class="dc-field-label">HR Representative</span>
+          <textarea class="dc-value" name="hrRep" rows="1" autocomplete="off">Diane Osei</textarea>
+        </label>
+      </div>
+
+      <div class="dc-block">
+        <div class="dc-field-label dc-box-label">Investigation of Incident</div>
+        <div class="dc-box" style="min-height:226.667px">
+          <textarea class="dc-textarea" name="investigation" style="min-height:212px">Grievor left station 14 during her scheduled shift without a relief operator present. Supervisor states this was without authorization; grievor states she attempted the call button for relief multiple times without response.</textarea>
         </div>
-
-        <div class="grid grid-2">
-          <label>Name of Supervisor
-            <input type="text" name="supervisorName" autocomplete="off" value="Marcus Lee">
-          </label>
-          <label>Area
-            <input type="text" name="area" autocomplete="off" value="Trim & Final Assembly">
-          </label>
+      </div>
+      <div class="dc-block">
+        <div class="dc-field-label dc-box-label">Supervisor's Remarks</div>
+        <div class="dc-box" style="min-height:173.333px">
+          <textarea class="dc-textarea" name="supervisorRemarks" style="min-height:159px">Grievor did not notify supervisor directly before leaving the line.</textarea>
         </div>
-
-        <div class="grid grid-2">
-          <label>Date of Infraction
-            <input type="date" name="dateInfraction" value="2026-06-09">
-          </label>
-          <label>Dept #
-            <input type="text" name="deptNum" autocomplete="off" value="8383">
-          </label>
+      </div>
+      <div class="dc-block">
+        <div class="dc-field-label dc-box-label">Resolution</div>
+        <div class="dc-box" style="min-height:146.667px">
+          <textarea class="dc-textarea" name="resolution" style="min-height:132px"></textarea>
         </div>
-
-        <div class="grid grid-2">
-          <label>Name of Witnesses
-            <input type="text" name="witnessNames" autocomplete="off" value="Sam Okafor">
-          </label>
-          <label>Time
-            <input type="text" name="time" autocomplete="off" placeholder="e.g. 2:15 PM" value="2:15 PM">
-          </label>
-        </div>
-
-        <label class="full">Unifor Representative
-          <input type="text" name="uniforRep" autocomplete="off" value="Priya Anand">
-        </label>
-        <label class="full">HR Representative
-          <input type="text" name="hrRep" autocomplete="off" value="Diane Osei">
-        </label>
-
-        <label class="full">Investigation of Incident
-          <textarea name="investigation" rows="6">Grievor left station 14 during her scheduled shift without a relief operator present. Supervisor states this was without authorization; grievor states she attempted the call button for relief multiple times without response.</textarea>
-        </label>
-        <label class="full">Supervisor's Remarks
-          <textarea name="supervisorRemarks" rows="4">Grievor did not notify supervisor directly before leaving the line.</textarea>
-        </label>
-        <label class="full">Resolution
-          <textarea name="resolution" rows="4"></textarea>
-        </label>
       </div>
     </form>
   </section>
-
-  <!-- ================= LIVE PREVIEW ================= -->
-  <aside class="preview-pane" id="previewPane" aria-label="Live PDF preview">
-    <div class="preview-toolbar">
-      <span class="preview-title">Live preview</span>
-      <div class="preview-controls">
-        <label class="preview-live-toggle">
-          <input type="checkbox" id="liveRefreshToggle" checked>
-          Live refresh
-        </label>
-        <button type="button" id="manualRefreshBtn" class="preview-refresh-btn" title="Refresh preview" aria-label="Refresh preview" hidden>
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-            <path d="M3 3v5h5"></path>
-            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
-            <path d="M16 16h5v5"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-    <iframe id="pdfPreview" title="PDF preview"></iframe>
-  </aside>
 
 </main>
-
-<button type="button" class="preview-toggle" id="previewToggle" aria-expanded="false" aria-controls="previewPane">
-  Preview
-</button>
 
 <!-- Admin mode. Reached by typing the unlock word on the Forms page; see ADMIN in script.js.
      There's no password check here on purpose — a static page has nowhere to verify one, so
