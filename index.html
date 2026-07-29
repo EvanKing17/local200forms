@@ -585,6 +585,45 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
   Preview
 </button>
 
+<!-- Admin mode. Reached by typing the unlock word on the Forms page; see ADMIN in script.js.
+     There's no password check here on purpose — a static page has nowhere to verify one, so
+     anything hardcoded would just be readable in the source. The GitHub token is the real
+     credential: it's supplied at the time, never stored, and GitHub does the verifying. -->
+<div class="admin-overlay" id="adminOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+  <div class="admin-modal">
+    <h2 class="admin-title" id="adminTitle">Rename forms</h2>
+
+    <div id="adminAuth">
+      <p class="admin-lede">
+        Publishing a rename commits <code>forms.config.js</code> to the site's repository, so the
+        new names show up for everyone once the site rebuilds.
+      </p>
+      <label class="admin-field">
+        <span>GitHub token</span>
+        <input type="password" id="adminToken" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+      </label>
+      <p class="admin-hint">
+        A fine-grained token with <strong>Contents: Read and write</strong> on this repository only.
+        It isn't saved anywhere — you'll paste it again next time.
+      </p>
+      <div class="admin-actions">
+        <button type="button" class="btn-secondary" data-admin-close>Cancel</button>
+        <button type="button" class="btn-primary" id="adminUnlock">Continue</button>
+      </div>
+    </div>
+
+    <div id="adminPanel" hidden>
+      <div id="adminFields"></div>
+      <div class="admin-actions">
+        <button type="button" class="btn-secondary" data-admin-close>Close</button>
+        <button type="button" class="btn-primary" id="adminPublish">Publish for everyone</button>
+      </div>
+    </div>
+
+    <p class="admin-status" id="adminStatus" role="status"></p>
+  </div>
+</div>
+
 <!-- Full-screen PDF preview. The iframe is the browser's own PDF viewer, so its toolbar
      handles zoom and page navigation; Download is ours because the native one would name the
      file after the blob URL rather than the grievance. -->

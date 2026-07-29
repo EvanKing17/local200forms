@@ -1613,3 +1613,230 @@ document.querySelectorAll('.dc-value').forEach(el => {
     el.form?.requestSubmit();
   });
 });
+
+/* ============ Admin mode: rename the forms for everyone ============
+ *
+ * The form names live in forms.config.js, a file served to every visitor, so renaming them
+ * "for everyone" means writing to that file. A static page can't write to itself — but it can
+ * ask GitHub to, which is what this does: read forms.config.js through the Contents API, write
+ * it back as a commit, and let the site rebuild.
+ *
+ * There is deliberately no password. A static page has no server to check one against, so any
+ * password would have to ship in the source where anyone could read it — it would look like
+ * security without being any. The GitHub token is the real credential: it's pasted at the time,
+ * held only in a local variable, and GitHub is what actually verifies it. The typed unlock word
+ * below is just to keep the panel out of the way, not to protect it.
+ */
+const ADMIN = {
+  unlockWord: 'rename',
+  owner: 'EvanKing17',
+  repo: 'local200forms',
+  path: 'forms.config.js',
+  branch: 'main',
+};
+
+const ADMIN_FIELDS = [
+  { key: 'title', label: 'Title (document heading, printed on the PDF)' },
+  { key: 'homeLabel', label: 'Name on the Forms page' },
+  { key: 'homeSub', label: 'Subtitle on the Forms page' },
+];
+
+const ADMIN_FORM_NAMES = {
+  ford: 'Grievance Investigation & Claim',
+  policy: 'Policy Grievance',
+  unifor: 'Plant Committee Fact Sheet',
+  investigation: '4.01 Investigation',
+};
+
+const adminOverlay = document.getElementById('adminOverlay');
+const adminAuth = document.getElementById('adminAuth');
+const adminPanel = document.getElementById('adminPanel');
+const adminFields = document.getElementById('adminFields');
+const adminTokenInput = document.getElementById('adminToken');
+const adminStatus = document.getElementById('adminStatus');
+
+let adminToken = null;
+let adminFileSha = null;   // the blob the edits are based on, so GitHub can reject a stale write
+
+function setAdminStatus(message, kind) {
+  adminStatus.textContent = message || '';
+  adminStatus.className = 'admin-status' + (kind ? ' is-' + kind : '');
+}
+
+/* btoa/atob are byte-oriented; round-trip through UTF-8 so accented names survive */
+function toBase64(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+function fromBase64(b64) {
+  return decodeURIComponent(escape(atob(b64.replace(/\s/g, ''))));
+}
+
+function openAdmin() {
+  adminOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+  adminAuth.hidden = false;
+  adminPanel.hidden = true;
+  setAdminStatus('');
+  adminTokenInput.value = '';
+  adminTokenInput.focus();
+}
+
+function closeAdmin() {
+  adminOverlay.hidden = true;
+  document.body.style.overflow = '';
+  // Don't leave the token sitting in the DOM or in memory once the panel is done with
+  adminTokenInput.value = '';
+  adminToken = null;
+  adminFileSha = null;
+}
+
+/*
+ * Typing the unlock word on the Forms page opens admin mode. Ignored while a field has focus,
+ * so it can't fire while someone is filling in a grievance.
+ */
+let adminBuffer = '';
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !adminOverlay.hidden) { closeAdmin(); return; }
+  if (!adminOverlay.hidden || homeView.hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+  if (e.key.length !== 1) return;
+
+  adminBuffer = (adminBuffer + e.key.toLowerCase()).slice(-ADMIN.unlockWord.length);
+  if (adminBuffer === ADMIN.unlockWord) {
+    adminBuffer = '';
+    openAdmin();
+  }
+});
+
+document.querySelectorAll('[data-admin-close]').forEach(btn => {
+  btn.addEventListener('click', closeAdmin);
+});
+
+function githubRequest(method, body) {
+  const url = `https://api.github.com/repos/${ADMIN.owner}/${ADMIN.repo}/contents/${ADMIN.path}`
+    + (method === 'GET' ? `?ref=${ADMIN.branch}` : '');
+  return fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
+/* Turns a GitHub API failure into something that says what to actually do about it */
+function describeGithubError(response) {
+  if (response.status === 401) return 'GitHub rejected that token. Check it was copied in full and hasn’t expired.';
+  if (response.status === 403) return 'That token is valid but not allowed to write here — it needs Contents: Read and write on this repository.';
+  if (response.status === 404) return `Couldn’t find ${ADMIN.path} on ${ADMIN.owner}/${ADMIN.repo}. A fine-grained token also returns this when it has no access to the repository.`;
+  if (response.status === 409) return 'The file changed on GitHub since it was loaded. Close and reopen admin mode to pick up the newer version.';
+  return `GitHub returned ${response.status}.`;
+}
+
+function renderAdminFields(config) {
+  adminFields.innerHTML = '';
+  Object.keys(ADMIN_FORM_NAMES).forEach(type => {
+    const group = document.createElement('div');
+    group.className = 'admin-group';
+    const heading = document.createElement('h3');
+    heading.textContent = ADMIN_FORM_NAMES[type];
+    group.appendChild(heading);
+
+    ADMIN_FIELDS.forEach(field => {
+      const label = document.createElement('label');
+      label.className = 'admin-field';
+      const span = document.createElement('span');
+      span.textContent = field.label;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = (config[type] && config[type][field.key]) || '';
+      input.dataset.type = type;
+      input.dataset.key = field.key;
+      label.append(span, input);
+      group.appendChild(label);
+    });
+    adminFields.appendChild(group);
+  });
+}
+
+function collectAdminConfig(base) {
+  const next = JSON.parse(JSON.stringify(base));
+  adminFields.querySelectorAll('input').forEach(input => {
+    const { type, key } = input.dataset;
+    next[type] = next[type] || {};
+    next[type][key] = input.value;
+  });
+  return next;
+}
+
+/*
+ * Reads the live forms.config.js out of the repository rather than trusting the copy this page
+ * loaded with — the page could have been open for hours, or someone else could have renamed
+ * something since. Doubles as the check that the token actually works.
+ */
+let adminConfig = null;
+
+document.getElementById('adminUnlock').addEventListener('click', async () => {
+  const token = adminTokenInput.value.trim();
+  if (!token) { setAdminStatus('Paste a GitHub token to continue.', 'error'); return; }
+
+  adminToken = token;
+  setAdminStatus('Checking token…');
+  try {
+    const response = await githubRequest('GET');
+    if (!response.ok) { setAdminStatus(describeGithubError(response), 'error'); adminToken = null; return; }
+
+    const file = await response.json();
+    adminFileSha = file.sha;
+    const source = fromBase64(file.content);
+    const match = source.match(/window\.FORMS_CONFIG_DATA\s*=\s*(\{[\s\S]*\});?\s*$/);
+    if (!match) { setAdminStatus(`Couldn’t read the config out of ${ADMIN.path}.`, 'error'); return; }
+
+    adminConfig = JSON.parse(match[1]);
+    renderAdminFields(adminConfig);
+    adminAuth.hidden = true;
+    adminPanel.hidden = false;
+    setAdminStatus('');
+  } catch (err) {
+    setAdminStatus(`Couldn’t reach GitHub: ${err.message}`, 'error');
+    adminToken = null;
+  }
+});
+
+document.getElementById('adminPublish').addEventListener('click', async () => {
+  const publishBtn = document.getElementById('adminPublish');
+  const updated = collectAdminConfig(adminConfig);
+  const source = '/* Form display names — homepage card label/subtitle + sheet-header/PDF title. '
+    + 'Edited via admin mode; a plain <script src> (not fetch) so this loads fine over file://. */\n'
+    + 'window.FORMS_CONFIG_DATA = ' + JSON.stringify(updated, null, 2) + ';\n';
+
+  publishBtn.disabled = true;
+  setAdminStatus('Publishing…');
+  try {
+    const response = await githubRequest('PUT', {
+      message: 'Rename forms via admin mode',
+      content: toBase64(source),
+      sha: adminFileSha,
+      branch: ADMIN.branch,
+    });
+    if (!response.ok) { setAdminStatus(describeGithubError(response), 'error'); return; }
+
+    const result = await response.json();
+    adminFileSha = result.content.sha;   // so a second publish in the same session isn't stale
+    adminConfig = updated;
+
+    // Show the new names here straight away; everyone else sees them once Pages rebuilds
+    Object.assign(FORMS_CONFIG, updated);
+    applyFormsConfig();
+    setAdminStatus('Published. The site rebuilds in about a minute, then everyone sees the new names.', 'ok');
+  } catch (err) {
+    setAdminStatus(`Couldn’t reach GitHub: ${err.message}`, 'error');
+  } finally {
+    publishBtn.disabled = false;
+  }
+});
