@@ -355,15 +355,20 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
       <!-- ---- Page 1 ---- -->
       <div class="dc-page">
         <div class="dc-page-head">
-          <span class="dc-sp">SP-<input type="text" name="spNumber" autocomplete="off" value="1024" size="6"></span>
+          <span class="dc-sp">
+            <span class="dc-field-label">SP Number</span>
+            <span class="dc-sp-value">SP-<input type="text" name="spNumber" autocomplete="off" value="1024"></span>
+          </span>
           <img class="dc-logo" alt="Unifor" data-unifor-logo>
         </div>
+        <div class="dc-doc-rule"></div>
 
         <div class="dc-doc-title dc-centered" id="form-unifor-heading">Local 200 Grievance Committee Fact Sheet</div>
         <p class="dc-doc-note">For Local Union Use Only</p>
         <p class="dc-doc-note">This form to accompany First Stage Grievance appealed to Bargaining Committee</p>
 
-        <div class="dc-field-grid dc-standalone dc-block" style="grid-template-columns: 45fr 25fr 30fr;">
+        <div class="dc-band dc-block"><span>Section A:</span><span class="dc-band-sub"> Grievor</span></div>
+        <div class="dc-field-grid dc-cols-211 dc-attached">
           <label>
             <span class="dc-field-label">Grievor's Name</span>
             <textarea class="dc-value" name="grievorName" rows="1" autocomplete="off">Jane Marie Doe</textarea>
@@ -378,33 +383,45 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
           </label>
         </div>
 
-        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+        <div class="dc-field-grid dc-cols-211 dc-standalone dc-block">
+          <label>
+            <span class="dc-field-label">Classification</span>
+            <textarea class="dc-value" name="classification" rows="1" autocomplete="off">Machine Repair Technician</textarea>
+          </label>
           <label>
             <span class="dc-field-label">Seniority Date</span>
             <input type="date" name="seniorityDate" value="1998-04-02">
           </label>
           <label>
-            <span class="dc-field-label">Classification</span>
-            <textarea class="dc-value" name="classification" rows="1" autocomplete="off">Machine Repair Technician</textarea>
-          </label>
-        </div>
-
-        <div class="dc-field-grid dc-standalone dc-block" style="grid-template-columns: 40fr 30fr 30fr;">
-          <label>
             <span class="dc-field-label">Time in Classification</span>
             <textarea class="dc-value" name="timeInClass" rows="1" autocomplete="off">6 years, 3 months</textarea>
           </label>
-          <label>
-            <span class="dc-field-label">Rate $</span>
-            <input type="text" class="dc-value-input currency-input" name="rate" inputmode="decimal" placeholder="0.00" value="$34.87">
-          </label>
-          <label>
-            <span class="dc-field-label">COLA $</span>
-            <input type="text" class="dc-value-input currency-input" name="cola" inputmode="decimal" placeholder="0.00" value="$1.42">
-          </label>
         </div>
 
-        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+        <!-- Rate and COLA are read together; discipline is a fact about the grievor's record,
+             so it shares this row rather than taking a full-width one of its own. -->
+        <div class="dc-split dc-block">
+          <div class="dc-field-grid dc-cols-2 dc-standalone">
+            <label>
+              <span class="dc-field-label">Rate $</span>
+              <input type="text" class="dc-value-input currency-input" name="rate" inputmode="decimal" placeholder="0.00" value="$34.87">
+            </label>
+            <label>
+              <span class="dc-field-label">COLA $</span>
+              <input type="text" class="dc-value-input currency-input" name="cola" inputmode="decimal" placeholder="0.00" value="$1.42">
+            </label>
+          </div>
+          <div class="dc-checkbox-field">
+            <span class="dc-field-label">Discipline on Record?</span>
+            <span class="dc-radio-row">
+              <label class="dc-radio"><input type="radio" name="discipline" value="Yes"> Yes</label>
+              <label class="dc-radio"><input type="radio" name="discipline" value="No" checked> No</label>
+            </span>
+          </div>
+        </div>
+
+        <div class="dc-band dc-block"><span>Section B:</span><span class="dc-band-sub"> Supervision &amp; Filing</span></div>
+        <div class="dc-field-grid dc-cols-3 dc-attached">
           <label>
             <span class="dc-field-label">Employee's Supervisor</span>
             <textarea class="dc-value" name="supervisor" rows="1" autocomplete="off">Marcus Lee</textarea>
@@ -413,32 +430,24 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
             <span class="dc-field-label">General Supervisor</span>
             <textarea class="dc-value" name="generalSupervisor" rows="1" autocomplete="off">Priya Anand</textarea>
           </label>
-        </div>
-
-        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
           <label>
             <span class="dc-field-label">Superintendent</span>
             <textarea class="dc-value" name="superintendent" rows="1" autocomplete="off">Diane Osei</textarea>
           </label>
+        </div>
+
+        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
           <label>
             <span class="dc-field-label">Date of Incident</span>
             <input type="date" name="uniforDateIncident" value="2026-06-09">
           </label>
-        </div>
-
-        <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
-          <div class="dc-cell">
-            <span class="dc-field-label">Discipline on Record?</span>
-            <span class="dc-radio-row">
-              <label class="dc-radio"><input type="radio" name="discipline" value="Yes"> Yes</label>
-              <label class="dc-radio"><input type="radio" name="discipline" value="No" checked> No</label>
-            </span>
-          </div>
           <label>
             <span class="dc-field-label">Date Grievance Filed</span>
             <input type="date" name="uniforDateFiled" value="2026-06-10">
           </label>
         </div>
+
+        <div class="dc-band dc-block"><span>Section C:</span><span class="dc-band-sub"> The Grievance</span></div>
 
         <div class="dc-block">
           <div class="dc-field-label dc-box-label">Who is involved in this grievance?</div>
@@ -474,13 +483,17 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
 
         <div class="dc-page-foot"><span>Unifor Local 200</span><span>PRIVATE</span><span>pg. 1 / 5</span></div>
       </div>
-
       <!-- ---- Page 2 ---- -->
       <div class="dc-page">
         <div class="dc-page-head">
-          <span class="dc-sp" data-sp-mirror>SP-1024</span>
+          <span class="dc-sp">
+            <span class="dc-field-label">SP Number</span>
+            <span class="dc-sp-value" data-sp-mirror>SP-1024</span>
+          </span>
           <img class="dc-logo" alt="Unifor" data-unifor-logo>
         </div>
+        <div class="dc-doc-rule"></div>
+        <div class="dc-band dc-block"><span>Section D:</span><span class="dc-band-sub"> Statements</span></div>
 
         <div class="dc-block">
           <div class="dc-field-label dc-box-label">Supervisor's Statement</div>
@@ -507,9 +520,14 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
       <!-- ---- Page 3 ---- -->
       <div class="dc-page">
         <div class="dc-page-head">
-          <span class="dc-sp" data-sp-mirror>SP-1024</span>
+          <span class="dc-sp">
+            <span class="dc-field-label">SP Number</span>
+            <span class="dc-sp-value" data-sp-mirror>SP-1024</span>
+          </span>
           <img class="dc-logo" alt="Unifor" data-unifor-logo>
         </div>
+        <div class="dc-doc-rule"></div>
+        <div class="dc-band dc-block"><span>Section E:</span><span class="dc-band-sub"> Investigation</span></div>
 
         <div class="dc-question">
           <span class="dc-question-text">Have you discussed the supervisor's disposition to the aggrieved? If not, please do so and detail below.</span>
@@ -589,9 +607,14 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
       <!-- ---- Page 4 ---- -->
       <div class="dc-page">
         <div class="dc-page-head">
-          <span class="dc-sp" data-sp-mirror>SP-1024</span>
+          <span class="dc-sp">
+            <span class="dc-field-label">SP Number</span>
+            <span class="dc-sp-value" data-sp-mirror>SP-1024</span>
+          </span>
           <img class="dc-logo" alt="Unifor" data-unifor-logo>
         </div>
+        <div class="dc-doc-rule"></div>
+        <div class="dc-band dc-block"><span>Section F:</span><span class="dc-band-sub"> Assessment &amp; Submission</span></div>
 
         <div class="dc-block">
           <div class="dc-field-label dc-box-label">Which of the supervisor's statements are true?</div>
@@ -642,9 +665,14 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
       <!-- ---- Page 5 ---- -->
       <div class="dc-page">
         <div class="dc-page-head">
-          <span class="dc-sp" data-sp-mirror>SP-1024</span>
+          <span class="dc-sp">
+            <span class="dc-field-label">SP Number</span>
+            <span class="dc-sp-value" data-sp-mirror>SP-1024</span>
+          </span>
           <img class="dc-logo" alt="Unifor" data-unifor-logo>
         </div>
+        <div class="dc-doc-rule"></div>
+        <div class="dc-band dc-block"><span>Section G:</span><span class="dc-band-sub"> Committee Comments</span></div>
 
         <div class="dc-block">
           <div class="dc-field-label dc-box-label">Committeeperson's Comments on Second Stage</div>
@@ -681,7 +709,8 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
       </div>
       <div class="dc-doc-rule"></div>
 
-      <div class="dc-field-grid dc-cols-2 dc-standalone">
+      <div class="dc-band"><span>Section A:</span><span class="dc-band-sub"> Incident Details</span></div>
+      <div class="dc-field-grid dc-cols-211 dc-attached">
         <label>
           <span class="dc-field-label">Name of Supervisor</span>
           <textarea class="dc-value" name="supervisorName" rows="1" autocomplete="off">Marcus Lee</textarea>
@@ -690,60 +719,57 @@ Nam tempor neque mi, a rhoncus risus ultricies ac. Duis quis faucibus orci. Phas
           <span class="dc-field-label">Area</span>
           <textarea class="dc-value" name="area" rows="1" autocomplete="off">Trim &amp; Final Assembly</textarea>
         </label>
-      </div>
-
-      <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
-        <label>
-          <span class="dc-field-label">Date of Infraction</span>
-          <input type="date" name="dateInfraction" value="2026-06-09">
-        </label>
         <label>
           <span class="dc-field-label">Dept #</span>
           <textarea class="dc-value" name="deptNum" rows="1" autocomplete="off">8383</textarea>
         </label>
       </div>
 
-      <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+      <div class="dc-field-grid dc-cols-112 dc-standalone dc-block">
         <label>
-          <span class="dc-field-label">Name of Witnesses</span>
-          <textarea class="dc-value" name="witnessNames" rows="1" autocomplete="off">Sam Okafor</textarea>
+          <span class="dc-field-label">Date of Infraction</span>
+          <input type="date" name="dateInfraction" value="2026-06-09">
         </label>
         <label>
           <span class="dc-field-label">Time</span>
           <textarea class="dc-value" name="time" rows="1" autocomplete="off" placeholder="e.g. 2:15 PM">2:15 PM</textarea>
         </label>
+        <label>
+          <span class="dc-field-label">Name of Witnesses</span>
+          <textarea class="dc-value" name="witnessNames" rows="1" autocomplete="off">Sam Okafor</textarea>
+        </label>
       </div>
 
-      <div class="dc-field-grid dc-standalone dc-block" style="grid-template-columns: 1fr;">
+      <div class="dc-band dc-block"><span>Section B:</span><span class="dc-band-sub"> Present at Investigation</span></div>
+      <div class="dc-field-grid dc-cols-2 dc-attached">
         <label>
           <span class="dc-field-label">Unifor Representative</span>
           <textarea class="dc-value" name="uniforRep" rows="1" autocomplete="off">Priya Anand</textarea>
         </label>
-      </div>
-
-      <div class="dc-field-grid dc-standalone dc-block" style="grid-template-columns: 1fr;">
         <label>
           <span class="dc-field-label">HR Representative</span>
           <textarea class="dc-value" name="hrRep" rows="1" autocomplete="off">Diane Osei</textarea>
         </label>
       </div>
 
+      <div class="dc-band dc-block"><span>Section C:</span><span class="dc-band-sub"> Investigation &amp; Resolution</span></div>
+
       <div class="dc-block">
         <div class="dc-field-label dc-box-label">Investigation of Incident</div>
-        <div class="dc-box" style="min-height:226.667px">
-          <textarea class="dc-textarea" name="investigation" style="min-height:212px">Grievor left station 14 during her scheduled shift without a relief operator present. Supervisor states this was without authorization; grievor states she attempted the call button for relief multiple times without response.</textarea>
+        <div class="dc-box" style="min-height:213.333px">
+          <textarea class="dc-textarea" name="investigation" style="min-height:199px">Grievor left station 14 during her scheduled shift without a relief operator present. Supervisor states this was without authorization; grievor states she attempted the call button for relief multiple times without response.</textarea>
         </div>
       </div>
       <div class="dc-block">
         <div class="dc-field-label dc-box-label">Supervisor's Remarks</div>
-        <div class="dc-box" style="min-height:173.333px">
-          <textarea class="dc-textarea" name="supervisorRemarks" style="min-height:159px">Grievor did not notify supervisor directly before leaving the line.</textarea>
+        <div class="dc-box" style="min-height:160px">
+          <textarea class="dc-textarea" name="supervisorRemarks" style="min-height:146px">Grievor did not notify supervisor directly before leaving the line.</textarea>
         </div>
       </div>
       <div class="dc-block">
         <div class="dc-field-label dc-box-label">Resolution</div>
-        <div class="dc-box" style="min-height:146.667px">
-          <textarea class="dc-textarea" name="resolution" style="min-height:132px"></textarea>
+        <div class="dc-box" style="min-height:133.333px">
+          <textarea class="dc-textarea" name="resolution" style="min-height:119px"></textarea>
         </div>
       </div>
     </form>

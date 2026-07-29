@@ -1094,27 +1094,32 @@ input[type="radio"] { width: 15px; height: 15px; }
   margin-bottom: 18px;
 }
 
+/* Label over value, no fill — the grey chip this used to be read as page furniture
+   rather than as part of the form. */
 .dc-sp {
-  display: inline-flex;
-  align-items: center;
-  background: #E2E2EC;
-  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dc-sp-value {
   font-family: Helvetica, Arial, sans-serif;
-  font-size: 12px;
+  font-size: 14.667px;
+  font-weight: 700;
   color: var(--dc-ink);
-  min-width: 120px;
 }
 
 .dc-sp input {
   border: none;
   background: transparent;
   padding: 0;
-  width: 70px;
+  width: 64px;
   font-family: Helvetica, Arial, sans-serif;
-  font-size: 12px;
+  font-size: 14.667px;
+  font-weight: 700;
   color: var(--dc-ink);
 }
-.dc-sp input:focus { outline: none; background: #fff; }
+.dc-sp input:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
 
 .dc-logo { width: 147px; height: auto; }
 
@@ -1328,4 +1333,61 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 @media (prefers-reduced-motion: reduce) {
   .skel-card { animation: none; background: #ececf0; }
+}
+
+
+/* ---------- Extra grid ratios ---------- */
+.dc-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.dc-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.dc-cols-112 { grid-template-columns: 1fr 1fr 2fr; }
+
+/* Two blocks sharing a row at the grid's midpoint, so their outer edges still line up
+   with the full-width rows above and below. */
+.dc-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--dc-gap);
+  align-items: start;
+}
+
+/* A labelled field whose value is a set of checkboxes. Taller than a text cell because the
+   boxes are 20px (15pt) and need to clear both the label and the border. */
+.dc-checkbox-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--dc-border);
+  border-radius: 3px;
+  padding: var(--dc-cell-top) var(--dc-cell-x) 8px;
+  min-height: 61.333px;                                  /* 46pt CHECKBOX_ROW_H */
+}
+
+@media (max-width: 900px) {
+  .dc-split { grid-template-columns: 1fr; }
+  .dc-cols-3, .dc-cols-112 { grid-template-columns: 1fr; }
+}
+
+/* ---------- Page-break markers ---------- */
+.dc-break {
+  position: relative;
+  height: 0;
+  margin: 20px 0;
+  border-top: 1px dashed var(--dc-primary);
+}
+
+.dc-break-tag {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  background: var(--dc-primary);
+  color: #fff;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }

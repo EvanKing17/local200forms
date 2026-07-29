@@ -244,16 +244,6 @@ function fitSingleLine(doc, text, maxWidth, baseSize, minSize = 6) {
   return size;
 }
 
-/* Centered bold form title at the top of the page, wrapping (rather than overflowing) if it's long */
-function drawFormHeading(doc, text, y = 40) {
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(0, 0, 0);
-  const lines = doc.splitTextToSize(text, 480);
-  lines.forEach((line, i) => doc.text(line, 306, y + i * 18, { align: 'center' }));
-  return y + lines.length * 18;
-}
-
 const UNIFOR_LOGO_ASPECT = 1342 / 532;
 
 /* The official Unifor logo (see unifor-logo.js), right-aligned so rightEdgeX is its right edge */
@@ -266,21 +256,32 @@ function drawUniforLogo(doc, rightEdgeX, topY, width = 110) {
 /* SP number + logo, repeated at the top of every Unifor Fact Sheet page. Returns the y to start content at. */
 function drawUniforPageHeader(doc, marginX, W, data) {
   const y = 44;
-  doc.setFillColor(226, 226, 236);
-  doc.rect(marginX, y, 90, 18, 'F');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
-  doc.text(`SP-${data.spNumber || ''}`, marginX + 6, y + 12);
-  drawUniforLogo(doc, marginX + W, y - 4);
-  return y + 40;
+  // Label above the number, in the same field style as the rest of the document — the grey
+  // fill this used to have made it read as a UI chip rather than part of the form.
+  setLabelStyle(doc);
+  doc.text('SP NUMBER', marginX, y + 4);
+  clearLabelStyle(doc);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...DC.ink);
+  doc.text(`SP-${data.spNumber || ''}`, marginX, y + 18);
+
+  drawUniforLogo(doc, marginX + W, y - 6);
+
+  doc.setDrawColor(...DC.primary);
+  doc.setLineWidth(1.5);
+  doc.line(marginX, y + 28, marginX + W, y + 28);
+  return y + 48;
 }
 
 /* "Unifor Local 200 / PRIVATE / pg. X / 5" footer, repeated at the bottom of every page */
 function drawUniforFooter(doc, marginX, W, pageNum, totalPages = 5) {
+  doc.setDrawColor(...DC.divider);
+  doc.setLineWidth(0.75);
+  doc.line(marginX, 758, marginX + W, 758);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.setTextColor(140, 140, 140);
+  doc.setTextColor(...DC.labelSoft);
   doc.text('Unifor Local 200', marginX, 770);
   doc.text('PRIVATE', 306, 770, { align: 'center' });
   doc.text(`pg. ${pageNum} / ${totalPages}`, marginX + W, 770, { align: 'right' });
@@ -292,7 +293,7 @@ function drawUniforFooter(doc, marginX, W, pageNum, totalPages = 5) {
 function yesNoQuestion(doc, x, y, label, value, checkboxX, labelMaxWidth) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(...DC.ink);
   const lines = labelMaxWidth ? doc.splitTextToSize(label, labelMaxWidth) : [label];
   doc.text(lines, x, y);
   checkboxText(doc, checkboxX, y - 3, 'Yes');
@@ -335,13 +336,33 @@ function clearLabelStyle(doc) {
 
 /*
  * Document header lockup: title over a subtitle, on a rule in the primary colour.
- * Left-aligned per the style guide (the older centered heading is drawFormHeading).
+ * Left-aligned per the style guide.
  */
-function drawDocHeader(doc, x, y, w, title, subtitle) {
+function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
+  // A boxed field sitting on the title's baseline, e.g. the Investigation form's "Step:"
+  let titleWidth = w;
+  if (rightField) {
+    const boxW = 54, boxH = 22;
+    const boxX = x + w - boxW;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...DC.ink);
+    const labelW = doc.getTextWidth(rightField.label);
+    doc.text(rightField.label, boxX - labelW - 8, y + 1);
+
+    doc.setDrawColor(...DC.border);
+    doc.setLineWidth(0.75);
+    doc.roundedRect(boxX, y - 15, boxW, boxH, DC_RADIUS, DC_RADIUS);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(String(rightField.value || ''), boxX + boxW / 2, y + 1, { align: 'center' });
+    titleWidth = w - boxW - labelW - 24;
+  }
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(...DC.ink);
-  const titleLines = doc.splitTextToSize(title, w);
+  const titleLines = doc.splitTextToSize(title, titleWidth);
   titleLines.forEach((line, i) => doc.text(line, x, y + i * 18));
   let cy = y + (titleLines.length - 1) * 18;
 
@@ -592,6 +613,35 @@ function markCheckbox(doc, x, y) {
   doc.setLineJoin('miter');
 }
 
+/*
+ * A labelled field whose value is a set of checkboxes, sized so the 15pt boxes sit clear of
+ * both the label above and the cell border below — cramming them into a boxedGrid cell built
+ * for a 9.5pt line of text is what made them collide with the text around them.
+ */
+const CHECKBOX_ROW_H = 46;
+
+function checkboxFieldRow(doc, x, y, w, label, options, value, attached = false) {
+  doc.setDrawColor(...DC.border);
+  doc.setLineWidth(0.75);
+  if (attached) doc.rect(x, y, w, CHECKBOX_ROW_H);
+  else doc.roundedRect(x, y, w, CHECKBOX_ROW_H, DC_RADIUS, DC_RADIUS);
+
+  setLabelStyle(doc);
+  doc.text(label.toUpperCase(), x + CELL_X, y + 10.5);
+  clearLabelStyle(doc);
+
+  // Centre of the checkbox row, leaving the label its own band above
+  const cy = y + 30;
+  let cx = x + CELL_X;
+  options.forEach(option => {
+    checkboxText(doc, cx, cy, option);
+    if (value === option) markCheckbox(doc, cx, cy);
+    doc.setFontSize(9.5);
+    cx += CHECKBOX_SIZE + 6 + doc.getTextWidth(option) + 22;
+  });
+  return y + CHECKBOX_ROW_H;
+}
+
 /* ============ FORD FORM ============ */
 function buildFordDoc(data) {
   const { jsPDF } = window.jspdf;
@@ -783,94 +833,93 @@ function buildUniforDoc(data) {
   const W = 532;
   let y = drawUniforPageHeader(doc, marginX, W, data);
 
-  y = drawFormHeading(doc, FORMS_CONFIG.unifor.title, y);
-  y += 4;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(...DC.ink);
+  const uniforTitleLines = doc.splitTextToSize(FORMS_CONFIG.unifor.title, W);
+  uniforTitleLines.forEach((line, i) => doc.text(line, 306, y + i * 18, { align: 'center' }));
+  y += (uniforTitleLines.length - 1) * 18 + 14;
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.setTextColor(120, 120, 120);
+  doc.setTextColor(...DC.labelSoft);
   doc.text('For Local Union Use Only', 306, y, { align: 'center' });
   y += 12;
   doc.text('This form to accompany First Stage Grievance appealed to Bargaining Committee', 306, y, { align: 'center' });
-  y += 26;
+  y += 24;
+
+  const w4 = W / 4;
+  const w3 = W / 3;
+
+  // ---- Section A: who the grievor is ----
+  y = sectionBar(doc, marginX, y, W, 'Section A:', ' Grievor');
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: "Grievor's Name", value: data.grievorName, width: w4 * 2 },
+    { label: 'GID #', value: data.gid, width: w4 },
+    { label: 'Dept', value: data.dept, width: w4 },
+  ], CELL_MIN_H, true);
+  y += 10;
 
   y = boxedGrid(doc, marginX, y, W, [
-    { label: "Grievor's Name", value: data.grievorName, width: W * 0.45 },
-    { label: 'GID #', value: data.gid, width: W * 0.25 },
-    { label: 'Dept', value: data.dept, width: W * 0.30 },
+    { label: 'Classification', value: data.classification, width: w4 * 2 },
+    { label: 'Seniority Date', value: fmtDateFit(doc, data.seniorityDate, w4 - CELL_X * 2), width: w4 },
+    { label: 'Time in Classification', value: data.timeInClass, width: w4 },
   ]);
-  y += 6;
+  y += 10;
+
+  // Rate and COLA are always read together, so they stay adjacent
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Rate $', value: formatCurrency(data.rate), width: w4 },
+    { label: 'COLA $', value: formatCurrency(data.cola), width: w4 },
+  ], CELL_MIN_H);
+  const rateRowBottom = y;
+  // Discipline sits beside Rate/COLA rather than in its own band-width row: it's a fact about
+  // the grievor's record, and the checkboxes need more height than a text cell.
+  checkboxFieldRow(doc, marginX + w4 * 2, rateRowBottom - CHECKBOX_ROW_H, w4 * 2,
+    'Discipline on Record?', ['Yes', 'No'], data.discipline);
+  y += 14;
+
+  // ---- Section B: the chain of supervision, and the dates ----
+  y = sectionBar(doc, marginX, y, W, 'Section B:', ' Supervision & Filing');
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: "Employee's Supervisor", value: data.supervisor, width: w3 },
+    { label: 'General Supervisor', value: data.generalSupervisor, width: w3 },
+    { label: 'Superintendent', value: data.superintendent, width: w3 },
+  ], CELL_MIN_H, true);
+  y += 10;
 
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Seniority Date', value: fmtDateFit(doc, data.seniorityDate, W / 2 - CELL_X * 2), width: W / 2 },
-    { label: 'Classification', value: data.classification, width: W / 2 },
+    { label: 'Date of Incident', value: fmtDateFit(doc, data.uniforDateIncident, w4 * 2 - CELL_X * 2), width: w4 * 2 },
+    { label: 'Date Grievance Filed', value: fmtDateFit(doc, data.uniforDateFiled, w4 * 2 - CELL_X * 2), width: w4 * 2 },
   ]);
-  y += 4;
+  y += 14;
 
-  // Rate and COLA are always looked at together, so keep them adjacent
-  y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Time in Classification', value: data.timeInClass, width: W * 0.4 },
-    { label: 'Rate $', value: formatCurrency(data.rate), width: W * 0.3 },
-    { label: 'COLA $', value: formatCurrency(data.cola), width: W * 0.3 },
-  ]);
-  y += 4;
-
-  y = boxedGrid(doc, marginX, y, W, [
-    { label: "Employee's Supervisor", value: data.supervisor, width: W / 2 },
-    { label: 'General Supervisor', value: data.generalSupervisor, width: W / 2 },
-  ]);
-  y += 6;
-
-  y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Superintendent', value: data.superintendent, width: W / 2 },
-    { label: 'Date of Incident', value: fmtDateFit(doc, data.uniforDateIncident, W / 2 - CELL_X * 2), width: W / 2 },
-  ]);
-  y += 6;
-
-  // Discipline checkboxes + Date Grievance Filed — content here is always short and fixed, so a
-  // plain fixed-height row (unlike boxedGrid) is safe, as long as it isn't started too close to
-  // the page edge itself.
-  const disciplineH = 34;
-  y = ensureSpace(doc, y, disciplineH);
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.75);
-  doc.rect(marginX, y, W / 2, disciplineH);
-  doc.rect(marginX + W / 2, y, W / 2, disciplineH);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(80, 80, 80);
-  doc.text('DISCIPLINE ON RECORD?', marginX + 5, y + 9);
-  doc.text('DATE GRIEVANCE FILED', marginX + W / 2 + 5, y + 9);
-  checkboxText(doc, marginX + 10, y + 24, 'Yes');
-  checkboxText(doc, marginX + 60, y + 24, 'No');
-  if (data.discipline === 'Yes') markCheckbox(doc, marginX + 10, y + 24);
-  else markCheckbox(doc, marginX + 60, y + 24);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
-  doc.setTextColor(0, 0, 0);
-  doc.text(fmtDate(data.uniforDateFiled), marginX + W / 2 + 5, y + 24);
-  y += disciplineH + 6;
+  // ---- Section C: the grievance itself ----
+  y = sectionBar(doc, marginX, y, W, 'Section C:', ' The Grievance');
+  y += 12;
 
   // flowTextBox paginates itself if the value is long, so no pre-emptive page-break needed here
-  y = flowTextBox(doc, marginX, y + 6, W, 'Who is involved in this grievance?', data.whoInvolved, 44);
-  y += 8;
+  y = flowTextBox(doc, marginX, y, W, 'Who is involved in this grievance?', data.whoInvolved, 44);
+  y += 12;
 
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'When did it happen?', value: data.whenHappened, width: W / 2 },
-    { label: 'Where did it happen?', value: data.whereHappened, width: W / 2 },
+    { label: 'When did it happen?', value: data.whenHappened, width: w4 * 2 },
+    { label: 'Where did it happen?', value: data.whereHappened, width: w4 * 2 },
   ]);
-  y += 4;
+  y += 12;
 
-  y = flowTextBox(doc, marginX, y + 6, W, 'Why is this a grievance?', data.whyGrievance, 70);
-  y += 8;
+  y = flowTextBox(doc, marginX, y, W, 'Why is this a grievance?', data.whyGrievance, 70);
+  y += 12;
 
-  y = flowTextBox(doc, marginX, y + 6, W, 'What do we want?', data.whatWeWant, 56);
+  y = flowTextBox(doc, marginX, y, W, 'What do we want?', data.whatWeWant, 56);
 
   drawUniforFooter(doc, marginX, W, 1);
 
   // ---- Page 2: Supervisor's Statement / Your Observation / Additional Information ----
   doc.addPage();
   y = drawUniforPageHeader(doc, marginX, W, data);
-  y += 10;
+  y = sectionBar(doc, marginX, y, W, 'Section D:', ' Statements');
+  y += 12;
   y = flowTextBox(doc, marginX, y, W, "Supervisor's Statement", data.supervisorStatement, 170);
   y += 14;
   y = flowTextBox(doc, marginX, y, W, 'Your Observation', data.yourObservation, 170);
@@ -881,7 +930,8 @@ function buildUniforDoc(data) {
   // ---- Page 3: Investigation questions ----
   doc.addPage();
   y = drawUniforPageHeader(doc, marginX, W, data);
-  y += 10;
+  y = sectionBar(doc, marginX, y, W, 'Section E:', ' Investigation');
+  y += 16;
 
   // Checkboxes are drawn taller (15pt) than a text line, anchored to the question's first line —
   // so the gap after a yes/no question needs extra room beyond the label's own line height,
@@ -910,7 +960,7 @@ function buildUniforDoc(data) {
   y += q2Lines * YES_NO_LINE_GAP + YES_NO_TRAILING_GAP;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(...DC.ink);
   doc.text('If so, when?', marginX, y);
   doc.setFont('helvetica', 'normal');
   doc.text(data.priorViolationWhen || '', marginX + 70, y);
@@ -929,8 +979,8 @@ function buildUniforDoc(data) {
   // ---- Page 4: Statements, settlement, submission ----
   doc.addPage();
   y = drawUniforPageHeader(doc, marginX, W, data);
-  y += 10;
-
+  y = sectionBar(doc, marginX, y, W, 'Section F:', ' Assessment & Submission');
+  y += 12;
   y = flowTextBox(doc, marginX, y, W, "Which of the supervisor's statements are true?", data.statementsTrue, 46);
   y += 10;
   y = flowTextBox(doc, marginX, y, W, 'Which are false?', data.statementsFalse, 46);
@@ -948,15 +998,15 @@ function buildUniforDoc(data) {
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(...DC.ink);
   doc.text("Grievor's Signature:", marginX, y);
-  doc.setDrawColor(0, 0, 0);
+  doc.setDrawColor(...DC.ink);
   doc.setLineWidth(0.75);
   doc.line(marginX + 110, y + 2, marginX + 400, y + 2);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.setTextColor(120, 120, 120);
+  doc.setTextColor(...DC.labelSoft);
   const noteLines = doc.splitTextToSize(
     'NOTE: These facts are basic requirements to the grievance procedure. They must be filled out. ' +
     'Additional facts may be filled in on space available, or attached separately.',
@@ -969,7 +1019,8 @@ function buildUniforDoc(data) {
   // ---- Page 5: Committee comments ----
   doc.addPage();
   y = drawUniforPageHeader(doc, marginX, W, data);
-  y += 10;
+  y = sectionBar(doc, marginX, y, W, 'Section G:', ' Committee Comments');
+  y += 12;
   y = flowTextBox(doc, marginX, y, W, "Committeeperson's Comments on Second Stage", data.committeepersonComments, 280);
   y += 14;
   flowTextBox(doc, marginX, y, W, "Plant Chair's Comments on Third Stage", data.plantChairComments, 280);
@@ -1002,46 +1053,41 @@ function buildInvestigationDoc(data) {
   const W = 532;
   let y = 40;
 
-  // Step box, top-right
-  const stepW = 60, stepH = 20;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Step:', marginX + W - stepW - 34, y + 14);
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.75);
-  doc.rect(marginX + W - stepW, y, stepW, stepH);
-  doc.setFont('helvetica', 'normal');
-  doc.text(data.step || '', marginX + W - stepW + 6, y + 14);
+  y = drawDocHeader(doc, marginX, 54, W, FORMS_CONFIG.investigation.title, '', { label: 'Step:', value: data.step });
 
-  y = drawFormHeading(doc, FORMS_CONFIG.investigation.title, y + 26);
+  const w4 = W / 4;
+
+  // ---- Section A: where and when ----
+  y = sectionBar(doc, marginX, y, W, 'Section A:', ' Incident Details');
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Name of Supervisor', value: data.supervisorName, width: w4 * 2 },
+    { label: 'Area', value: data.area, width: w4 },
+    { label: 'Dept #', value: data.deptNum, width: w4 },
+  ], CELL_MIN_H, true);
+  y += 10;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Date of Infraction', value: fmtDateFit(doc, data.dateInfraction, w4 - CELL_X * 2), width: w4 },
+    { label: 'Time', value: data.time, width: w4 },
+    { label: 'Name of Witnesses', value: data.witnessNames, width: w4 * 2 },
+  ]);
   y += 14;
 
+  // ---- Section B: who was in the room ----
+  y = sectionBar(doc, marginX, y, W, 'Section B:', ' Present at Investigation');
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Name of Supervisor', value: data.supervisorName, width: W / 2 },
-    { label: 'Area', value: data.area, width: W / 2 },
-  ]);
-  y += 4;
-  y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Date of Infraction', value: fmtDateFit(doc, data.dateInfraction, W / 2 - CELL_X * 2), width: W / 2 },
-    { label: 'Dept #', value: data.deptNum, width: W / 2 },
-  ]);
-  y += 4;
-  y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Name of Witnesses', value: data.witnessNames, width: W / 2 },
-    { label: 'Time', value: data.time, width: W / 2 },
-  ]);
-  y += 4;
-  y = boxedGrid(doc, marginX, y, W, [{ label: 'Unifor Representative', value: data.uniforRep, width: W }]);
-  y += 4;
-  y = boxedGrid(doc, marginX, y, W, [{ label: 'HR Representative', value: data.hrRep, width: W }]);
-  y += 10;
+    { label: 'Unifor Representative', value: data.uniforRep, width: w4 * 2 },
+    { label: 'HR Representative', value: data.hrRep, width: w4 * 2 },
+  ], CELL_MIN_H, true);
+  y += 14;
 
-  y = flowTextBox(doc, marginX, y, W, 'Investigation of Incident:', data.investigation, 170);
+  // ---- Section C: the account ----
+  y = sectionBar(doc, marginX, y, W, 'Section C:', ' Investigation & Resolution');
   y += 12;
-  y = flowTextBox(doc, marginX, y, W, "Supervisor's Remarks:", data.supervisorRemarks, 130);
-  y += 12;
-  flowTextBox(doc, marginX, y, W, 'Resolution:', data.resolution, 110);
+  y = flowTextBox(doc, marginX, y, W, 'Investigation of Incident:', data.investigation, 160);
+  y += 14;
+  y = flowTextBox(doc, marginX, y, W, "Supervisor's Remarks:", data.supervisorRemarks, 120);
+  y += 14;
+  flowTextBox(doc, marginX, y, W, 'Resolution:', data.resolution, 100);
 
   embedFormData(doc, 'investigation', data);
   return doc;
@@ -1109,6 +1155,7 @@ function clearForm(form) {
   });
   form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
+  if (currentFormType) updatePageBreaks(currentFormType);
 }
 
 /* Fills a form's fields (including custom date pickers) from a plain {name: value} object */
@@ -1139,6 +1186,7 @@ function showForm(type, data) {
   document.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   // scrollHeight reads 0 while the panel is hidden, so size the textareas now that it's visible
   entry.form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
+  updatePageBreaks(type);
 }
 
 document.querySelectorAll('.form-card').forEach(card => {
@@ -1852,3 +1900,78 @@ if (window.jspdf) {
   // the PDF buttons report the failure themselves.
   setTimeout(() => { clearInterval(poll); appReady(); }, 8000);
 }
+
+/* ============ Page-break markers ============
+ *
+ * Shows where the printed page will actually break while the form is being filled in, so the
+ * split doesn't have to be discovered by opening the preview over and over.
+ *
+ * The Unifor sheet is skipped: buildUniforDoc() calls addPage() at fixed points, so it already
+ * renders as five real sheets and there is nothing to predict.
+ *
+ * For the rest, the break positions are worked out from the measured DOM using the same rule
+ * the PDF uses -- a block that would cross the bottom margin moves to the next page whole,
+ * rather than being sliced -- because the document view is laid out at the PDF's own scale
+ * (1pt = 1.3333px). That is a mirror of the pagination logic rather than a reading of it, so
+ * every update checks its own answer against the page count of the real PDF and renders
+ * nothing if the two disagree. A wrong break line is worse than no break line.
+ */
+const PX_PER_PT = 4 / 3;
+const PAGE_TOP_PX = 40 * PX_PER_PT;          // the builders' top margin
+const PAGE_USABLE_PX = (PAGE_BOTTOM - 40) * PX_PER_PT;
+
+function makeBreakMarker(pageNumber) {
+  const marker = document.createElement('div');
+  marker.className = 'dc-break';
+  marker.setAttribute('aria-hidden', 'true');
+  const tag = document.createElement('span');
+  tag.className = 'dc-break-tag';
+  tag.textContent = 'Page ' + pageNumber;
+  marker.appendChild(tag);
+  return marker;
+}
+
+function updatePageBreaks(type) {
+  const entry = FORM_BUILDERS[type];
+  if (!entry) return;
+  const form = entry.form;
+  form.querySelectorAll('.dc-break').forEach(node => node.remove());
+
+  // Multi-sheet forms draw their own page boundaries
+  if (!form.classList.contains('dc-page')) return;
+
+  const sheetTop = form.getBoundingClientRect().top + parseFloat(getComputedStyle(form).paddingTop);
+  let pageStart = sheetTop;
+  let pages = 1;
+  const marks = [];
+
+  Array.from(form.children).forEach(block => {
+    const rect = block.getBoundingClientRect();
+    if (!rect.height) return;
+    if (rect.bottom - pageStart > PAGE_USABLE_PX && rect.top > pageStart) {
+      pages += 1;
+      pageStart = rect.top;
+      marks.push({ block, page: pages });
+    }
+  });
+
+  // The check: if this disagrees with the PDF, say nothing rather than something wrong
+  let actualPages;
+  try {
+    actualPages = entry.build(fd(form)).getNumberOfPages();
+  } catch {
+    return;
+  }
+  if (actualPages !== pages) return;
+
+  marks.forEach(({ block, page }) => block.parentNode.insertBefore(makeBreakMarker(page), block));
+}
+
+const refreshPageBreaks = debounce(() => {
+  if (currentFormType) updatePageBreaks(currentFormType);
+}, 400);
+
+[fordForm, policyForm, uniforForm, investigationForm].forEach(form => {
+  form.addEventListener('input', refreshPageBreaks);
+  form.addEventListener('change', refreshPageBreaks);
+});
