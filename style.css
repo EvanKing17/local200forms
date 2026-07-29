@@ -810,22 +810,29 @@ input[type="radio"] { width: 15px; height: 15px; }
   margin-top: var(--dc-gap);
 }
 
+/* One ledger line: label left, figure right. See hourCell() — these hold a single number in a
+   half-page-wide box, so a stacked label left the figure marooned in empty space. */
 .dc-hour-cell {
-  height: 48px;                                          /* 36pt HOUR_CELL_H */
+  height: 34.667px;                                      /* 26pt HOUR_CELL_H */
   border: 1px solid var(--dc-border);
   border-radius: 3px;
-  padding: var(--dc-cell-top) var(--dc-cell-x);
+  padding: 0 var(--dc-cell-x);
   margin: 0;
   display: flex;
-  flex-direction: column;
-  gap: 0;                 /* see the note on .dc-field-grid > label */
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .dc-hour-cell .dc-field-label { line-height: var(--dc-label-h); }
 
 .dc-hour-cell input {
-  margin: var(--dc-label-gap) -2px 0;
-  width: calc(100% + 4px);
+  margin: 0;
+  width: auto;
+  max-width: 45%;
+  flex: 0 1 auto;
+  text-align: right;
   border: none;
   background: transparent;
   padding: 0 2px;

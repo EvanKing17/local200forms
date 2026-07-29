@@ -185,9 +185,20 @@ document.addEventListener('keydown', (e) => {
 const MONTH_NAMES_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_NAMES_SHORT = MONTH_NAMES_FULL.map(m => m.slice(0, 3));
 
-function buildFilename(name, formTypeLabel) {
-  const today = new Date();
-  const dateStr = `${MONTH_NAMES_FULL[today.getMonth()]} ${today.getDate()} ${today.getFullYear()}`;
+function buildFilename(name, formTypeLabel, occurredIso) {
+  // The date of the incident, not the day the PDF happened to be made — a grievance gets
+  // reprinted and refiled, and it's the occurrence that identifies it. Falls back to today
+  // when the incident date hasn't been filled in yet.
+  const parts = String(occurredIso || '').split('-');
+  const monthIndex = parseInt(parts[1], 10) - 1;
+  let dateStr;
+  if (parts.length === 3 && MONTH_NAMES_FULL[monthIndex]) {
+    // Read off the string rather than via a Date, which would shift the day west of UTC
+    dateStr = `${MONTH_NAMES_FULL[monthIndex]} ${parseInt(parts[2], 10)} ${parts[0]}`;
+  } else {
+    const today = new Date();
+    dateStr = `${MONTH_NAMES_FULL[today.getMonth()]} ${today.getDate()} ${today.getFullYear()}`;
+  }
   const safeName = (name || 'Unnamed').trim().replace(/[\\/:*?"<>|]/g, '') || 'Unnamed';
   return `${safeName} - ${dateStr} ${formTypeLabel}.pdf`;
 }
@@ -562,26 +573,29 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
   return currentY;
 }
 
-const HOUR_CELL_H = 36;
+const HOUR_CELL_H = 26;
 
 /*
- * An hours cell in the guide's labelled-field style: its own bordered box with the label
- * above the value, rather than a label sitting outside a separate value box.
+ * An hours cell reads as one ledger line: label on the left, figure on the right, rather than
+ * the label-above-value used everywhere else. These hold a single number in a half-page-wide
+ * box, so stacking them left the figure marooned in a lot of empty space — and a number
+ * belongs against the right edge anyway, the way it would in the spreadsheets these replaced.
  */
 function hourCell(doc, x, y, w, label, value) {
   doc.setDrawColor(...DC.border);
   doc.setLineWidth(0.75);
   doc.roundedRect(x, y, w, HOUR_CELL_H, DC_RADIUS, DC_RADIUS);
 
+  const baseline = y + 16;
   setLabelStyle(doc);
-  doc.text(doc.splitTextToSize(label.toUpperCase(), w - CELL_X * 2)[0], x + CELL_X, y + 10.5);
+  doc.text(doc.splitTextToSize(label.toUpperCase(), w * 0.62)[0], x + CELL_X, baseline);
   clearLabelStyle(doc);
 
   const val = (value || '').toString();
   doc.setFont('helvetica', 'normal');
-  fitSingleLine(doc, val, w - CELL_X * 2, 9.5, 6.5);
+  fitSingleLine(doc, val, w * 0.3, 9.5, 6.5);
   doc.setTextColor(...DC.ink);
-  doc.text(val, x + CELL_X, y + 26);
+  doc.text(val, x + w - CELL_X, baseline, { align: 'right' });
   return y + HOUR_CELL_H;
 }
 
@@ -746,7 +760,7 @@ fordForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildFordDoc(data);
-  openPdfViewer(doc, buildFilename(data.employeeName, 'Grievance Claim'));
+  openPdfViewer(doc, buildFilename(data.employeeName, 'Grievance Claim', data.dateIncident));
 });
 
 document.getElementById('fordClear').addEventListener('click', () => {
@@ -824,7 +838,7 @@ policyForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildPolicyDoc(data);
-  openPdfViewer(doc, buildFilename(data.employeeName, 'Policy Grievance'));
+  openPdfViewer(doc, buildFilename(data.employeeName, 'Policy Grievance', data.dateIncident));
 });
 
 document.getElementById('policyClear').addEventListener('click', () => {
@@ -1044,7 +1058,7 @@ uniforForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildUniforDoc(data);
-  openPdfViewer(doc, buildFilename(data.grievorName, 'Fact Sheet'));
+  openPdfViewer(doc, buildFilename(data.grievorName, 'Fact Sheet', data.uniforDateIncident));
 });
 
 document.getElementById('uniforClear').addEventListener('click', () => {
@@ -1106,7 +1120,7 @@ investigationForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
   const doc = buildInvestigationDoc(data);
-  openPdfViewer(doc, buildFilename(data.supervisorName, 'Investigation Form'));
+  openPdfViewer(doc, buildFilename(data.supervisorName, 'Investigation Form', data.dateInfraction));
 });
 
 document.getElementById('investigationClear').addEventListener('click', () => {

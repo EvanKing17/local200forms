@@ -208,6 +208,19 @@ function run(win, doc) {
     const out = win.fmtDateFit(d, '2027-12-31', 40);
     return out === '12/31/2027' || { detail: 'got ' + out };
   });
+  check(g5, 'Filename uses the date of the incident, not today', () => {
+    const out = win.buildFilename('Jane Doe', 'Fact Sheet', '2026-06-09');
+    return out === 'Jane Doe - June 9 2026 Fact Sheet.pdf' || { detail: out };
+  });
+  check(g5, 'Filename falls back to today when no incident date is set', () => {
+    const out = win.buildFilename('Jane Doe', 'Fact Sheet', '');
+    return /^Jane Doe - \w+ \d+ \d{4} Fact Sheet\.pdf$/.test(out) || { detail: out };
+  });
+  check(g5, 'The incident date is not shifted by time zone', () => {
+    // Parsed from the string; new Date('2026-01-01') would be the 31st west of UTC
+    const out = win.buildFilename('X', 'Y', '2026-01-01');
+    return out === 'X - January 1 2026 Y.pdf' || { detail: out };
+  });
   check(g5, 'Filename uses the spelled-out date', () =>
     /^Jane - \w+ \d+ \d{4} Fact Sheet\.pdf$/.test(win.buildFilename('Jane', 'Fact Sheet')) ||
     { detail: win.buildFilename('Jane', 'Fact Sheet') });
