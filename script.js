@@ -1206,6 +1206,7 @@ function showHome() {
   currentFormType = null;
   homeView.hidden = false;
   workspace.hidden = true;
+  refreshClearAllButton();
 }
 
 /*
@@ -1308,14 +1309,13 @@ function showUploadError(message, file) {
   uploadError.hidden = false;
 }
 
-uploadInput.addEventListener('change', async () => {
-  const file = uploadInput.files[0];
-  uploadInput.value = ''; // allow re-selecting the same file later
+/* One path for both ways in: the file picker and a file dropped on the page */
+async function handleIncomingFile(file) {
   if (!file) return;
 
   uploadError.hidden = true;
   if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
-    showUploadError('Please choose a PDF file.');
+    showUploadError('That isn’t a PDF.');
     return;
   }
 
@@ -1332,10 +1332,76 @@ uploadInput.addEventListener('change', async () => {
     return;
   }
   if (!FORM_BUILDERS[payload.formType]) {
-    showUploadError('Unrecognized form type.');
+    showUploadError('That PDF names a form this app doesn’t have.', file);
     return;
   }
   showForm(payload.formType, payload.data);
+}
+
+uploadInput.addEventListener('change', () => {
+  const file = uploadInput.files[0];
+  uploadInput.value = '';   // so the same file can be chosen again later
+  handleIncomingFile(file);
+});
+
+/*
+ * Drag and drop over the whole window. dragenter/dragleave fire for every element crossed, so
+ * a depth counter decides when the file has genuinely left rather than moved onto a child.
+ */
+const dropOverlay = document.getElementById('dropOverlay');
+let dragDepth = 0;
+
+function draggingFile(e) {
+  return Array.from(e.dataTransfer && e.dataTransfer.types || []).includes('Files');
+}
+
+window.addEventListener('dragenter', (e) => {
+  if (!draggingFile(e)) return;
+  e.preventDefault();
+  dragDepth += 1;
+  dropOverlay.hidden = false;
+});
+
+window.addEventListener('dragover', (e) => {
+  if (!draggingFile(e)) return;
+  e.preventDefault();   // without this the browser refuses the drop
+});
+
+window.addEventListener('dragleave', (e) => {
+  if (!draggingFile(e)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) dropOverlay.hidden = true;
+});
+
+window.addEventListener('drop', (e) => {
+  if (!draggingFile(e)) return;
+  e.preventDefault();   // otherwise the browser navigates to the file
+  dragDepth = 0;
+  dropOverlay.hidden = true;
+  handleIncomingFile(e.dataTransfer.files[0]);
+});
+
+/* ============ Clear all forms ============ */
+/* Only offered when there's something to lose, rather than sitting there dead */
+function refreshClearAllButton() {
+  const button = document.getElementById('clearAllForms');
+  if (!button || typeof FORM_BUILDERS === 'undefined') return;
+  const filled = Object.keys(FORM_BUILDERS).filter(type => formHasData(FORM_BUILDERS[type].form));
+  button.hidden = filled.length === 0;
+  button.textContent = filled.length === 1 ? 'Clear 1 form' : `Clear all ${filled.length} forms`;
+}
+
+document.getElementById('clearAllForms').addEventListener('click', () => {
+  const filled = Object.keys(FORM_BUILDERS).filter(type => formHasData(FORM_BUILDERS[type].form));
+  // Wiping several forms and their saved drafts at once is worth one question
+  const what = filled.length === 1 ? 'this form' : `all ${filled.length} forms`;
+  if (!confirm(`Clear ${what}? Anything typed in and not yet saved as a PDF will be lost.`)) return;
+
+  Object.keys(FORM_BUILDERS).forEach(type => {
+    clearForm(FORM_BUILDERS[type].form);
+    discardDraft(type);
+  });
+  refreshClearAllButton();
 });
 
 applyFormsConfig();

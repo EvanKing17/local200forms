@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
 
@@ -48,12 +48,12 @@
     </button>
   </div>
 
-  <div class="upload-box">
-    <div class="upload-box-text">
-      <span class="upload-box-title">Upload a completed form</span>
-      <span class="upload-box-hint">A PDF made here fills the form back in. Anything else can still be opened and read, but not filled in.</span>
-    </div>
-    <label class="btn-secondary upload-btn" for="uploadInput">Choose PDF…</label>
+  <!-- Opening a PDF is a rare errand, so it doesn't hold a box of its own any more: drop a file
+       anywhere on the page. The file picker stays as a plain link, because a phone or tablet
+       has nothing to drag with. -->
+  <div class="home-actions">
+    <button type="button" class="home-action is-danger" id="clearAllForms" hidden>Clear all forms</button>
+    <label class="home-action" for="uploadInput">Open a PDF made here</label>
     <input type="file" id="uploadInput" accept="application/pdf" hidden>
   </div>
   <p class="upload-error" id="uploadError" hidden></p>
@@ -766,6 +766,11 @@
 
 </main>
 
+<!-- Shown only while a file is over the window -->
+<div class="drop-overlay" id="dropOverlay" hidden aria-hidden="true">
+  <span class="drop-overlay-text">Drop a PDF to open it</span>
+</div>
+
 <!-- Admin mode. Reached by typing the unlock word on the Forms page; see ADMIN in script.js.
      There's no password check here on purpose — a static page has nowhere to verify one, so
      anything hardcoded would just be readable in the source. The GitHub token is the real
@@ -823,6 +828,6 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="script.js?v=15"></script>
+<script src="script.js?v=18"></script>
 </body>
 </html>

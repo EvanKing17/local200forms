@@ -22,9 +22,10 @@ because the page on screen *is* the page that comes out.
 - **Works offline.** Install it (below) and it runs with no signal at all.
 - **Drafts save as you type**, so a closed tab or a dead battery costs nothing.
   "Clear form" is how you throw one away.
-- **Re-open a finished PDF.** Upload a PDF this app made and it fills the form
-  back in — it recognises its own files from data embedded invisibly in them.
-  A scan, or a form from anywhere else, is rejected.
+- **Re-open a finished PDF.** Drop one anywhere on the page, or use the link
+  under the form list. A PDF this app made fills the form back in — it
+  recognises its own files from data embedded invisibly in them. Anything else
+  can still be opened and read, just not filled in.
 - **Enter moves to the next field**, and Shift+Enter back — these were spreadsheets
   before they were this, and the muscle memory is real. In the big narrative
   boxes Enter makes a new paragraph, and Ctrl+Enter moves on.

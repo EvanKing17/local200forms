@@ -379,6 +379,44 @@ function run(win, doc) {
     return stops.length === 1 || { detail: stops.length + ' stops for one group' };
   });
 
+  const g6c = group('Home page');
+  check(g6c, 'Clear all is hidden when every form is empty', () => {
+    FORMS.forEach(f => win.clearForm(doc.getElementById(f.form)));
+    win.showHome();
+    return doc.getElementById('clearAllForms').hidden || { detail: 'button was showing' };
+  });
+  check(g6c, 'Clear all counts the forms with something in them', () => {
+    win.showForm('ford');
+    doc.getElementById('fordForm').elements.employeeName.value = 'A';
+    win.showForm('policy');
+    doc.getElementById('policyForm').elements.employeeName.value = 'B';
+    win.showHome();
+    const button = doc.getElementById('clearAllForms');
+    return (!button.hidden && button.textContent === 'Clear all 2 forms') ||
+      { detail: 'hidden=' + button.hidden + ' label=' + button.textContent };
+  });
+  check(g6c, 'The upload box is gone but the picker remains', () => {
+    const boxGone = !doc.querySelector('.upload-box');
+    const picker = !!doc.querySelector('label[for=uploadInput]');
+    return (boxGone && picker) || { detail: 'boxGone=' + boxGone + ' picker=' + picker };
+  });
+  check(g6c, 'A dragged file raises the drop overlay', () => {
+    const overlay = doc.getElementById('dropOverlay');
+    const data = new win.DataTransfer();
+    data.items.add(new win.File([new Uint8Array([37, 80, 68, 70])], 'x.pdf', { type: 'application/pdf' }));
+    win.dispatchEvent(new win.DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: data }));
+    const shown = !overlay.hidden;
+    win.dispatchEvent(new win.DragEvent('dragleave', { bubbles: true, cancelable: true, dataTransfer: data }));
+    return (shown && overlay.hidden) || { detail: 'shown=' + shown + ' hiddenAfter=' + overlay.hidden };
+  });
+  check(g6c, 'dragover is cancelled, or the browser refuses the drop', () => {
+    const data = new win.DataTransfer();
+    data.items.add(new win.File([new Uint8Array([37, 80, 68, 70])], 'x.pdf', { type: 'application/pdf' }));
+    const event = new win.DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: data });
+    win.dispatchEvent(event);
+    return event.defaultPrevented || { detail: 'dragover was not prevented' };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {
