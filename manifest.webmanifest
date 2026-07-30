@@ -1,6 +1,6 @@
 {
-  "name": "Local 200 Grievance Forms",
-  "short_name": "Grievances",
+  "name": "Union Forms",
+  "short_name": "Union Forms",
   "description": "Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.",
   "start_url": "./",
   "scope": "./",
