@@ -194,6 +194,15 @@ function run(win, doc) {
       return payload.data[probe] === 'Round Trip ' + f.type || { detail: 'value did not match' };
     });
   });
+  check(g4, 'A PDF from elsewhere can still be opened', () => {
+    // Not auto-filled — but offered to the viewer rather than dead-ended
+    const foreign = new win.Blob([new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52])], { type: 'application/pdf' });
+    win.showPdf(foreign, 'someone-elses.pdf', null);
+    const open = !doc.getElementById('pdfViewer').hidden;
+    const named = doc.getElementById('pdfViewerName').textContent === 'someone-elses.pdf';
+    doc.getElementById('pdfViewerClose').click();
+    return (open && named) || { detail: 'open=' + open + ' named=' + named };
+  });
   check(g4, 'A PDF from elsewhere is rejected', () =>
     win.readEmbeddedFormData(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52])) === null);
 

@@ -1532,3 +1532,25 @@ input[type="radio"] { width: 15px; height: 15px; }
 @media (prefers-reduced-motion: reduce) {
   .dc-saved, .dc-notice { transition: none; }
 }
+
+/* The upload notice is a fork rather than a dead end, so it carries an action */
+.upload-error {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.upload-error[hidden] { display: none; }
+
+.upload-error-action {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b91c1c;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.upload-error-action:hover { background: rgba(185, 28, 28, 0.08); }
