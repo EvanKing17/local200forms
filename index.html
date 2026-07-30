@@ -14,14 +14,14 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 
 <!-- ================= HOME: FORM LIBRARY ================= -->
 <div class="home-view" id="homeView">
   <h1 class="home-title">Forms</h1>
-  <p class="home-sub">Pick a form to fill in, or upload a PDF this app already generated to pick up where you left off.</p>
+  <p class="home-sub">Pick a form to fill in.</p>
 
   <div class="skeleton" id="skeleton" hidden aria-hidden="true"></div>
 
@@ -828,6 +828,6 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="script.js?v=18"></script>
+<script src="script.js?v=19"></script>
 </body>
 </html>
