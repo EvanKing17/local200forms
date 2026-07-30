@@ -1119,7 +1119,7 @@ input[type="radio"] { width: 15px; height: 15px; }
   color: var(--dc-ink);
 }
 
-.dc-sp input {
+.dc-sp-value input {
   border: none;
   background: transparent;
   padding: 0;
@@ -1129,9 +1129,9 @@ input[type="radio"] { width: 15px; height: 15px; }
   font-weight: 700;
   color: var(--dc-ink);
 }
-.dc-sp input:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
+.dc-sp-value input:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
 
-.dc-logo { width: 147px; height: auto; }
+.dc-logo { width: 122.667px; height: auto; }   /* 92pt UNIFOR_LOGO_W */
 
 .dc-page-foot {
   display: flex;
@@ -1291,17 +1291,20 @@ input[type="radio"] { width: 15px; height: 15px; }
   flex-shrink: 0;
 }
 
+/* No box: a lone digit in a drawn box reads as an empty form control on paper, when it's
+   really just part of the heading. */
 .dc-step input {
-  width: 80px;
-  border: 1px solid var(--dc-border);
-  border-radius: 3px;
+  width: 44px;
+  border: none;
   background: transparent;
-  padding: 4px 8px;
+  padding: 0 2px;
   font-family: Helvetica, Arial, sans-serif;
-  font-size: 12.667px;
+  font-size: 14.667px;
   color: var(--dc-ink);
 }
-.dc-step input:focus { outline: none; background: var(--dc-field-bg); }
+.dc-step input:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
+
+.dc-step .dc-inline-label { font-size: 14.667px; }
 
 .dc-value-input {
   margin: var(--dc-label-gap) -2px 0;
@@ -1357,8 +1360,10 @@ input[type="radio"] { width: 15px; height: 15px; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--dc-gap);
-  align-items: start;
+  align-items: stretch;      /* one visual row, so both sides end level */
 }
+
+.dc-split .dc-field-grid { min-height: 61.333px; }   /* 46pt, matching the checkbox field */
 
 /* A labelled field whose value is a set of checkboxes. Taller than a text cell because the
    boxes are 20px (15pt) and need to clear both the label and the border. */

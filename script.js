@@ -268,21 +268,31 @@ function drawUniforLogo(doc, rightEdgeX, topY, width = 110) {
 }
 
 /* SP number + logo, repeated at the top of every Unifor Fact Sheet page. Returns the y to start content at. */
+const UNIFOR_HEADER_TOP = 42;
+const UNIFOR_LOGO_W = 92;
+
 function drawUniforPageHeader(doc, marginX, W, data) {
-  const y = 44;
+  const top = UNIFOR_HEADER_TOP;
+  const logoH = UNIFOR_LOGO_W / UNIFOR_LOGO_ASPECT;
+  drawUniforLogo(doc, marginX + W, top, UNIFOR_LOGO_W);
+
   // Just the number, no label — the "SP-" prefix already says what it is, and the grey fill
   // this used to sit on read as a UI chip rather than part of the form.
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...DC.ink);
-  doc.text(`SP-${data.spNumber || ''}`, marginX, y + 18);
+  doc.text(`SP-${data.spNumber || ''}`, marginX, top + logoH / 2 + 4);   // centred against the logo
 
-  drawUniforLogo(doc, marginX + W, y - 6);
-
+  /*
+   * The rule clears whichever of the two runs lower, rather than sitting at a fixed offset —
+   * it was drawn at a fixed 28pt and the logo, being taller than that, printed straight
+   * through it.
+   */
+  const ruleY = top + logoH + 10;
   doc.setDrawColor(...DC.primary);
   doc.setLineWidth(1.5);
-  doc.line(marginX, y + 28, marginX + W, y + 28);
-  return y + 48;
+  doc.line(marginX, ruleY, marginX + W, ruleY);
+  return ruleY + 18;
 }
 
 /* "Unifor Local 200 / PRIVATE / pg. X / 5" footer, repeated at the bottom of every page */
@@ -350,24 +360,26 @@ function clearLabelStyle(doc) {
  * Left-aligned per the style guide.
  */
 function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
-  // A boxed field sitting on the title's baseline, e.g. the Investigation form's "Step:"
+  /*
+   * A short value sitting on the title's baseline, e.g. the Investigation form's "Step: 1".
+   * Plain text rather than a boxed field — a lone digit in a drawn box reads as an empty
+   * form control on paper, when it's really just part of the heading.
+   */
   let titleWidth = w;
   if (rightField) {
-    const boxW = 54, boxH = 22;
-    const boxX = x + w - boxW;
-    doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...DC.ink);
-    const labelW = doc.getTextWidth(rightField.label);
-    doc.text(rightField.label, boxX - labelW - 8, y + 1);
+    const value = String(rightField.value || '');
 
-    doc.setDrawColor(...DC.border);
-    doc.setLineWidth(0.75);
-    doc.roundedRect(boxX, y - 15, boxW, boxH, DC_RADIUS, DC_RADIUS);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.text(String(rightField.value || ''), boxX + boxW / 2, y + 1, { align: 'center' });
-    titleWidth = w - boxW - labelW - 24;
+    const valueW = doc.getTextWidth(value);
+    doc.text(value, x + w, y + 1, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    const labelW = doc.getTextWidth(rightField.label);
+    doc.text(rightField.label, x + w - valueW - 5, y + 1, { align: 'right' });
+
+    titleWidth = w - labelW - valueW - 28;
   }
 
   doc.setFont('helvetica', 'bold');
@@ -641,18 +653,18 @@ function markCheckbox(doc, x, y) {
  */
 const CHECKBOX_ROW_H = 46;
 
-function checkboxFieldRow(doc, x, y, w, label, options, value, attached = false) {
+function checkboxFieldRow(doc, x, y, w, label, options, value, attached = false, height = CHECKBOX_ROW_H) {
   doc.setDrawColor(...DC.border);
   doc.setLineWidth(0.75);
-  if (attached) doc.rect(x, y, w, CHECKBOX_ROW_H);
-  else doc.roundedRect(x, y, w, CHECKBOX_ROW_H, DC_RADIUS, DC_RADIUS);
+  if (attached) doc.rect(x, y, w, height);
+  else doc.roundedRect(x, y, w, height, DC_RADIUS, DC_RADIUS);
 
   setLabelStyle(doc);
   doc.text(label.toUpperCase(), x + CELL_X, y + 10.5);
   clearLabelStyle(doc);
 
   // Centre of the checkbox row, leaving the label its own band above
-  const cy = y + 30;
+  const cy = y + height - 16;
   let cx = x + CELL_X;
   options.forEach(option => {
     checkboxText(doc, cx, cy, option);
@@ -660,7 +672,7 @@ function checkboxFieldRow(doc, x, y, w, label, options, value, attached = false)
     doc.setFontSize(9.5);
     cx += CHECKBOX_SIZE + 6 + doc.getTextWidth(option) + 22;
   });
-  return y + CHECKBOX_ROW_H;
+  return y + height;
 }
 
 /* ============ FORD FORM ============ */
@@ -888,17 +900,27 @@ function buildUniforDoc(data) {
   ]);
   y += 10;
 
-  // Rate and COLA are always read together, so they stay adjacent
-  y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Rate $', value: formatCurrency(data.rate), width: w4 },
-    { label: 'COLA $', value: formatCurrency(data.cola), width: w4 },
-  ], CELL_MIN_H);
-  const rateRowBottom = y;
-  // Discipline sits beside Rate/COLA rather than in its own band-width row: it's a fact about
-  // the grievor's record, and the checkboxes need more height than a text cell.
-  checkboxFieldRow(doc, marginX + w4 * 2, rateRowBottom - CHECKBOX_ROW_H, w4 * 2,
-    'Discipline on Record?', ['Yes', 'No'], data.discipline);
-  y += 14;
+  /*
+   * Rate and COLA are read together, so they stay adjacent; Discipline sits beside them rather
+   * than taking a band-width row of its own, being a fact about the grievor's record.
+   *
+   * Two half-width blocks with a gap between, not one full-width grid with a box laid over its
+   * right half — drawn that way, the grid's own border ran on underneath the checkboxes and
+   * printed as a stray line. Both are given the same height so their edges line up.
+   */
+  const halfW = (W - 10) / 2;
+  const splitH = Math.max(measureBoxedGrid(doc, [
+    { label: 'Rate $', value: formatCurrency(data.rate), width: halfW / 2 },
+    { label: 'COLA $', value: formatCurrency(data.cola), width: halfW / 2 },
+  ], CELL_MIN_H), CHECKBOX_ROW_H);
+
+  boxedGrid(doc, marginX, y, halfW, [
+    { label: 'Rate $', value: formatCurrency(data.rate), width: halfW / 2 },
+    { label: 'COLA $', value: formatCurrency(data.cola), width: halfW / 2 },
+  ], splitH);
+  checkboxFieldRow(doc, marginX + halfW + 10, y, halfW,
+    'Discipline on Record?', ['Yes', 'No'], data.discipline, false, splitH);
+  y += splitH + 14;
 
   // ---- Section B: the chain of supervision, and the dates ----
   y = sectionBar(doc, marginX, y, W, 'Section B:', ' Supervision & Filing');
