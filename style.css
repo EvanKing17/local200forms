@@ -145,23 +145,6 @@ button:focus-visible,
   border: 1px solid #fecaca;
 }
 
-.back-to-forms {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  width: fit-content;
-  background: none;
-  border: none;
-  color: var(--c-accent);
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 4px 0;
-  margin: 14px clamp(16px, 4vw, 40px) 0;
-  grid-column: 1 / -1;
-}
-.back-to-forms:hover { text-decoration: underline; }
 
 /* ---------- Workspace ---------- */
 .workspace {
@@ -603,6 +586,7 @@ input[type="radio"] { width: 15px; height: 15px; }
   top: 0;
   z-index: 5;
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 10px;
   max-width: 816px;
@@ -1430,7 +1414,7 @@ input[type="radio"] { width: 15px; height: 15px; }
 
   .home-view,
   .dc-toolbar,
-  .back-to-forms,
+  .dc-back,
   .skeleton,
   .update-banner,
   .pdf-viewer,
@@ -1480,7 +1464,6 @@ input[type="radio"] { width: 15px; height: 15px; }
 /* ---------- Toolbar status: draft saved, and missing-field notices ---------- */
 .dc-saved,
 .dc-notice {
-  margin-right: auto;              /* sit at the left, opposite the buttons */
   align-self: center;
   font-family: var(--font-sans);
   font-size: 12.5px;
@@ -1575,4 +1558,51 @@ input[type="radio"] { width: 15px; height: 15px; }
   border: 2px dashed rgba(255, 255, 255, 0.7);
   border-radius: var(--radius-lg);
   padding: 28px 40px;
+}
+
+/* ---------- Back to the form list ----------
+ * Lives inside the sticky toolbar rather than above it: on the five-page Fact Sheet the old
+ * link scrolled off the top and left no way back without scrolling all the way up again.
+ */
+.dc-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: auto;              /* holds the left end, pushing the actions right */
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px 10px 13px;
+  cursor: pointer;
+}
+.dc-back:hover {
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+.dc-back svg { flex-shrink: 0; }
+
+/* Back out of the preview from the side the eye starts on, not only the × at the far end */
+.pdf-viewer-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  margin-right: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.pdf-viewer-back:hover { background: rgba(255, 255, 255, 0.15); }
+
+@media print {
+  .dc-back { display: none !important; }
 }

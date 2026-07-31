@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 
@@ -60,7 +60,6 @@
 </div>
 
 <main class="workspace" id="workspace" hidden>
-  <button type="button" class="back-to-forms" id="backToForms">&#8249; Back to Forms</button>
 
 
   <!-- ================= FORD FORM (WYSIWYG document view) =================
@@ -69,6 +68,13 @@
        the department, so they render as empty boxes with no controls. -->
   <section class="form-panel active" id="form-ford" aria-labelledby="form-ford-heading">
     <div class="dc-toolbar">
+      <button type="button" class="dc-back" data-back-to-forms>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+        </svg>
+        Forms
+      </button>
       <button type="button" class="btn-secondary" id="fordClear">Clear form</button>
       <button type="submit" class="btn-primary" form="fordForm">Preview PDF</button>
     </div>
@@ -239,6 +245,13 @@
        buildPolicyDoc() is the Ford document without the hours grid or Section D. -->
   <section class="form-panel" id="form-policy" aria-labelledby="form-policy-heading">
     <div class="dc-toolbar">
+      <button type="button" class="dc-back" data-back-to-forms>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+        </svg>
+        Forms
+      </button>
       <button type="button" class="btn-secondary" id="policyClear">Clear form</button>
       <button type="submit" class="btn-primary" form="policyForm">Preview PDF</button>
     </div>
@@ -352,6 +365,13 @@
        same repeated SP header and "pg. N / 5" footer the PDF draws. -->
   <section class="form-panel" id="form-unifor" aria-labelledby="form-unifor-heading">
     <div class="dc-toolbar">
+      <button type="button" class="dc-back" data-back-to-forms>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+        </svg>
+        Forms
+      </button>
       <button type="button" class="btn-secondary" id="uniforClear">Clear form</button>
       <button type="submit" class="btn-primary" form="uniforForm">Preview PDF</button>
     </div>
@@ -685,6 +705,13 @@
   <!-- ================= 4.01 INVESTIGATION FORM (document view) ================= -->
   <section class="form-panel" id="form-investigation" aria-labelledby="form-investigation-heading">
     <div class="dc-toolbar">
+      <button type="button" class="dc-back" data-back-to-forms>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+        </svg>
+        Forms
+      </button>
       <button type="button" class="btn-secondary" id="investigationClear">Clear form</button>
       <button type="submit" class="btn-primary" form="investigationForm">Preview PDF</button>
     </div>
@@ -815,6 +842,12 @@
      file after the blob URL rather than the grievance. -->
 <div class="pdf-viewer" id="pdfViewer" hidden role="dialog" aria-modal="true" aria-labelledby="pdfViewerName">
   <div class="pdf-viewer-bar">
+    <button type="button" class="pdf-viewer-back" id="pdfViewerBack" aria-label="Back to the form">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+      </svg>
+    </button>
     <span class="pdf-viewer-name" id="pdfViewerName"></span>
     <div class="pdf-viewer-actions">
       <button type="button" class="btn-secondary" id="pdfViewerPrint">Print</button>
@@ -828,6 +861,6 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="script.js?v=20"></script>
+<script src="script.js?v=21"></script>
 </body>
 </html>

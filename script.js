@@ -166,6 +166,7 @@ function closePdfViewer() {
 }
 
 document.getElementById('pdfViewerClose').addEventListener('click', closePdfViewer);
+document.getElementById('pdfViewerBack').addEventListener('click', closePdfViewer);
 
 document.getElementById('pdfViewerDownload').addEventListener('click', () => {
   if (viewerDoc) { download(viewerDoc, viewerFilename); return; }
@@ -1269,12 +1270,11 @@ document.querySelectorAll('.form-card').forEach(card => {
   card.addEventListener('click', () => showForm(card.dataset.form));
 });
 
-document.getElementById('backToForms').addEventListener('click', () => {
-  if (formHasData(FORM_BUILDERS[currentFormType].form) &&
-      !confirm('Leave this form? Anything you’ve entered will be lost unless you’ve already saved a PDF.')) {
-    return;
-  }
-  showHome();
+document.querySelectorAll('[data-back-to-forms]').forEach(button => {
+  button.addEventListener('click', () => {
+    // Nothing to warn about any more: the draft is already saved on this device
+    showHome();
+  });
 });
 
 /* ============ Upload & recognize a previously generated PDF ============ */
@@ -2349,7 +2349,7 @@ function showSavedIndicator(type) {
     indicator = document.createElement('span');
     indicator.className = 'dc-saved';
     indicator.textContent = 'Saved';
-    toolbar.insertBefore(indicator, toolbar.firstChild);
+    toolbar.insertBefore(indicator, toolbar.querySelector('.btn-secondary'));
   }
   indicator.classList.add('is-visible');
   clearTimeout(savedIndicatorTimers[type]);
@@ -2395,7 +2395,7 @@ function noticeFor(type) {
     notice = document.createElement('span');
     notice.className = 'dc-notice';
     notice.setAttribute('role', 'status');
-    toolbar.insertBefore(notice, toolbar.firstChild);
+    toolbar.insertBefore(notice, toolbar.querySelector('.btn-secondary'));
   }
   return notice;
 }
