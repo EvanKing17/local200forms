@@ -14,9 +14,15 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
+
+<!-- Fixed rather than part of either page, so it's in the same place whichever one you're on -->
+<button type="button" class="text-size-toggle" id="textSizeToggle"
+        aria-pressed="false" title="Larger text" aria-label="Larger text">
+  <span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span>
+</button>
 
 <!-- ================= HOME: FORM LIBRARY ================= -->
 <div class="home-view" id="homeView">
@@ -53,7 +59,6 @@
        has nothing to drag with. -->
   <div class="home-actions">
     <button type="button" class="home-action is-danger" id="clearAllForms" hidden>Clear all forms</button>
-    <button type="button" class="home-action" id="textSizeToggle" aria-pressed="false">Larger text</button>
     <label class="home-action" for="uploadInput">Open a PDF made here</label>
     <input type="file" id="uploadInput" accept="application/pdf" hidden>
   </div>
@@ -862,6 +867,6 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="script.js?v=27"></script>
+<script src="script.js?v=31"></script>
 </body>
 </html>

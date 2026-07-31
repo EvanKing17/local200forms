@@ -2495,8 +2495,10 @@ function applyTextSize(large) {
   document.body.classList.toggle('is-large-text', large);
   const button = document.getElementById('textSizeToggle');
   if (button) {
-    button.textContent = large ? 'Normal text' : 'Larger text';
     button.setAttribute('aria-pressed', String(large));
+    const label = large ? 'Normal text' : 'Larger text';
+    button.setAttribute('title', label);
+    button.setAttribute('aria-label', label);
   }
   if (currentFormType) {
     FORM_BUILDERS[currentFormType].form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);

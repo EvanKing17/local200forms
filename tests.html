@@ -466,17 +466,42 @@ function run(win, doc) {
     const last = faces[faces.length - 1] || '';
     return /F2/.test(last) || { detail: 'drawn with ' + last };
   });
-  check(g6e, 'Larger text scales the sheet and is remembered', () => {
+  check(g6e, 'Larger text scales forms and the list, and is remembered', () => {
     const toggle = doc.getElementById('textSizeToggle');
     win.showHome();
     toggle.click();
+    const home = win.getComputedStyle(doc.getElementById('homeView')).zoom;
     win.showForm('ford');
-    const zoom = win.getComputedStyle(doc.getElementById('fordForm')).zoom;
+    const form = win.getComputedStyle(doc.getElementById('form-ford')).zoom;
     const stored = win.localStorage.getItem('local200forms:textSize');
     toggle.click();
-    const back = win.getComputedStyle(doc.getElementById('fordForm')).zoom;
-    return (String(zoom) === '1.25' && stored === 'large' && String(back) === '1') ||
-      { detail: 'zoom=' + zoom + ' stored=' + stored + ' restored=' + back };
+    const back = win.getComputedStyle(doc.getElementById('form-ford')).zoom;
+    return (String(home) === '1.25' && String(form) === '1.25' && stored === 'large' && String(back) === '1') ||
+      { detail: 'home=' + home + ' form=' + form + ' stored=' + stored + ' restored=' + back };
+  });
+  check(g6e, 'The text-size control is fixed and on every page', () => {
+    const toggle = doc.getElementById('textSizeToggle');
+    const fixed = win.getComputedStyle(toggle).position === 'fixed';
+    win.showHome();
+    const onHome = toggle.getBoundingClientRect().width > 0;
+    win.showForm('unifor');
+    const onForm = toggle.getBoundingClientRect().width > 0;
+    return (fixed && onHome && onForm) ||
+      { detail: 'fixed=' + fixed + ' home=' + onHome + ' form=' + onForm };
+  });
+  check(g6e, 'Nothing overflows sideways, zoomed or not', () => {
+    const toggle = doc.getElementById('textSizeToggle');
+    const bad = [];
+    [false, true].forEach(zoom => {
+      if (zoom) toggle.click();
+      FORMS.forEach(f => {
+        win.showForm(f.type);
+        const el = doc.documentElement;
+        if (el.scrollWidth > el.clientWidth + 1) bad.push((zoom ? 'zoomed ' : '') + f.type);
+      });
+      if (zoom) toggle.click();
+    });
+    return bad.length === 0 || { detail: bad.join(', ') };
   });
   check(g6e, 'Page breaks stay correct while zoomed', () => {
     const toggle = doc.getElementById('textSizeToggle');

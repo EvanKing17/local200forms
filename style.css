@@ -588,6 +588,7 @@ input[type="radio"] { width: 15px; height: 15px; }
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;          /* a phone, more so when zoomed, can't fit these on one line */
   gap: 10px;
   max-width: 816px;
   margin: 0 auto 16px;
@@ -632,6 +633,7 @@ input[type="radio"] { width: 15px; height: 15px; }
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 .dc-band .dc-band-sub { font-weight: 400; color: var(--dc-band-sub); }
 
@@ -763,6 +765,7 @@ input[type="radio"] { width: 15px; height: 15px; }
    half-page-wide box, so a stacked label left the figure marooned in empty space. */
 .dc-hour-cell {
   height: 34.667px;                                      /* 26pt HOUR_CELL_H */
+  min-width: 0;             /* a grid item defaults to min-width:auto and won't shrink below its content */
   border: 1px solid var(--dc-border);
   border-radius: 3px;
   padding: 0 var(--dc-cell-x);
@@ -774,12 +777,18 @@ input[type="radio"] { width: 15px; height: 15px; }
   gap: 12px;
 }
 
-.dc-hour-cell .dc-field-label { line-height: var(--dc-label-h); }
+/* min-width:0 lets a flex item shrink past its own text; without it the nowrap label sets a
+   floor on the cell's width and the row runs off a narrow screen. */
+.dc-hour-cell .dc-field-label {
+  line-height: var(--dc-label-h);
+  min-width: 0;
+}
 
 .dc-hour-cell input {
   margin: 0;
   width: auto;
   max-width: 45%;
+  min-width: 0;
   flex: 0 1 auto;
   text-align: right;
   border: none;
@@ -1640,7 +1649,8 @@ input[type="radio"] { width: 15px; height: 15px; }
  * zoom, not a bigger font: every size in the document view is a conversion of a measurement in
  * the PDF, so growing the type alone would push it out of cells built to fit it.
  */
-.is-large-text .dc-page { zoom: 1.25; }
+.is-large-text .home-view,
+.is-large-text .form-panel { zoom: 1.25; }
 
 /* ---------- Sheet navigation ---------- */
 .dc-sheet-nav { position: relative; }
@@ -1699,5 +1709,49 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 @media print {
   .dc-sheet-nav { display: none !important; }
-  .is-large-text .dc-page { zoom: 1; }   /* paper is paper */
+  .is-large-text .home-view,
+  .is-large-text .form-panel { zoom: 1; }   /* paper is paper */
+  .text-size-toggle { display: none !important; }
+}
+
+/* ---------- Larger text control ----------
+ * Fixed at the top so it's in the same place on the form list and inside a form, and sits
+ * below the preview overlay so it never floats over a PDF.
+ */
+.text-size-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 90;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1px;
+  width: 44px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  color: var(--c-text-muted);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+.text-size-toggle:hover { border-color: var(--c-accent); color: var(--c-accent); }
+.text-size-toggle[aria-pressed="true"] {
+  background: var(--dc-primary);
+  border-color: var(--dc-primary);
+  color: #fff;
+}
+
+.tsz-mark { display: flex; align-items: baseline; gap: 1px; }
+.tsz-small { font-size: 12px; font-weight: 700; }
+.tsz-large { font-size: 18px; font-weight: 700; }
+
+/* Keep page content clear of the control where the column would otherwise run under it */
+@media (max-width: 960px) {
+  .dc-toolbar { padding-right: 52px; }
+}
+@media (max-width: 900px) {
+  .home-view { padding-right: 68px; }
 }
