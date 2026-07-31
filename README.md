@@ -30,6 +30,10 @@ because the page on screen *is* the page that comes out.
   before they were this, and the muscle memory is real. In the big narrative
   boxes Enter makes a new paragraph, and Ctrl+Enter moves on.
 - **Ctrl+P prints the form itself**, without the toolbar or the app around it.
+- **Larger text** scales the whole sheet for reading, and is remembered. The PDF
+  is unaffected.
+- The Fact Sheet's five sheets have a **sheet indicator and jump menu**, and a
+  form with work waiting in it is **marked on the list**.
 
 ## Install it
 

@@ -417,6 +417,92 @@ function run(win, doc) {
     return event.defaultPrevented || { detail: 'dragover was not prevented' };
   });
 
+  const g6d = group('Getting around');
+  check(g6d, 'Back sits in the sticky toolbar on every form', () => {
+    const missing = FORMS.filter(f => !doc.querySelector('#form-' + f.type + ' .dc-toolbar .dc-back'));
+    return missing.length === 0 || { detail: 'missing on ' + missing.map(f => f.type).join(', ') };
+  });
+  check(g6d, 'The preview has a back arrow as well as a close button', () =>
+    (!!doc.getElementById('pdfViewerBack') && !!doc.getElementById('pdfViewerClose')) ||
+    { detail: 'one of them is missing' });
+  check(g6d, 'Only the multi-sheet form gets sheet navigation', () => {
+    win.showForm('unifor');
+    const onUnifor = !!doc.querySelector('#form-unifor .dc-sheet-nav');
+    const onFord = !!doc.querySelector('#form-ford .dc-sheet-nav');
+    return (onUnifor && !onFord) || { detail: 'unifor=' + onUnifor + ' ford=' + onFord };
+  });
+  check(g6d, 'Sheet menu is named from each sheet’s section', () => {
+    const items = [].map.call(doc.querySelectorAll('#form-unifor .dc-sheet-menu button'), b => b.textContent);
+    return (items.length === 5 && /Statements/.test(items[1])) || { detail: items.join(' / ') };
+  });
+  check(g6d, 'The indicator follows the scroll position', () => {
+    win.showForm('unifor');
+    const label = doc.querySelector('#form-unifor .dc-sheet-current');
+    const sheets = doc.querySelectorAll('#form-unifor .dc-page');
+    const toolbar = doc.querySelector('#form-unifor .dc-toolbar');
+    win.scrollTo(0, sheets[3].getBoundingClientRect().top + win.scrollY - toolbar.offsetHeight - 24);
+    win.__app.FORM_BUILDERS.unifor.syncSheet();
+    const got = label.textContent;
+    win.scrollTo(0, 0);
+    win.__app.FORM_BUILDERS.unifor.syncSheet();
+    return got === 'Sheet 4 of 5' || { detail: 'read ' + got };
+  });
+
+  const g6e = group('Reading it');
+  check(g6e, 'Entered values are bold, labels are not confused with them', () => {
+    win.showForm('ford');
+    const value = win.getComputedStyle(doc.querySelector('#fordForm .dc-value')).fontWeight;
+    const prose = win.getComputedStyle(doc.querySelector('#fordForm .dc-textarea')).fontWeight;
+    return (value === '700' && prose === '700') || { detail: 'value=' + value + ' prose=' + prose };
+  });
+  check(g6e, 'The PDF draws entered values in the bold face', () => {
+    const form = doc.getElementById('fordForm');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Bold Check';
+    const raw = atob(win.buildFordDoc(win.fd(form)).output('datauristring').split(',')[1]);
+    const at = raw.indexOf('(Bold Check)');
+    const faces = raw.slice(Math.max(0, at - 300), at).match(/\/(F\d+) [\d.]+ Tf/g) || [];
+    win.clearForm(form);
+    const last = faces[faces.length - 1] || '';
+    return /F2/.test(last) || { detail: 'drawn with ' + last };
+  });
+  check(g6e, 'Larger text scales the sheet and is remembered', () => {
+    const toggle = doc.getElementById('textSizeToggle');
+    win.showHome();
+    toggle.click();
+    win.showForm('ford');
+    const zoom = win.getComputedStyle(doc.getElementById('fordForm')).zoom;
+    const stored = win.localStorage.getItem('local200forms:textSize');
+    toggle.click();
+    const back = win.getComputedStyle(doc.getElementById('fordForm')).zoom;
+    return (String(zoom) === '1.25' && stored === 'large' && String(back) === '1') ||
+      { detail: 'zoom=' + zoom + ' stored=' + stored + ' restored=' + back };
+  });
+  check(g6e, 'Page breaks stay correct while zoomed', () => {
+    const toggle = doc.getElementById('textSizeToggle');
+    win.showForm('ford');
+    win.clearForm(doc.getElementById('fordForm'));
+    toggle.click();
+    win.updatePageBreaks('ford');
+    const zoomed = doc.querySelectorAll('#fordForm .dc-break').length;
+    toggle.click();
+    win.updatePageBreaks('ford');
+    const plain = doc.querySelectorAll('#fordForm .dc-break').length;
+    return (zoomed === plain && zoomed === 1) || { detail: 'zoomed=' + zoomed + ' plain=' + plain };
+  });
+  check(g6e, 'A form with work in it is flagged on the list', () => {
+    win.showForm('policy');
+    win.clearForm(doc.getElementById('policyForm'));
+    doc.getElementById('policyForm').elements.employeeName.value = 'Someone';
+    win.showHome();
+    const flagged = !!doc.querySelector('.form-card[data-form=policy] .draft-flag');
+    win.showForm('policy');
+    win.clearForm(doc.getElementById('policyForm'));
+    win.showHome();
+    const cleared = !doc.querySelector('.form-card[data-form=policy] .draft-flag');
+    return (flagged && cleared) || { detail: 'flagged=' + flagged + ' clearedAfter=' + cleared };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {

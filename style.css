@@ -1606,3 +1606,98 @@ input[type="radio"] { width: 15px; height: 15px; }
 @media print {
   .dc-back { display: none !important; }
 }
+
+/* ---------- Typed-in values ----------
+ * Bold everywhere a person has entered something, so what was filled in reads apart from the
+ * printed form around it — which matters most on a photocopy or a fax. The PDF does the same.
+ */
+.dc-value,
+.dc-textarea,
+.dc-value-input,
+.dc-hour-cell input,
+.dc-step input,
+.dc-inline-field input,
+.dc-field-grid .datepicker-trigger { font-weight: 700; }
+
+/* ---------- Draft marker on the form list ---------- */
+.form-card { position: relative; }
+
+.draft-flag {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-primary);
+  background: #e8eef5;
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+/* ---------- Larger text ----------
+ * zoom, not a bigger font: every size in the document view is a conversion of a measurement in
+ * the PDF, so growing the type alone would push it out of cells built to fit it.
+ */
+.is-large-text .dc-page { zoom: 1.25; }
+
+/* ---------- Sheet navigation ---------- */
+.dc-sheet-nav { position: relative; }
+
+.dc-sheet-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--c-text-muted);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dc-sheet-current::after {
+  content: "";
+  border: 4px solid transparent;
+  border-top-color: currentColor;
+  margin-top: 3px;
+}
+.dc-sheet-current:hover { border-color: var(--c-accent); color: var(--c-accent); }
+
+.dc-sheet-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: 220px;
+  padding: 6px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.16);
+}
+.dc-sheet-menu[hidden] { display: none; }
+
+.dc-sheet-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--c-text);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+.dc-sheet-menu button:hover { background: var(--c-surface-alt); color: var(--c-accent); }
+
+@media print {
+  .dc-sheet-nav { display: none !important; }
+  .is-large-text .dc-page { zoom: 1; }   /* paper is paper */
+}

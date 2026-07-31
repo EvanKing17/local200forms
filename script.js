@@ -32,6 +32,11 @@ const DEFAULT_FORMS_CONFIG = {
 };
 const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };
 
+/* Where drafts are kept. Declared here rather than with the rest of the draft code near the
+   bottom of the file: showHome() runs at module level well above that block and reaches in
+   through refreshDraftFlags(), so a const declared down there would still be unreachable. */
+const DRAFT_PREFIX = 'local200forms:draft:';
+
 function applyFormsConfig() {
   // Checks for null/undefined specifically (not just falsy) so an intentionally-cleared field
   // (empty string, from admin.html) actually clears the display instead of being skipped —
@@ -360,6 +365,17 @@ const DC = {
 
 const DC_RADIUS = 2.5;  // the guide's 3px corner radius, in points
 
+/*
+ * Entered values are bold, so what someone filled in reads apart from the printed form around
+ * it. Measuring has to use the same face as drawing, or splitTextToSize would wrap against a
+ * narrower string than actually appears.
+ */
+function setValueStyle(doc, size = 9.5) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(size);
+  doc.setTextColor(...DC.ink);
+}
+
 /* The guide's 0.06em label tracking. jsPDF char spacing is absolute, so it's derived per size. */
 function setLabelStyle(doc, size = 6.5) {
   doc.setFont('helvetica', 'bold');
@@ -388,7 +404,7 @@ function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
     doc.setTextColor(...DC.ink);
     const value = String(rightField.value || '');
 
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'bold');
     const valueW = doc.getTextWidth(value);
     doc.text(value, x + w, y + 1, { align: 'right' });
 
@@ -463,8 +479,7 @@ function prepareGridCells(doc, cells) {
     setLabelStyle(doc, labelFontSize);
     const labelLines = doc.splitTextToSize(c.label.toUpperCase(), c.width - CELL_X * 2).slice(0, 2);
     clearLabelStyle(doc);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(valueFontSize);
+    setValueStyle(doc, valueFontSize);
     const valueLines = doc.splitTextToSize(c.value || '', c.width - CELL_X * 2);
     return { ...c, labelLines, valueLines };
   });
@@ -542,9 +557,7 @@ function boxedGrid(doc, x, y, w, cells, minH = CELL_MIN_H, attached = false) {
     setLabelStyle(doc);
     doc.text(c.labelLines, cx + CELL_X, y + 10.5);
     clearLabelStyle(doc);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(valueFontSize);
-    doc.setTextColor(...DC.ink);
+    setValueStyle(doc, valueFontSize);
     doc.text(c.valueLines, cx + CELL_X, y + labelBlockH + CELL_LABEL_GAP + 8);
     cx += c.width;
   });
@@ -558,7 +571,7 @@ function boxedGrid(doc, x, y, w, cells, minH = CELL_MIN_H, attached = false) {
  */
 function flowTextBox(doc, x, y, w, label, value, minH = 26) {
   const fontSize = 9.5, lineHeight = 12;
-  doc.setFontSize(fontSize);
+  setValueStyle(doc, fontSize);
   const allLines = doc.splitTextToSize(value || '', w - CELL_X * 2);
   let idx = 0, currentY = y, first = true;
   do {
@@ -587,9 +600,7 @@ function flowTextBox(doc, x, y, w, label, value, minH = 26) {
     doc.setDrawColor(...DC.border);
     doc.setLineWidth(0.75);
     doc.roundedRect(x, boxY, w, boxH, DC_RADIUS, DC_RADIUS);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(fontSize);
-    doc.setTextColor(...DC.inkSoft);
+    setValueStyle(doc, fontSize);
     doc.text(allLines.slice(idx, idx + linesThisBox), x + CELL_X, boxY + 14);
     idx += linesThisBox;
     currentY = boxY + boxH;
@@ -621,9 +632,8 @@ function hourCell(doc, x, y, w, label, value) {
   clearLabelStyle(doc);
 
   const val = (value || '').toString();
-  doc.setFont('helvetica', 'normal');
+  setValueStyle(doc);
   fitSingleLine(doc, val, w * 0.3, 9.5, 6.5);
-  doc.setTextColor(...DC.ink);
   doc.text(val, x + w - CELL_X, baseline, { align: 'right' });
   return y + HOUR_CELL_H;
 }
@@ -1022,7 +1032,7 @@ function buildUniforDoc(data) {
   doc.setFontSize(9.5);
   doc.setTextColor(...DC.ink);
   doc.text('If so, when?', marginX, y);
-  doc.setFont('helvetica', 'normal');
+  setValueStyle(doc);
   doc.text(data.priorViolationWhen || '', marginX + 70, y);
   y += 18;
   y = flowTextBox(doc, marginX, y, W, 'What action did the company take?', data.companyAction, 40);
@@ -1208,6 +1218,7 @@ function showHome() {
   homeView.hidden = false;
   workspace.hidden = true;
   refreshClearAllButton();
+  refreshDraftFlags();
 }
 
 /*
@@ -1264,6 +1275,7 @@ function showForm(type, data) {
   // scrollHeight reads 0 while the panel is hidden, so size the textareas now that it's visible
   entry.form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
   updatePageBreaks(type);
+  if (entry.syncSheet) entry.syncSheet();
 }
 
 document.querySelectorAll('.form-card').forEach(card => {
@@ -1386,13 +1398,13 @@ window.addEventListener('drop', (e) => {
 function refreshClearAllButton() {
   const button = document.getElementById('clearAllForms');
   if (!button || typeof FORM_BUILDERS === 'undefined') return;
-  const filled = Object.keys(FORM_BUILDERS).filter(type => formHasData(FORM_BUILDERS[type].form));
+  const filled = Object.keys(FORM_BUILDERS).filter(formHasContent);
   button.hidden = filled.length === 0;
   button.textContent = filled.length === 1 ? 'Clear 1 form' : `Clear all ${filled.length} forms`;
 }
 
 document.getElementById('clearAllForms').addEventListener('click', () => {
-  const filled = Object.keys(FORM_BUILDERS).filter(type => formHasData(FORM_BUILDERS[type].form));
+  const filled = Object.keys(FORM_BUILDERS).filter(formHasContent);
   // Wiping several forms and their saved drafts at once is worth one question
   const what = filled.length === 1 ? 'this form' : `all ${filled.length} forms`;
   if (!confirm(`Clear ${what}? Anything typed in and not yet saved as a PDF will be lost.`)) return;
@@ -1402,6 +1414,7 @@ document.getElementById('clearAllForms').addEventListener('click', () => {
     discardDraft(type);
   });
   refreshClearAllButton();
+  refreshDraftFlags();
 });
 
 applyFormsConfig();
@@ -2180,10 +2193,13 @@ function updatePageBreaks(type) {
   let pages = 1;
   const marks = [];
 
+  // getBoundingClientRect reports zoomed pixels, so undo the zoom before comparing to the
+  // page height, which is in the document's own scale
+  const zoom = documentZoom();
   Array.from(form.children).forEach(block => {
     const rect = block.getBoundingClientRect();
     if (!rect.height) return;
-    if (rect.bottom - pageStart > PAGE_USABLE_PX && rect.top > pageStart) {
+    if ((rect.bottom - pageStart) / zoom > PAGE_USABLE_PX && rect.top > pageStart) {
       pages += 1;
       pageStart = rect.top;
       marks.push({ block, page: pages });
@@ -2280,14 +2296,16 @@ function showUpdateBanner(worker) {
  * dialog asking permission to hand back what they just typed is friction for its own sake.
  * "Clear form" is the way out, and it discards the draft too.
  */
-const DRAFT_PREFIX = 'local200forms:draft:';
-
-/* A function, not a const, so it can't be read before it's initialised — this block sits at the
-   end of the file but the form lifecycle above it calls in. */
-let draftStorageOk = null;
+/*
+ * `var`, not `let`: this block sits near the end of the file, but showHome() runs at module
+ * level much earlier and reaches in through refreshDraftFlags(). A `let` would still be in its
+ * temporal dead zone at that point and throw, taking the rest of the script's setup with it.
+ * `var` hoists as undefined, which is exactly the "not worked out yet" state wanted here.
+ */
+var draftStorageOk;
 
 function draftsAvailable() {
-  if (draftStorageOk === null) {
+  if (draftStorageOk === undefined) {
     try {
       const probe = DRAFT_PREFIX + 'probe';
       localStorage.setItem(probe, '1');
@@ -2428,3 +2446,171 @@ Object.keys(FORM_BUILDERS).forEach(type => {
  * whichever internals happen to be function declarations.
  */
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX };
+
+/* ============ Which forms have something in them ============
+ *
+ * A form that hasn't been opened yet is empty in the DOM even when a draft is sitting in
+ * storage, so both have to be checked — otherwise work saved before a reload looks like it
+ * isn't there.
+ */
+function formHasContent(type) {
+  const entry = FORM_BUILDERS[type];
+  if (!entry) return false;
+  return formHasData(entry.form) || !!readDraft(type);
+}
+
+/* A card with work waiting behind it says so, rather than looking identical to an empty one */
+function refreshDraftFlags() {
+  Object.keys(FORM_BUILDERS).forEach(type => {
+    const card = document.querySelector(`.form-card[data-form="${type}"]`);
+    if (!card) return;
+    const has = formHasContent(type);
+    let flag = card.querySelector('.draft-flag');
+    if (has && !flag) {
+      flag = document.createElement('span');
+      flag.className = 'draft-flag';
+      flag.textContent = 'Draft';
+      card.appendChild(flag);
+    } else if (!has && flag) {
+      flag.remove();
+    }
+  });
+}
+
+/* ============ Larger text ============
+ *
+ * Scales the whole sheet with `zoom` rather than enlarging the type on its own: every size in
+ * the document view is a conversion of a measurement in the PDF, so growing the text alone
+ * would push it out of cells built to fit it. Zooming keeps the page exactly as proportioned,
+ * just bigger. The PDF is untouched either way.
+ */
+const TEXT_SIZE_KEY = 'local200forms:textSize';
+const LARGE_ZOOM = 1.25;
+
+function documentZoom() {
+  return document.body.classList.contains('is-large-text') ? LARGE_ZOOM : 1;
+}
+
+function applyTextSize(large) {
+  document.body.classList.toggle('is-large-text', large);
+  const button = document.getElementById('textSizeToggle');
+  if (button) {
+    button.textContent = large ? 'Normal text' : 'Larger text';
+    button.setAttribute('aria-pressed', String(large));
+  }
+  if (currentFormType) {
+    FORM_BUILDERS[currentFormType].form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
+    updatePageBreaks(currentFormType);
+  }
+}
+
+document.getElementById('textSizeToggle').addEventListener('click', () => {
+  const large = !document.body.classList.contains('is-large-text');
+  applyTextSize(large);
+  try { localStorage.setItem(TEXT_SIZE_KEY, large ? 'large' : 'normal'); } catch { /* not fatal */ }
+});
+
+try {
+  if (localStorage.getItem(TEXT_SIZE_KEY) === 'large') applyTextSize(true);
+} catch { /* storage unavailable; stay at the default size */ }
+
+/* ============ Sheet navigation ============
+ *
+ * The Fact Sheet is five sheets and roughly seven screens. Without this you scroll a long way
+ * with no idea which one you're on and no way to jump, which is the single roughest part of
+ * filling it in.
+ */
+function panelIsActive(type) {
+  const panel = document.getElementById('form-' + type);
+  return panel && panel.classList.contains('active');
+}
+
+function sheetLabels(form) {
+  return Array.from(form.querySelectorAll('.dc-page')).map((sheet, i) => {
+    const band = sheet.querySelector('.dc-band');
+    const sub = band && band.querySelector('.dc-band-sub');
+    const name = sub ? sub.textContent.trim() : (band ? band.textContent.trim() : '');
+    return { index: i, sheet, label: name ? `${i + 1} · ${name}` : `Sheet ${i + 1}` };
+  });
+}
+
+function buildSheetNav(type) {
+  const form = FORM_BUILDERS[type].form;
+  const sheets = sheetLabels(form);
+  if (sheets.length < 2) return;
+
+  const toolbar = document.querySelector(`#form-${type} .dc-toolbar`);
+  if (!toolbar || toolbar.querySelector('.dc-sheet-nav')) return;
+
+  const nav = document.createElement('div');
+  nav.className = 'dc-sheet-nav';
+
+  const current = document.createElement('button');
+  current.type = 'button';
+  current.className = 'dc-sheet-current';
+  current.setAttribute('aria-expanded', 'false');
+  current.textContent = `Sheet 1 of ${sheets.length}`;
+
+  const menu = document.createElement('div');
+  menu.className = 'dc-sheet-menu';
+  menu.hidden = true;
+
+  sheets.forEach(({ sheet, label }) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.textContent = label;
+    item.addEventListener('click', () => {
+      menu.hidden = true;
+      current.setAttribute('aria-expanded', 'false');
+      // Clear the sticky toolbar, or the sheet's first rows land underneath it
+      const top = sheet.getBoundingClientRect().top + window.scrollY - toolbar.offsetHeight - SHEET_JUMP_GAP;
+      window.scrollTo({ top, behavior: 'smooth' });
+      syncCurrentSheet();
+    });
+    menu.appendChild(item);
+  });
+
+  current.addEventListener('click', () => {
+    menu.hidden = !menu.hidden;
+    current.setAttribute('aria-expanded', String(!menu.hidden));
+  });
+  document.addEventListener('click', (e) => {
+    if (!nav.contains(e.target)) { menu.hidden = true; current.setAttribute('aria-expanded', 'false'); }
+  });
+
+  nav.append(current, menu);
+  toolbar.insertBefore(nav, toolbar.querySelector('.dc-back').nextSibling);
+
+  /*
+   * Whichever sheet has passed under the toolbar is the one you're on. Worked out from the
+   * measured positions on scroll rather than with an IntersectionObserver: the answer is the
+   * same, and this can be checked directly at any scroll position instead of depending on when
+   * the browser decides to deliver a callback.
+   */
+  const SHEET_JUMP_GAP = 24;   // how far below the toolbar a jumped-to sheet is parked
+
+  function syncCurrentSheet() {
+    // The line has to sit below where a jump parks a sheet, or the sheet you just jumped to
+    // reads as still being the previous one
+    const line = toolbar.getBoundingClientRect().bottom + SHEET_JUMP_GAP + 8;
+    let active = 0;
+    sheets.forEach(({ sheet }, i) => {
+      if (sheet.getBoundingClientRect().top <= line) active = i;
+    });
+    current.textContent = `Sheet ${active + 1} of ${sheets.length}`;
+  }
+
+  // Throttled on a timer rather than requestAnimationFrame, which only runs while the page is
+  // producing frames — this keeps working in a background tab, and stays testable.
+  let lastSync = 0;
+  window.addEventListener('scroll', () => {
+    const now = Date.now();
+    if (now - lastSync < 80) return;
+    lastSync = now;
+    if (panelIsActive(type)) syncCurrentSheet();
+  }, { passive: true });
+
+  FORM_BUILDERS[type].syncSheet = syncCurrentSheet;
+}
+
+Object.keys(FORM_BUILDERS).forEach(buildSheetNav);
