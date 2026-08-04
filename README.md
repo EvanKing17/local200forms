@@ -84,6 +84,30 @@ names exactly:
 
 Anything it can't place is listed on screen rather than dropped quietly.
 
+### Getting the file here
+
+Three ways in, all landing on the same confirmation step:
+
+- **Drop it on the page**, or pick it with the upload link.
+- **Share it to the app.** Once Union Forms is installed, it appears in
+  Android's share sheet. Sharing a grievance file from another app opens it
+  here directly. This is the easiest route on a tablet.
+- **Open a `.grv`.** On a desktop with the app installed, double-clicking a
+  `.grv` opens it in Union Forms.
+
+`.grv` is the same JSON under a private extension. It is deliberately *not*
+`.json` — registering that would make this app the default for every JSON file
+on the machine.
+
+## Handing a form to another device
+
+**Save .grv** on any of the four forms writes out what is typed in it. Open
+that file on another device — share it, drop it on the page, or double-click it
+— and the form comes back filled in. All four forms round-trip, including the
+Fact Sheet's radio answers.
+
+It carries values only. Attached documents are not part of it.
+
 ## Install it
 
 On a phone: open the link, then **Add to Home screen** (Chrome: ⋮ menu,

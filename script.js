@@ -1393,7 +1393,8 @@ async function handleIncomingFile(file) {
 
   uploadError.hidden = true;
   // A handover file from another application, riding in on the same route as a PDF
-  if (/\.json$/i.test(file.name) || file.type === 'application/json') {
+  if (/\.(json|grv)$/i.test(file.name) || file.type === 'application/json' ||
+      file.type === 'application/grievance+json') {
     await handleJsonImport(file);
     return;
   }
@@ -1419,6 +1420,90 @@ async function handleIncomingFile(file) {
     return;
   }
   showForm(payload.formType, payload.data);
+}
+
+/* ============ Handing a form to another device ============
+ *
+ * The same values a .json handover carries, saved back out. The extension is .grv rather than
+ * .json so the installed app can claim it without taking over every JSON file on the machine —
+ * double-clicking one opens it here. Reading it is the route above; nothing extra is needed.
+ */
+function buildGrv(type) {
+  // fd() is what the PDF round-trip already serialises with, so a .grv carries exactly as much
+  const fields = {};
+  Object.entries(fd(FORM_BUILDERS[type].form)).forEach(([key, value]) => {
+    const text = String(value).trim();
+    if (text) fields[key] = text;
+  });
+  return { app: 'local200forms', form: type, saved: new Date().toISOString(), fields };
+}
+
+function saveGrv(type) {
+  const form = FORM_BUILDERS[type].form;
+  const payload = buildGrv(type);
+  const who = (form.elements[KEY_FIELD] && form.elements[KEY_FIELD].value.trim()) || 'Grievance';
+  const name = who.replace(/[\/:*?"<>|]/g, '').trim() + ' - ' + FORM_BUILDERS[type].label + '.grv';
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/grievance+json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return name;
+}
+
+document.querySelectorAll('[data-save-grv]').forEach(button => {
+  button.addEventListener('click', () => {
+    const type = button.dataset.saveGrv;
+    if (!formHasContent(type)) {
+      showUploadError('There is nothing in this form to save yet.');
+      return;
+    }
+    const name = saveGrv(type);
+    // Same reasoning as the PDF download: it lands in a folder without a word otherwise
+    const said = button.textContent;
+    button.textContent = 'Saved ' + name;
+    button.disabled = true;
+    setTimeout(() => { button.textContent = said; button.disabled = false; }, 3000);
+  });
+});
+
+/* ---------- Arriving from somewhere else ---------- */
+
+/*
+ * Android's share sheet posts the file to ./share, which the service worker answers by parking
+ * it in a cache and sending the browser here. Collected once, then cleared, so a later reload
+ * doesn't reopen it.
+ */
+async function collectSharedFile() {
+  if (!/[?&]shared=1/.test(location.search) || !window.caches) return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    const cache = await caches.open('local200forms-share');
+    const response = await cache.match('shared-file');
+    if (!response) return;
+    await cache.delete('shared-file');
+    const name = decodeURIComponent(response.headers.get('x-shared-name') || 'shared');
+    const type = response.headers.get('content-type') || '';
+    await handleIncomingFile(new File([await response.blob()], name, { type }));
+  } catch (err) {
+    showUploadError('Something was shared here, but it couldn’t be read.');
+  }
+}
+collectSharedFile();
+
+/* And on the desktop, a .grv opened from the file manager arrives through the launch queue */
+if (window.launchQueue && 'files' in window.LaunchParams.prototype) {
+  window.launchQueue.setConsumer(async params => {
+    for (const handle of params.files || []) {
+      await handleIncomingFile(await handle.getFile());
+      break;                                   // one form at a time; the rest would overwrite it
+    }
+  });
 }
 
 uploadInput.addEventListener('change', () => {
@@ -3177,6 +3262,42 @@ const IMPORT_FORM_FIELDS = {
            'dateIncident', 'dateFiled', 'details'],
 };
 
+/*
+ * The two lists above are the handover contract with the other application, so they are written
+ * out by hand and stay put. The Fact Sheet and the 4.01 aren't part of that contract — they are
+ * only ever read back from a .grv this app wrote itself — so their fields are taken from the
+ * form as it stands. Nothing to keep in step with the markup, and nothing to forget.
+ */
+function importableFields(type) {
+  if (IMPORT_FORM_FIELDS[type]) return IMPORT_FORM_FIELDS[type];
+  const names = [];
+  FORM_BUILDERS[type].form.querySelectorAll('[name]').forEach(el => {
+    if (!names.includes(el.name)) names.push(el.name);
+  });
+  return names;
+}
+
+/*
+ * Asked of the field itself rather than its name — seniorityDate is a date and doesn't start
+ * with "date", and a name-shaped guess would eventually be wrong the other way too.
+ */
+function isDateField(type, field) {
+  const el = FORM_BUILDERS[type] && FORM_BUILDERS[type].form.querySelector('[name="' + field + '"]');
+  if (!el) return false;
+  // By the time this runs the date inputs have been replaced by the app's own picker, which
+  // keeps the value on a hidden input — so both shapes count
+  return el.type === 'date' || (el.type === 'hidden' && !!el.closest('.datepicker'));
+}
+
+/* The label printed beside the field, so the confirmation step doesn't read out variable names */
+function importLabel(type, field) {
+  if (IMPORT_LABELS[field]) return IMPORT_LABELS[field];
+  const el = FORM_BUILDERS[type] && FORM_BUILDERS[type].form.querySelector('[name="' + field + '"]');
+  const label = el && el.closest('label');
+  const caption = label && label.querySelector('.dc-field-label');
+  return (caption && caption.textContent.trim()) || field;
+}
+
 /* The sending app won't know our field names, so a spread of plausible ones is accepted */
 const IMPORT_ALIASES = {
   employeeName: ['employeename', 'name', 'employee', 'grievor', 'grievorname', 'member', 'membername'],
@@ -3205,17 +3326,25 @@ const IMPORT_LABELS = {
   hoursDouble: 'Hours at double time', hoursTriple: 'Hours at triple time',
 };
 
-const IMPORT_FORM_NAMES = { ford: 'Grievance Investigation & Claim', policy: 'Policy Grievance' };
+const IMPORT_FORM_NAMES = {
+  ford: 'Grievance Investigation & Claim', policy: 'Policy Grievance',
+  unifor: 'Fact Sheet', investigation: 'Investigation Form',
+};
 
 function normaliseKey(key) {
   return String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-/* "monetary" and "policy" are what the sending app is asked for; the rest are courtesies */
+/*
+ * "monetary" and "policy" are what the sending app is asked for; the rest are courtesies. The
+ * last two only turn up in a .grv this app saved, which writes the form's own name.
+ */
 function importFormType(raw) {
   const word = normaliseKey(raw || '');
   if (['monetary', 'money', 'ford', 'claim', 'grievance', 'monetarygrievance'].includes(word)) return 'ford';
   if (['policy', 'policygrievance'].includes(word)) return 'policy';
+  if (['unifor', 'factsheet', 'fact'].includes(word)) return 'unifor';
+  if (['investigation', 'investigationform', '401', 'step401'].includes(word)) return 'investigation';
   return null;
 }
 
@@ -3253,15 +3382,22 @@ function readGrievanceJson(text) {
   const lookup = {};
   Object.keys(source).forEach(key => { lookup[normaliseKey(key)] = source[key]; });
 
+  const fields = importableFields(type);
+  const namesFor = field => {
+    const own = normaliseKey(field);
+    const aliases = IMPORT_ALIASES[field] || [];
+    return aliases.includes(own) ? aliases : [own].concat(aliases);
+  };
+
   const values = {};
   const ignored = [];
-  IMPORT_FORM_FIELDS[type].forEach(field => {
-    const alias = (IMPORT_ALIASES[field] || []).find(name => lookup[name] !== undefined && lookup[name] !== null && lookup[name] !== '');
+  fields.forEach(field => {
+    const alias = namesFor(field).find(name => lookup[name] !== undefined && lookup[name] !== null && lookup[name] !== '');
     if (!alias) return;
     let value = lookup[alias];
-    if (field === 'dateIncident' || field === 'dateFiled') {
+    if (isDateField(type, field)) {
       const iso = importDate(value);
-      if (!iso) { ignored.push(IMPORT_LABELS[field] + ' (couldn’t read the date)'); return; }
+      if (!iso) { ignored.push(importLabel(type, field) + ' (couldn’t read the date)'); return; }
       value = iso;
     }
     values[field] = String(value);
@@ -3269,7 +3405,7 @@ function readGrievanceJson(text) {
 
   // Anything sent that this form has no home for, so it can be said out loud rather than lost
   const claimed = new Set();
-  IMPORT_FORM_FIELDS[type].forEach(f => (IMPORT_ALIASES[f] || []).forEach(a => claimed.add(a)));
+  fields.forEach(f => namesFor(f).forEach(a => claimed.add(a)));
   Object.keys(lookup).forEach(key => {
     if (!claimed.has(key) && !['form', 'type', 'formtype', 'grievancetype', 'fields', 'data', 'values'].includes(key)) {
       ignored.push(String(key));
@@ -3297,7 +3433,7 @@ function showImport(result, filename) {
     row.className = 'import-row';
     const label = document.createElement('span');
     label.className = 'import-label';
-    label.textContent = IMPORT_LABELS[field] || field;
+    label.textContent = importLabel(result.type, field);
     const value = document.createElement('span');
     value.className = 'import-value';
     const text = result.values[field];

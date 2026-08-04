@@ -89,6 +89,8 @@ function group(name) {
  * list stays in the order it was written.
  */
 let chain = Promise.resolve();
+let MANIFEST = {};
+let SW_SOURCE = '';
 
 function checkAsync(g, label, fn) {
   const item = { label, ok: false, detail: '' };
@@ -152,7 +154,15 @@ document.getElementById('host').addEventListener('load', () => {
   failed = 0;
 
   // Give the app a moment to lay out and size its fields
-  setTimeout(() => {
+  setTimeout(async () => {
+    // Two files the app never loads into a page, so they are read here to be checked
+    try {
+      MANIFEST = await (await fetch('manifest.webmanifest')).json();
+      SW_SOURCE = await (await fetch('sw.js')).text();
+    } catch (err) {
+      MANIFEST = {};
+      SW_SOURCE = '';
+    }
     chain = Promise.resolve();
     run(win, doc);
     chain.then(render);
@@ -963,6 +973,91 @@ function run(win, doc) {
     }
     doc.getElementById('uploadError').hidden = true;
     return bad.length === 0 || { detail: bad.join(' | ') };
+  });
+
+  const g11 = group('Handing a form to another device');
+
+  checkAsync(g11, 'A .grv saved from a form reads straight back in', async () => {
+    const form = doc.getElementById('uniforForm');
+    win.showForm('unifor');
+    win.clearForm(form);
+    form.elements.grievorName.value = 'Round Trip';
+    form.elements.seniorityDate.value = '2019-03-04';
+    form.elements.discipline.value = 'Yes';          // a radio, not just text
+    const saved = win.buildGrv('unifor');
+    win.clearForm(form);
+
+    await win.handleIncomingFile(
+      new win.File([JSON.stringify(saved)], 'trip.grv', { type: 'application/grievance+json' }));
+    const offered = !doc.getElementById('importOverlay').hidden;
+    doc.getElementById('importConfirm').click();
+    const back = {
+      name: form.elements.grievorName.value,
+      date: form.elements.seniorityDate.value,
+      radio: form.elements.discipline.value,
+    };
+    win.clearForm(form);
+    return (offered && back.name === 'Round Trip' && back.date === '2019-03-04' && back.radio === 'Yes') ||
+      { detail: 'dialog=' + offered + ' ' + JSON.stringify(back) };
+  });
+
+  checkAsync(g11, 'A .grv names its form so all four can come home', async () => {
+    const wrong = [];
+    for (const type of ['ford', 'policy', 'unifor', 'investigation']) {
+      const read = win.readGrievanceJson(JSON.stringify(win.buildGrv(type)));
+      if (read.type !== type) wrong.push(type + ' came back as ' + read.type);
+    }
+    return wrong.length === 0 || { detail: wrong.join(', ') };
+  });
+
+  check(g11, 'The 4.01 offers its own fields, taken from the form itself', () => {
+    const fields = win.importableFields('investigation');
+    const missing = ['dateInfraction', 'dateFiled'].filter(f => !fields.includes(f));
+    return missing.length === 0 || { detail: 'missing ' + missing.join(', ') };
+  });
+
+  check(g11, 'Date fields are found by what they are, not what they are called', () => {
+    // seniorityDate is a date and does not start with "date"
+    return (win.isDateField('unifor', 'seniorityDate') &&
+            win.isDateField('ford', 'dateFiled') &&
+            !win.isDateField('unifor', 'grievorName')) ||
+      { detail: 'seniorityDate=' + win.isDateField('unifor', 'seniorityDate') };
+  });
+
+  check(g11, 'An empty form refuses to save a .grv', () => {
+    const form = doc.getElementById('policyForm');
+    win.showForm('policy');
+    win.clearForm(form);
+    doc.querySelector('[data-save-grv="policy"]').click();
+    const said = doc.getElementById('uploadError').textContent;
+    doc.getElementById('uploadError').hidden = true;
+    return said.indexOf('nothing in this form') !== -1 || { detail: said || '(said nothing)' };
+  });
+
+  check(g11, 'The share target and the .grv handler are declared', () => {
+    const m = MANIFEST;
+    const share = m.share_target;
+    const files = share && share.params && share.params.files && share.params.files[0];
+    const grv = m.file_handlers && m.file_handlers[0];
+    const claimsGrv = grv && Object.values(grv.accept).some(list => list.includes('.grv'));
+    // .json must NOT be claimed — the installed app would take over every JSON file on the machine
+    const takesJson = (m.file_handlers || []).some(h =>
+      Object.values(h.accept).some(list => list.includes('.json')));
+    return (share && share.method === 'POST' && share.enctype === 'multipart/form-data' &&
+            files && files.name === 'file' && claimsGrv && !takesJson) ||
+      { detail: 'share=' + JSON.stringify(share) + ' handlers=' + JSON.stringify(m.file_handlers) };
+  });
+
+  check(g11, 'The worker answers the share POST before the GET-only shortcut', () => {
+    const post = SW_SOURCE.indexOf("request.method === 'POST'");
+    const bail = SW_SOURCE.indexOf("request.method !== 'GET'");
+    return (post !== -1 && post < bail) ||
+      { detail: 'POST handling at ' + post + ', GET-only bail at ' + bail };
+  });
+
+  check(g11, 'The shared file survives the worker clearing out old caches', () => {
+    return SW_SOURCE.indexOf('k !== SHARE_CACHE') !== -1 ||
+      { detail: 'activate would delete the parked share' };
   });
 
   const g7 = group('Drafts');

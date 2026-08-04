@@ -8,7 +8,7 @@
  * CACHE is versioned: bump it whenever a precached file changes, or browsers will keep serving
  * the old copy. Old caches are deleted on activate.
  */
-const VERSION = '44';
+const VERSION = '45';
 const CACHE = 'local200forms-v' + VERSION;
 
 /* Must match the ?v= in index.html — bump both together, or the worker will keep serving the
@@ -45,7 +45,8 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE && k !== SHARE_CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -54,8 +55,41 @@ self.addEventListener('message', event => {
   if (event.data === 'skip-waiting') self.skipWaiting();
 });
 
+const SHARE_CACHE = 'local200forms-share';
+
+/*
+ * Android hands a shared file over as a POST to ./share, which is a URL nothing serves — this
+ * worker is what answers it. The file is parked in a cache and the browser is sent on to the
+ * app, which collects it on the way in. A redirect rather than a rendered response, so the
+ * share URL doesn't stay in the address bar.
+ */
+async function receiveShare(request) {
+  try {
+    const form = await request.formData();
+    const file = form.get('file');
+    if (file && file.name) {
+      const cache = await caches.open(SHARE_CACHE);
+      await cache.put('shared-file', new Response(file, {
+        headers: {
+          'content-type': file.type || 'application/octet-stream',
+          'x-shared-name': encodeURIComponent(file.name),
+        },
+      }));
+      return Response.redirect('./?shared=1', 303);
+    }
+  } catch (err) {
+    /* fall through and just open the app */
+  }
+  return Response.redirect('./', 303);
+}
+
 self.addEventListener('fetch', event => {
   const request = event.request;
+
+  if (request.method === 'POST' && new URL(request.url).pathname.endsWith('/share')) {
+    event.respondWith(receiveShare(request));
+    return;
+  }
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
