@@ -873,6 +873,98 @@ function run(win, doc) {
     return label === 'Upload a PDF' || { detail: label };
   });
 
+  const g10 = group('Filling a form from JSON');
+  const asJson = (obj, name) =>
+    new win.File([typeof obj === 'string' ? obj : JSON.stringify(obj)], name, { type: 'application/json' });
+
+  checkAsync(g10, 'A monetary grievance fills the claim form', async () => {
+    FORMS.forEach(f => win.clearForm(doc.getElementById(f.form)));
+    await win.handleIncomingFile(asJson({
+      form: 'monetary',
+      fields: { employeeName: 'Evan King', globalId: '002173535', dateIncident: '2026-07-22',
+                details: 'Denied overtime.', hoursStraight: '8' },
+    }, 'claim.json'));
+    const shown = !doc.getElementById('importOverlay').hidden;
+    doc.getElementById('importConfirm').click();
+    const form = doc.getElementById('fordForm');
+    const onFord = doc.getElementById('form-ford').classList.contains('active');
+    const filled = form.elements.employeeName.value === 'Evan King' &&
+                   form.elements.dateIncident.value === '2026-07-22' &&
+                   form.elements.hoursStraight.value === '8';
+    win.clearForm(form);
+    return (shown && onFord && filled) ||
+      { detail: 'dialog=' + shown + ' onFord=' + onFord + ' filled=' + filled };
+  });
+
+  checkAsync(g10, 'A policy grievance fills the policy form', async () => {
+    await win.handleIncomingFile(asJson({
+      type: 'policy',
+      fields: { employeeName: 'Jane Doe', article: 'Article 8.01', details: 'Applied unevenly.' },
+    }, 'policy.json'));
+    doc.getElementById('importConfirm').click();
+    const form = doc.getElementById('policyForm');
+    const onPolicy = doc.getElementById('form-policy').classList.contains('active');
+    const filled = form.elements.employeeName.value === 'Jane Doe';
+    win.clearForm(form);
+    return (onPolicy && filled) || { detail: 'onPolicy=' + onPolicy + ' filled=' + filled };
+  });
+
+  checkAsync(g10, 'Field names from another app are recognised', async () => {
+    // The sending app won't know our names, so a spread of plausible ones is accepted
+    const read = win.readGrievanceJson(JSON.stringify({
+      type: 'policy', name: 'Jane Doe', gid: 'G88452', dept: 'Trim',
+      supervisor: 'Marcus Lee', violation: 'Article 8.01', description: 'Uneven.',
+    }));
+    const got = read.values;
+    return (got.employeeName === 'Jane Doe' && got.globalId === 'G88452' &&
+            got.department === 'Trim' && got.processCoach === 'Marcus Lee' &&
+            got.article === 'Article 8.01' && got.details === 'Uneven.') ||
+      { detail: JSON.stringify(got) };
+  });
+
+  checkAsync(g10, 'Dates arrive in several shapes', async () => {
+    const shapes = ['2026-07-22', '2026/07/22', '07/22/2026', '2026-07-22T13:00:00Z'];
+    const wrong = shapes.filter(s => win.importDate(s) !== '2026-07-22');
+    const nonsense = win.importDate('last Tuesday');
+    return (wrong.length === 0 && nonsense === null) ||
+      { detail: 'unhandled: ' + wrong.join(', ') + ', nonsense gave ' + nonsense };
+  });
+
+  checkAsync(g10, 'Values with nowhere to go are named, not silently dropped', async () => {
+    const read = win.readGrievanceJson(JSON.stringify({
+      form: 'policy', fields: { employeeName: 'A', hoursStraight: '8', mysteryField: 'x' },
+    }));
+    // hours belong to the monetary form, so on a policy grievance they have no home
+    return (read.ignored.includes('hoursstraight') && read.ignored.includes('mysteryfield')) ||
+      { detail: read.ignored.join(', ') };
+  });
+
+  checkAsync(g10, 'Nothing is written until it is confirmed', async () => {
+    const form = doc.getElementById('fordForm');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Already here';
+    await win.handleIncomingFile(asJson({ form: 'monetary', fields: { employeeName: 'Incoming' } }, 'x.json'));
+    const warned = !doc.getElementById('importWarning').hidden;   // the form already has content
+    const untouched = form.elements.employeeName.value === 'Already here';
+    doc.querySelector('[data-import-close]').click();
+    const stillUntouched = form.elements.employeeName.value === 'Already here';
+    win.clearForm(form);
+    return (warned && untouched && stillUntouched) ||
+      { detail: 'warned=' + warned + ' beforeConfirm=' + untouched + ' afterCancel=' + stillUntouched };
+  });
+
+  checkAsync(g10, 'A file that says nothing useful is refused clearly', async () => {
+    const cases = [['{not json', 'valid JSON'], [JSON.stringify({ fields: {} }), 'monetary']];
+    const bad = [];
+    for (const [body, expect] of cases) {
+      await win.handleIncomingFile(asJson(body, 'bad.json'));
+      const said = doc.getElementById('uploadError').textContent;
+      if (said.indexOf(expect) === -1) bad.push(said);
+    }
+    doc.getElementById('uploadError').hidden = true;
+    return bad.length === 0 || { detail: bad.join(' | ') };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {

@@ -1391,6 +1391,11 @@ async function handleIncomingFile(file) {
   if (!file) return;
 
   uploadError.hidden = true;
+  // A handover file from another application, riding in on the same route as a PDF
+  if (/\.json$/i.test(file.name) || file.type === 'application/json') {
+    await handleJsonImport(file);
+    return;
+  }
   if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
     showUploadError('That isn’t a PDF.');
     return;
@@ -3152,3 +3157,199 @@ function markUp(item) {
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX,
                  get attachments() { return attachments; },
                  TOOL_SETTINGS, INK_COLOURS, HIGHLIGHT_COLOURS };
+
+/* ============ Filling a form from JSON ============
+ *
+ * Another application can hand a grievance over as a .json file, dropped on the page or chosen
+ * through the same upload link as a PDF. It rides on that route on purpose: it isn't something
+ * a rep does day to day, and it doesn't deserve a button of its own.
+ *
+ * The file says which kind of grievance it is and supplies whatever values it has. Nothing is
+ * written straight into a form — what would be filled is shown first, because the form may
+ * already have a draft in it.
+ */
+const IMPORT_FORM_FIELDS = {
+  ford: ['employeeName', 'globalId', 'department', 'processCoach', 'article',
+         'dateIncident', 'dateFiled', 'details',
+         'hoursStraight', 'hoursShift1', 'hoursTimeHalf', 'hoursShift3', 'hoursDouble', 'hoursTriple'],
+  policy: ['employeeName', 'globalId', 'department', 'processCoach', 'article',
+           'dateIncident', 'dateFiled', 'details'],
+};
+
+/* The sending app won't know our field names, so a spread of plausible ones is accepted */
+const IMPORT_ALIASES = {
+  employeeName: ['employeename', 'name', 'employee', 'grievor', 'grievorname', 'member', 'membername'],
+  globalId: ['globalid', 'gid', 'employeeid', 'employeenumber', 'badge', 'badgenumber', 'id'],
+  department: ['department', 'dept', 'deptname', 'departmentname'],
+  processCoach: ['processcoach', 'coach', 'supervisor', 'leader', 'teamleader'],
+  article: ['article', 'articleviolation', 'articles', 'violation', 'violations', 'articlesviolated'],
+  dateIncident: ['dateincident', 'incidentdate', 'dateofincident', 'occurred', 'occurrencedate',
+                 'incident', 'dateofoccurrence'],
+  dateFiled: ['datefiled', 'fileddate', 'dateoffiling', 'filed', 'submitted', 'submitteddate'],
+  details: ['details', 'detailsofincident', 'description', 'narrative', 'summary', 'statement', 'facts'],
+  hoursStraight: ['hoursstraight', 'straighttime', 'straight', 'hoursatstraighttime'],
+  hoursTimeHalf: ['hourstimehalf', 'timeandonehalf', 'timehalf', 'hoursattimeandonehalf', 'overtime'],
+  hoursDouble: ['hoursdouble', 'doubletime', 'hoursatdoubletime'],
+  hoursTriple: ['hourstriple', 'tripletime', 'hoursattripletime'],
+  hoursShift1: ['hoursshift1', 'shift1', 'shift1premium', 'shiftonepremium', 'hoursof1shiftprem'],
+  hoursShift3: ['hoursshift3', 'shift3', 'shift3premium', 'shiftthreepremium', 'hoursof3shiftprem'],
+};
+
+const IMPORT_LABELS = {
+  employeeName: 'Employee Name', globalId: 'Global ID', department: 'Department',
+  processCoach: 'Process Coach', article: 'Article Violation', dateIncident: 'Date of Incident',
+  dateFiled: 'Date Filed', details: 'Details of Incident',
+  hoursStraight: 'Hours at straight time', hoursShift1: 'Hours of #1 Shift Prem',
+  hoursTimeHalf: 'Hours at time & one half', hoursShift3: 'Hours of #3 Shift Prem',
+  hoursDouble: 'Hours at double time', hoursTriple: 'Hours at triple time',
+};
+
+const IMPORT_FORM_NAMES = { ford: 'Grievance Investigation & Claim', policy: 'Policy Grievance' };
+
+function normaliseKey(key) {
+  return String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/* "monetary" and "policy" are what the sending app is asked for; the rest are courtesies */
+function importFormType(raw) {
+  const word = normaliseKey(raw || '');
+  if (['monetary', 'money', 'ford', 'claim', 'grievance', 'monetarygrievance'].includes(word)) return 'ford';
+  if (['policy', 'policygrievance'].includes(word)) return 'policy';
+  return null;
+}
+
+/* Accepts yyyy-mm-dd, yyyy/mm/dd, mm/dd/yyyy and an ISO timestamp; anything else is left out */
+function importDate(value) {
+  const text = String(value).trim();
+  let m = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+  m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+  return null;
+}
+
+/*
+ * Reads a handover file into { type, values, ignored }. Values may sit under `fields`, `data`
+ * or `values`, or simply at the top level — the shape the other app finds natural is fine.
+ */
+function readGrievanceJson(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error('that file isn’t valid JSON');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('the file should contain a single grievance');
+  }
+
+  const type = importFormType(parsed.form || parsed.type || parsed.formType || parsed.grievanceType);
+  if (!type) {
+    throw new Error('it doesn’t say whether this is a "monetary" or a "policy" grievance');
+  }
+
+  const source = parsed.fields || parsed.data || parsed.values || parsed;
+  const lookup = {};
+  Object.keys(source).forEach(key => { lookup[normaliseKey(key)] = source[key]; });
+
+  const values = {};
+  const ignored = [];
+  IMPORT_FORM_FIELDS[type].forEach(field => {
+    const alias = (IMPORT_ALIASES[field] || []).find(name => lookup[name] !== undefined && lookup[name] !== null && lookup[name] !== '');
+    if (!alias) return;
+    let value = lookup[alias];
+    if (field === 'dateIncident' || field === 'dateFiled') {
+      const iso = importDate(value);
+      if (!iso) { ignored.push(IMPORT_LABELS[field] + ' (couldn’t read the date)'); return; }
+      value = iso;
+    }
+    values[field] = String(value);
+  });
+
+  // Anything sent that this form has no home for, so it can be said out loud rather than lost
+  const claimed = new Set();
+  IMPORT_FORM_FIELDS[type].forEach(f => (IMPORT_ALIASES[f] || []).forEach(a => claimed.add(a)));
+  Object.keys(lookup).forEach(key => {
+    if (!claimed.has(key) && !['form', 'type', 'formtype', 'grievancetype', 'fields', 'data', 'values'].includes(key)) {
+      ignored.push(String(key));
+    }
+  });
+
+  return { type, values, ignored };
+}
+
+/* ---------- The confirmation step ---------- */
+const importOverlay = document.getElementById('importOverlay');
+let pendingImport = null;
+
+function showImport(result, filename) {
+  pendingImport = result;
+  const entries = Object.keys(result.values);
+  document.getElementById('importSummary').textContent =
+    filename + ' holds a ' + IMPORT_FORM_NAMES[result.type] + ' with ' +
+    entries.length + (entries.length === 1 ? ' value.' : ' values.');
+
+  const list = document.getElementById('importList');
+  list.innerHTML = '';
+  entries.forEach(field => {
+    const row = document.createElement('div');
+    row.className = 'import-row';
+    const label = document.createElement('span');
+    label.className = 'import-label';
+    label.textContent = IMPORT_LABELS[field] || field;
+    const value = document.createElement('span');
+    value.className = 'import-value';
+    const text = result.values[field];
+    value.textContent = text.length > 90 ? text.slice(0, 90) + '…' : text;
+    row.append(label, value);
+    list.appendChild(row);
+  });
+
+  const leftOut = document.getElementById('importIgnored');
+  if (result.ignored.length) {
+    leftOut.hidden = false;
+    leftOut.textContent = 'Not used: ' + result.ignored.join(', ') + '.';
+  } else {
+    leftOut.hidden = true;
+  }
+
+  // The form may already have work in it, and filling replaces the lot
+  const warning = document.getElementById('importWarning');
+  warning.hidden = !formHasContent(result.type);
+  if (!warning.hidden) {
+    warning.textContent = 'The ' + IMPORT_FORM_NAMES[result.type] +
+      ' form already has something in it. Filling it in from this file replaces what is there.';
+  }
+
+  document.getElementById('importConfirm').disabled = entries.length === 0;
+  importOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+  document.getElementById('importConfirm').focus();
+}
+
+function closeImport() {
+  importOverlay.hidden = true;
+  document.body.style.overflow = '';
+  pendingImport = null;
+}
+
+document.querySelectorAll('[data-import-close]').forEach(button => {
+  button.addEventListener('click', closeImport);
+});
+
+document.getElementById('importConfirm').addEventListener('click', () => {
+  if (!pendingImport) return;
+  const { type, values } = pendingImport;
+  closeImport();
+  showForm(type, values);
+  saveDraft(type);
+});
+
+async function handleJsonImport(file) {
+  try {
+    const result = readGrievanceJson(await file.text());
+    showImport(result, file.name);
+  } catch (err) {
+    showUploadError('Couldn’t use ' + file.name + ': ' + err.message + '.');
+  }
+}

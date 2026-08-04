@@ -39,6 +39,51 @@ because the page on screen *is* the page that comes out.
 - The Fact Sheet's five sheets have a **sheet indicator and jump menu**, and a
   form with work waiting in it is **marked on the list**.
 
+## Filling a form from another application
+
+Drop a `.json` file on the page, or pick it with the same upload link as a PDF.
+It shows what it found and fills the form only once you say so.
+
+```json
+{
+  "form": "monetary",
+  "fields": {
+    "employeeName": "Evan King",
+    "globalId": "002173535",
+    "department": "8383 - Heads",
+    "processCoach": "Wes Macauley",
+    "article": "Article 14.02",
+    "dateIncident": "2026-07-22",
+    "dateFiled": "2026-07-29",
+    "details": "What happened.",
+    "hoursStraight": "8",
+    "hoursTimeHalf": "0",
+    "hoursDouble": "4",
+    "hoursTriple": "0",
+    "hoursShift1": "0",
+    "hoursShift3": "0"
+  }
+}
+```
+
+`form` is `"monetary"` (the Grievance Investigation & Claim) or `"policy"` (the
+Policy Grievance, which has no hours). The hours are only read for a monetary
+grievance.
+
+It is deliberately forgiving, so the sending app doesn't have to match these
+names exactly:
+
+- Fields can sit under `fields`, `data`, `values`, or straight at the top level.
+- `form`, `type`, `formType` and `grievanceType` all name the kind.
+- Names are matched ignoring case, spaces and punctuation, and common
+  alternatives are accepted — `name`/`grievor` for the employee, `gid`/`badge`
+  for the global ID, `dept`, `supervisor`, `violation`, `incidentDate`,
+  `description`, and so on.
+- Dates are read as `YYYY-MM-DD`, `YYYY/MM/DD`, `MM/DD/YYYY` or an ISO
+  timestamp.
+
+Anything it can't place is listed on screen rather than dropped quietly.
+
 ## Install it
 
 On a phone: open the link, then **Add to Home screen** (Chrome: ⋮ menu,

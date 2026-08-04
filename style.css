@@ -2148,3 +2148,54 @@ input[type="radio"] { width: 15px; height: 15px; }
   cursor: default;
   background: transparent;
 }
+
+/* ---------- Filling a form from a handover file ---------- */
+.import-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+
+.import-row {
+  display: flex;
+  gap: 14px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--c-border);
+  font-size: 13px;
+}
+.import-row:last-child { border-bottom: none; }
+
+.import-label {
+  flex: 0 0 40%;
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+
+.import-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--c-text);
+  word-break: break-word;
+}
+
+.import-warning {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: #fdf6e3;
+  border: 1px solid #f0dfae;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #8a5a00;
+}
+.import-warning[hidden] { display: none; }
+
+.import-ignored {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--c-text-faint);
+}
+.import-ignored[hidden] { display: none; }
