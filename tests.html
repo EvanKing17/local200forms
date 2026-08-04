@@ -556,109 +556,161 @@ function run(win, doc) {
 
   const g8 = group('Supporting documents');
 
-  /*
-   * pdf.js schedules rendering with requestAnimationFrame, which a page only gets while it is
-   * producing frames. Shim it so these run in a headless or hidden window too.
-   */
+  /* pdf.js schedules rendering with requestAnimationFrame, which a page only gets while it is
+     producing frames. Shim it so these run in a hidden or headless window too. */
   if (!win.__rafShimmed) {
     win.requestAnimationFrame = (cb) => win.setTimeout(() => cb(Date.now()), 0);
     win.__rafShimmed = true;
   }
 
-  function samplePdf(win, doc, name) {
-    return new win.File([doc.output('blob')], name, { type: 'application/pdf' });
-  }
+  const asFile = (pdf, name) => new win.File([pdf.output('blob')], name, { type: 'application/pdf' });
+  let attached = null;
 
-  let attachedDoc = null;
-
-  checkAsync(g8, 'A PDF is rasterised into pages', async () => {
+  checkAsync(g8, 'A PDF is read without being redrawn', async () => {
     const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
-    attachedDoc = await win.Annotator.readFile(samplePdf(win, src, 'Letter.pdf'));
-    if (attachedDoc.pages.length !== 1) return { detail: attachedDoc.pages.length + ' pages' };
-    const page = attachedDoc.pages[0].base;
-    return (page.width > 100 && page.height > 100) || { detail: page.width + 'x' + page.height };
+    attached = await win.Annotator.readFile(asFile(src, 'Letter.pdf'));
+    if (attached.pages.length !== 1) return { detail: attached.pages.length + ' pages' };
+    const keptOriginal = attached.bytes && attached.bytes.length > 1000;
+    const hasView = attached.pages[0].view.width > 100;
+    return (keptOriginal && hasView) ||
+      { detail: 'bytes=' + (attached.bytes || []).length + ' view=' + hasView };
   });
 
-  checkAsync(g8, 'Blacking out destroys what was underneath', async () => {
-    const page = attachedDoc.pages[0];
-    page.annotations = [{ type: 'redact', x: 0.2, y: 0.2, w: 0.5, h: 0.1 }];
-    const flat = win.Annotator.flatten(page);
-    const x = Math.round(0.3 * flat.width), y = Math.round(0.24 * flat.height);
-    const px = flat.getContext('2d').getImageData(x, y, 1, 1).data;
-    return (px[0] === 0 && px[1] === 0 && px[2] === 0) || { detail: 'pixel ' + [px[0], px[1], px[2]] };
+  checkAsync(g8, 'Attached pages keep their text in the output', async () => {
+    // The point of not redrawing them: an attached PDF stays searchable and sharp
+    const form = doc.getElementById('fordForm');
+    win.clearForm(form);
+    attached.pages[0].annotations = [
+      { type: 'rect', color: '#111111', width: 3, fill: true, x: 0.1, y: 0.2, w: 0.5, h: 0.05 },
+    ];
+    const bytes = await win.Annotator.appendTo(
+      win.buildFordDoc(win.fd(form)).output('arraybuffer'), [attached]);
+    const raw = new TextDecoder('latin1').decode(bytes);
+    // the label is drawn uppercase by the builder
+    return raw.indexOf('NAME OF SUPERVISOR') > -1 || { detail: 'the attachment text was lost' };
   });
 
   checkAsync(g8, 'Attached pages are appended after the form', async () => {
     const form = doc.getElementById('fordForm');
     win.clearForm(form);
     const before = win.buildFordDoc(win.fd(form)).getNumberOfPages();
-    win.__app.attachments.ford.length = 0;
-    win.__app.attachments.ford.push(attachedDoc);
-    const after = win.appendAttachments(win.buildFordDoc(win.fd(form)), 'ford').getNumberOfPages();
-    win.__app.attachments.ford.length = 0;
-    return after === before + attachedDoc.pages.length ||
-      { detail: before + ' + ' + attachedDoc.pages.length + ' gave ' + after };
-  });
-
-  checkAsync(g8, 'An attachment carries no text into the output', async () => {
-    // The point of rasterising: nothing under a black box can be selected back out
-    const form = doc.getElementById('fordForm');
-    win.clearForm(form);
-    win.__app.attachments.ford.length = 0;
-    win.__app.attachments.ford.push(attachedDoc);
-    const out = win.appendAttachments(win.buildFordDoc(win.fd(form)), 'ford');
-    const raw = atob(out.output('datauristring').split(',')[1]);
-    win.__app.attachments.ford.length = 0;
-    return raw.indexOf('Name of Supervisor') === -1 || { detail: 'the attachment’s text survived' };
+    const bytes = await win.Annotator.appendTo(
+      win.buildFordDoc(win.fd(form)).output('arraybuffer'), [attached]);
+    const PDFLib = await win.Annotator.loadPdfLib();
+    const merged = await PDFLib.PDFDocument.load(bytes);
+    return merged.getPageCount() === before + attached.pages.length ||
+      { detail: before + ' + ' + attached.pages.length + ' gave ' + merged.getPageCount() };
   });
 
   checkAsync(g8, 'Every mark-up tool records a mark', async () => {
     const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
-    const markup = await win.Annotator.readFile(samplePdf(win, src, 'Marks.pdf'));
-    win.openEditor(markup, () => {});
-    const canvas = doc.getElementById('editorCanvas');
+    const item = await win.Annotator.readFile(asFile(src, 'Marks.pdf'));
+    win.openEditor(item, () => {});
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
     const r = canvas.getBoundingClientRect();
-    const at = (p) => new win.PointerEvent('pointerdown', { clientX: r.left + p[0] * r.width, clientY: r.top + p[1] * r.height, pointerId: 1, bubbles: true, cancelable: true });
-    const to = (t, p) => new win.PointerEvent(t, { clientX: r.left + p[0] * r.width, clientY: r.top + p[1] * r.height, pointerId: 1, bubbles: true, cancelable: true });
-    ['pen', 'highlight', 'arrow', 'rect', 'ellipse', 'redact', 'pixelate'].forEach((tool, i) => {
+    const ev = (t, p) => new win.PointerEvent(t, { clientX: r.left + p[0] * r.width,
+      clientY: r.top + p[1] * r.height, pointerId: 1, bubbles: true, cancelable: true });
+    ['pen', 'highlight', 'arrow', 'rect', 'ellipse', 'pixelate'].forEach((tool, i) => {
       doc.querySelector('#editorTools .tool[data-tool="' + tool + '"]').click();
-      const y = 0.08 + i * 0.1;
-      canvas.dispatchEvent(at([0.15, y]));
-      canvas.dispatchEvent(to('pointermove', [0.6, y + 0.04]));
-      canvas.dispatchEvent(to('pointerup', [0.6, y + 0.04]));
+      const y = 0.1 + i * 0.12;
+      canvas.dispatchEvent(ev('pointerdown', [0.15, y]));
+      canvas.dispatchEvent(ev('pointermove', [0.6, y + 0.04]));
+      canvas.dispatchEvent(ev('pointerup', [0.6, y + 0.04]));
     });
-    const types = markup.pages[0].annotations.map(a => a.type);
+    const types = item.pages[0].annotations.map(a => a.type);
     doc.getElementById('editorDone').click();
-    return types.length === 7 || { detail: types.join(', ') };
+    return types.length === 6 || { detail: types.join(', ') };
   });
+
+  checkAsync(g8, 'There is no redaction tool pretending to delete', async () =>
+    !doc.querySelector('#editorTools .tool[data-tool="redact"]') ||
+    { detail: 'a redact tool is still offered' });
 
   checkAsync(g8, 'A tap that draws nothing leaves nothing', async () => {
     const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
-    const markup = await win.Annotator.readFile(samplePdf(win, src, 'Tap.pdf'));
-    win.openEditor(markup, () => {});
-    const canvas = doc.getElementById('editorCanvas');
+    const item = await win.Annotator.readFile(asFile(src, 'Tap.pdf'));
+    win.openEditor(item, () => {});
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
     const r = canvas.getBoundingClientRect();
-    const ev = (t) => new win.PointerEvent(t, { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1, bubbles: true, cancelable: true });
+    const ev = (t) => new win.PointerEvent(t, { clientX: r.left + r.width / 2,
+      clientY: r.top + r.height / 2, pointerId: 1, bubbles: true, cancelable: true });
     doc.querySelector('#editorTools .tool[data-tool="pen"]').click();
     canvas.dispatchEvent(ev('pointerdown'));
     canvas.dispatchEvent(ev('pointerup'));
-    const count = markup.pages[0].annotations.length;
+    const count = item.pages[0].annotations.length;
     doc.getElementById('editorDone').click();
     return count === 0 || { detail: count + ' marks left behind' };
   });
 
-  checkAsync(g8, 'Undo removes the last mark only', async () => {
-    const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
-    const markup = await win.Annotator.readFile(samplePdf(win, src, 'Undo.pdf'));
-    markup.pages[0].annotations = [
-      { type: 'pen', color: '#000', width: 3, points: [[0.1, 0.1], [0.2, 0.2]] },
-      { type: 'redact', x: 0.3, y: 0.3, w: 0.2, h: 0.05 },
-    ];
-    win.openEditor(markup, () => {});
-    doc.getElementById('editorUndo').click();
-    const left = markup.pages[0].annotations.map(a => a.type);
+  checkAsync(g8, 'Every page is on screen and scrolls', async () => {
+    const src = win.buildUniforDoc(win.fd(doc.getElementById('uniforForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'Five.pdf'));
+    win.openEditor(item, () => {});
+    const canvases = doc.querySelectorAll('#editorPages .editor-canvas').length;
+    const scrolls = win.getComputedStyle(doc.getElementById('editorStage')).overflow === 'auto';
+    const noPager = !doc.getElementById('editorPrev');
     doc.getElementById('editorDone').click();
-    return (left.length === 1 && left[0] === 'pen') || { detail: left.join(', ') };
+    return (canvases === 5 && scrolls && noPager) ||
+      { detail: canvases + ' canvases, scrolls=' + scrolls + ', pagerGone=' + noPager };
+  });
+
+  checkAsync(g8, 'Each tool remembers its own colour and thickness', async () => {
+    const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'Tools.pdf'));
+    win.openEditor(item, () => {});
+    const pick = (t) => doc.querySelector('#editorTools .tool[data-tool="' + t + '"]').click();
+    pick('highlight');
+    const width = doc.getElementById('editorWidth');
+    width.value = 11;
+    width.dispatchEvent(new win.Event('input', { bubbles: true }));
+    pick('pen');
+    const penWidth = win.__app.TOOL_SETTINGS.pen.width;
+    pick('highlight');
+    const highlightWidth = win.__app.TOOL_SETTINGS.highlight.width;
+    doc.getElementById('editorDone').click();
+    return (penWidth === 4 && highlightWidth === 11) ||
+      { detail: 'pen=' + penWidth + ' highlight=' + highlightWidth };
+  });
+
+  checkAsync(g8, 'The highlighter starts yellow with its own colours', async () => {
+    const yellow = win.__app.TOOL_SETTINGS.highlight.color === '#FFE44D';
+    const separate = win.__app.INK_COLOURS[0] !== win.__app.HIGHLIGHT_COLOURS[0];
+    return (yellow && separate) || { detail: 'yellow=' + yellow + ' separate=' + separate };
+  });
+
+  checkAsync(g8, 'The cursor shows the size of the nib', async () => {
+    const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'Cursor.pdf'));
+    win.openEditor(item, () => {});
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
+    const r = canvas.getBoundingClientRect();
+    const hover = () => {
+      canvas.dispatchEvent(new win.PointerEvent('pointerenter', { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1, bubbles: true }));
+      canvas.dispatchEvent(new win.PointerEvent('pointermove', { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1, bubbles: true }));
+    };
+    const cursor = doc.getElementById('brushCursor');
+    doc.querySelector('#editorTools .tool[data-tool="pen"]').click();
+    hover();
+    const pen = parseFloat(cursor.style.width);
+    doc.querySelector('#editorTools .tool[data-tool="highlight"]').click();
+    hover();
+    const highlight = parseFloat(cursor.style.width);
+    doc.querySelector('#editorTools .tool[data-tool="rect"]').click();
+    hover();
+    const hiddenForShapes = cursor.hidden;
+    doc.getElementById('editorDone').click();
+    return (pen > 0 && highlight > pen && hiddenForShapes) ||
+      { detail: 'pen=' + pen + ' highlight=' + highlight + ' hiddenForShapes=' + hiddenForShapes };
+  });
+
+  checkAsync(g8, 'The document can be renamed before it is saved', async () => {
+    const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'scan0042.pdf'));
+    let saved = null;
+    win.openEditor(item, (finished) => { saved = finished.name; });
+    doc.getElementById('editorName').value = 'Smith grievance evidence';
+    doc.getElementById('editorDone').click();
+    return saved === 'Smith grievance evidence.pdf' || { detail: 'saved as ' + saved };
   });
 
   const g7 = group('Drafts');

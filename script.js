@@ -798,8 +798,8 @@ const fordForm = document.getElementById('fordForm');
 fordForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
-  const doc = appendAttachments(buildFordDoc(data), 'ford');
-  openPdfViewer(doc, buildFilename(data.employeeName, 'Grievance Claim', data.dateIncident));
+  const doc = buildFordDoc(data);
+  openWithAttachments(doc, 'ford', buildFilename(data.employeeName, 'Grievance Claim', data.dateIncident));
 });
 
 document.getElementById('fordClear').addEventListener('click', () => {
@@ -876,8 +876,8 @@ const policyForm = document.getElementById('policyForm');
 policyForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
-  const doc = appendAttachments(buildPolicyDoc(data), 'policy');
-  openPdfViewer(doc, buildFilename(data.employeeName, 'Policy Grievance', data.dateIncident));
+  const doc = buildPolicyDoc(data);
+  openWithAttachments(doc, 'policy', buildFilename(data.employeeName, 'Policy Grievance', data.dateIncident));
 });
 
 document.getElementById('policyClear').addEventListener('click', () => {
@@ -1106,8 +1106,8 @@ const uniforForm = document.getElementById('uniforForm');
 uniforForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
-  const doc = appendAttachments(buildUniforDoc(data), 'unifor');
-  openPdfViewer(doc, buildFilename(data.grievorName, 'Fact Sheet', data.uniforDateIncident));
+  const doc = buildUniforDoc(data);
+  openWithAttachments(doc, 'unifor', buildFilename(data.grievorName, 'Fact Sheet', data.uniforDateIncident));
 });
 
 document.getElementById('uniforClear').addEventListener('click', () => {
@@ -1168,8 +1168,8 @@ const investigationForm = document.getElementById('investigationForm');
 investigationForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
-  const doc = appendAttachments(buildInvestigationDoc(data), 'investigation');
-  openPdfViewer(doc, buildFilename(data.supervisorName, 'Investigation Form', data.dateInfraction));
+  const doc = buildInvestigationDoc(data);
+  openWithAttachments(doc, 'investigation', buildFilename(data.supervisorName, 'Investigation Form', data.dateInfraction));
 });
 
 document.getElementById('investigationClear').addEventListener('click', () => {
@@ -2456,7 +2456,6 @@ Object.keys(FORM_BUILDERS).forEach(type => {
  * that to one named object makes the contract obvious, instead of tests quietly depending on
  * whichever internals happen to be function declarations.
  */
-window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX, get attachments() { return attachments; } };
 
 /* ============ Which forms have something in them ============
  *
@@ -2631,205 +2630,271 @@ Object.keys(FORM_BUILDERS).forEach(buildSheetNav);
 /* ============ Attachments and the mark-up editor ============
  *
  * Supporting documents ride along with the grievance so the whole thing goes in as one PDF.
- * Pages are rasterised on the way in (annotate.js explains why that matters for redaction) and
- * appended after the form when the PDF is built.
+ * The pages themselves are never redrawn — see annotate.js — so attached PDFs stay sharp and
+ * searchable, and the marks go on top as vector shapes.
  */
-const COLOURS = ['#C31A1A', '#002855', '#1a7f37', '#EAAA00', '#000000', '#FFFFFF'];
-const DRAG_TOOLS = ['rect', 'ellipse', 'redact', 'pixelate', 'arrow'];
+
+/* Highlighter colours are the translucent ones you'd reach for on paper; everything else gets
+   the solid set. Each tool keeps its own colour and thickness, so switching between them
+   doesn't lose the setting you just chose. */
+const INK_COLOURS = ['#C31A1A', '#002855', '#1a7f37', '#7A1FA2', '#111111'];
+const HIGHLIGHT_COLOURS = ['#FFE44D', '#8CF07A', '#7FD8FF', '#FF9AD5', '#FFB061'];
+
+const TOOL_SETTINGS = {
+  pen: { color: '#C31A1A', width: 4 },
+  highlight: { color: '#FFE44D', width: 4 },
+  arrow: { color: '#C31A1A', width: 4 },
+  rect: { color: '#C31A1A', width: 3, fill: false },
+  ellipse: { color: '#C31A1A', width: 3, fill: false },
+  pixelate: { color: '#111111', width: 3 },
+};
+
+const FREEHAND_TOOLS = ['pen', 'highlight'];
+const DRAG_TOOLS = ['rect', 'ellipse', 'pixelate', 'arrow'];
 
 const attachments = { ford: [], policy: [], unifor: [], investigation: [] };
 
 const editor = document.getElementById('editor');
-const editorCanvas = document.getElementById('editorCanvas');
 const editorStage = document.getElementById('editorStage');
-const editorName = document.getElementById('editorName');
+const editorPages = document.getElementById('editorPages');
+const editorNameInput = document.getElementById('editorName');
 const editorPageLabel = document.getElementById('editorPageLabel');
+const brushCursor = document.getElementById('brushCursor');
 
 let editorDoc = null;
-let editorPage = 0;
 let editorTool = 'pen';
-let editorColour = COLOURS[0];
-let editorWidth = 4;
-let editorFill = false;
 let editorOnDone = null;
+let pageCanvases = [];
+
+function settings() {
+  return TOOL_SETTINGS[editorTool];
+}
+
+function coloursForTool() {
+  return editorTool === 'highlight' ? HIGHLIGHT_COLOURS : INK_COLOURS;
+}
 
 function buildSwatches() {
   const host = document.getElementById('editorSwatches');
   host.innerHTML = '';
-  COLOURS.forEach(colour => {
+  coloursForTool().forEach(colour => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'swatch';
     button.style.background = colour;
     button.setAttribute('aria-label', colour);
-    button.setAttribute('aria-pressed', String(colour === editorColour));
+    button.setAttribute('aria-pressed', String(colour === settings().color));
     button.addEventListener('click', () => {
-      editorColour = colour;
+      settings().color = colour;
       host.querySelectorAll('.swatch').forEach(s => s.setAttribute('aria-pressed', String(s === button)));
+      updateBrushCursor();
     });
     host.appendChild(button);
   });
 }
 
-/* Redaction has no colour or thickness, and only a box or oval can be filled */
 function syncToolOptions() {
-  const redacting = editorTool === 'redact' || editorTool === 'pixelate';
-  document.getElementById('colourRow').hidden = redacting;
-  document.getElementById('widthRow').hidden = redacting;
-  document.getElementById('fillRow').hidden = !(editorTool === 'rect' || editorTool === 'ellipse');
-  document.getElementById('redactNote').hidden = !redacting;
+  const set = settings();
+  editor.classList.toggle('is-freehand', FREEHAND_TOOLS.includes(editorTool));
+  const shape = editorTool === 'rect' || editorTool === 'ellipse';
+  document.getElementById('colourRow').hidden = editorTool === 'pixelate';
+  document.getElementById('widthRow').hidden = editorTool === 'pixelate';
+  document.getElementById('fillRow').hidden = !shape;
+  document.getElementById('fillNote').hidden = !(shape && set.fill);
+  document.getElementById('editorWidth').value = set.width;
+  document.getElementById('widthValue').textContent = set.width;
+  document.getElementById('editorFill').checked = !!set.fill;
   document.querySelectorAll('#editorTools .tool').forEach(button => {
     button.setAttribute('aria-pressed', String(button.dataset.tool === editorTool));
   });
+  buildSwatches();
+  updateBrushCursor();
 }
 
 document.querySelectorAll('#editorTools .tool').forEach(button => {
   button.addEventListener('click', () => { editorTool = button.dataset.tool; syncToolOptions(); });
 });
-document.getElementById('editorWidth').addEventListener('input', (e) => { editorWidth = +e.target.value; });
-document.getElementById('editorFill').addEventListener('change', (e) => { editorFill = e.target.checked; });
-
-/* Sized to fit the stage, so a whole page is visible without scrolling around it */
-function fitCanvas() {
-  if (!editorDoc) return;
-  const page = editorDoc.pages[editorPage];
-  const stage = editorStage.getBoundingClientRect();
-  const room = { w: Math.max(160, stage.width - 32), h: Math.max(160, stage.height - 32) };
-  const scale = Math.min(room.w / page.base.width, room.h / page.base.height, 1.6);
-  editorCanvas.width = Math.round(page.base.width * scale);
-  editorCanvas.height = Math.round(page.base.height * scale);
-  window.Annotator.renderPage(editorCanvas, page);
-}
-
-function showEditorPage(index) {
-  if (!editorDoc) return;
-  editorPage = Math.max(0, Math.min(index, editorDoc.pages.length - 1));
-  editorPageLabel.textContent = 'Page ' + (editorPage + 1) + ' of ' + editorDoc.pages.length;
-  document.getElementById('editorPrev').disabled = editorPage === 0;
-  document.getElementById('editorNext').disabled = editorPage === editorDoc.pages.length - 1;
-  fitCanvas();
-}
-
-document.getElementById('editorPrev').addEventListener('click', () => showEditorPage(editorPage - 1));
-document.getElementById('editorNext').addEventListener('click', () => showEditorPage(editorPage + 1));
-
-document.getElementById('editorUndo').addEventListener('click', () => {
-  if (!editorDoc) return;
-  editorDoc.pages[editorPage].annotations.pop();
-  window.Annotator.renderPage(editorCanvas, editorDoc.pages[editorPage]);
+document.getElementById('editorWidth').addEventListener('input', (e) => {
+  settings().width = +e.target.value;
+  document.getElementById('widthValue').textContent = e.target.value;
+  updateBrushCursor();
 });
+document.getElementById('editorFill').addEventListener('change', (e) => {
+  settings().fill = e.target.checked;
+  document.getElementById('fillNote').hidden = !e.target.checked;
+});
+
+/* ---------- The cursor shows what the tool will actually lay down ----------
+ * A crosshair tells you nothing about how wide a highlighter stroke is going to be, which is
+ * the thing you want to know before you drag across a line of text.
+ */
+let cursorOver = null;
+
+function brushDiameter(canvas, page) {
+  const set = settings();
+  const scale = canvas.getBoundingClientRect().width / canvas.width;
+  const base = window.Annotator.strokeWidthFor(page, set) * (canvas.width / page.width) * scale;
+  return Math.max(4, editorTool === 'highlight' ? base * 4 : base);
+}
+
+function updateBrushCursor() {
+  if (!cursorOver || !FREEHAND_TOOLS.includes(editorTool)) { brushCursor.hidden = true; return; }
+  const size = brushDiameter(cursorOver.canvas, cursorOver.page);
+  brushCursor.style.width = size + 'px';
+  brushCursor.style.height = size + 'px';
+  brushCursor.style.borderRadius = editorTool === 'highlight' ? '2px' : '50%';
+  brushCursor.style.background = settings().color;
+  brushCursor.style.opacity = editorTool === 'highlight' ? '0.45' : '0.85';
+}
+
+function moveBrushCursor(e) {
+  if (!FREEHAND_TOOLS.includes(editorTool)) { brushCursor.hidden = true; return; }
+  const stage = editorStage.getBoundingClientRect();
+  brushCursor.hidden = false;
+  brushCursor.style.left = (e.clientX - stage.left) + 'px';
+  brushCursor.style.top = (e.clientY - stage.top) + 'px';
+}
+
+/* ---------- Laying the pages out ----------
+ * Every page is on screen at once and scrolls, rather than one at a time behind arrows: it's
+ * how any document reader behaves, and it makes it obvious how much there is.
+ */
+function layoutPages() {
+  editorPages.innerHTML = '';
+  pageCanvases = [];
+  if (!editorDoc) return;
+
+  editorDoc.pages.forEach((page, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'editor-page';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = page.view.width;
+    canvas.height = page.view.height;
+    canvas.className = 'editor-canvas';
+    canvas.dataset.page = String(i);
+
+    const number = document.createElement('span');
+    number.className = 'editor-page-number';
+    number.textContent = 'Page ' + (i + 1);
+
+    wrap.append(canvas, number);
+    editorPages.appendChild(wrap);
+    pageCanvases.push(canvas);
+    window.Annotator.renderPage(canvas, page);
+    attachDrawing(canvas, page, i);
+  });
+
+  editorPageLabel.textContent = editorDoc.pages.length +
+    (editorDoc.pages.length === 1 ? ' page' : ' pages');
+}
 
 function openEditor(doc, onDone) {
   editorDoc = doc;
   editorOnDone = onDone || null;
-  editorName.textContent = doc.name;
+  editorNameInput.value = doc.name.replace(/\.[^.]+$/, '');
   editor.hidden = false;
   document.body.style.overflow = 'hidden';
-  buildSwatches();
   syncToolOptions();
-  showEditorPage(0);
+  layoutPages();
+  editorStage.scrollTop = 0;
 }
 
 function closeEditor() {
   editor.hidden = true;
+  brushCursor.hidden = true;
   document.body.style.overflow = '';
   const finished = editorDoc;
   const done = editorOnDone;
+  if (finished) finished.name = (editorNameInput.value.trim() || finished.name) + '.pdf';
   editorDoc = null;
   editorOnDone = null;
+  pageCanvases = [];
   if (done) done(finished);
 }
 
 document.getElementById('editorBack').addEventListener('click', closeEditor);
 document.getElementById('editorDone').addEventListener('click', closeEditor);
-window.addEventListener('resize', () => { if (!editor.hidden) fitCanvas(); });
 
-/* ---------- Marking up ----------
- * Pointer events rather than separate mouse and touch handling, so a finger, a stylus and a
- * mouse all work through one path. Positions are kept 0..1 across the page, so the same marks
- * land correctly on the small preview and again at full size on export.
- */
+/* Undo takes the last mark made anywhere in the document, not just on one page */
+document.getElementById('editorUndo').addEventListener('click', () => {
+  if (!editorDoc) return;
+  for (let i = editorDoc.pages.length - 1; i >= 0; i--) {
+    const page = editorDoc.pages[i];
+    if (page.annotations.length) {
+      page.annotations.pop();
+      window.Annotator.renderPage(pageCanvases[i], page);
+      return;
+    }
+  }
+});
+
+/* ---------- Marking up ---------- */
 let stroke = null;
 
-function pointOn(e) {
-  const r = editorCanvas.getBoundingClientRect();
-  return [
-    Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
-    Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
-  ];
-}
-
-editorCanvas.addEventListener('pointerdown', (e) => {
-  if (!editorDoc) return;
-  e.preventDefault();
-  editorCanvas.setPointerCapture(e.pointerId);
-  const [x, y] = pointOn(e);
-
-  if (editorTool === 'arrow') {
-    stroke = { type: 'arrow', color: editorColour, width: editorWidth, x1: x, y1: y, x2: x, y2: y };
-  } else if (DRAG_TOOLS.includes(editorTool)) {
-    stroke = { type: editorTool, color: editorColour, width: editorWidth, fill: editorFill,
-               x, y, w: 0, h: 0, ox: x, oy: y };
-  } else {
-    stroke = { type: editorTool, color: editorColour, width: editorWidth, points: [[x, y]] };
+function attachDrawing(canvas, page, index) {
+  function pointOn(e) {
+    const r = canvas.getBoundingClientRect();
+    return [
+      Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+      Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
+    ];
   }
-  editorDoc.pages[editorPage].annotations.push(stroke);
-});
 
-editorCanvas.addEventListener('pointermove', (e) => {
-  if (!stroke || !editorDoc) return;
-  const [x, y] = pointOn(e);
-  if (stroke.points) {
-    stroke.points.push([x, y]);
-  } else if (stroke.type === 'arrow') {
-    stroke.x2 = x;
-    stroke.y2 = y;
-  } else {
-    // Dragging in any direction, so normalise back to a positive width and height
-    stroke.x = Math.min(stroke.ox, x);
-    stroke.y = Math.min(stroke.oy, y);
-    stroke.w = Math.abs(x - stroke.ox);
-    stroke.h = Math.abs(y - stroke.oy);
+  canvas.addEventListener('pointerenter', () => { cursorOver = { canvas, page }; updateBrushCursor(); });
+  canvas.addEventListener('pointerleave', () => { if (!stroke) { cursorOver = null; brushCursor.hidden = true; } });
+  canvas.addEventListener('pointermove', moveBrushCursor);
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!editorDoc) return;
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    cursorOver = { canvas, page };
+    const [x, y] = pointOn(e);
+    const set = settings();
+
+    if (editorTool === 'arrow') {
+      stroke = { type: 'arrow', color: set.color, width: set.width, x1: x, y1: y, x2: x, y2: y };
+    } else if (DRAG_TOOLS.includes(editorTool)) {
+      stroke = { type: editorTool, color: set.color, width: set.width, fill: !!set.fill,
+                 x, y, w: 0, h: 0, ox: x, oy: y };
+    } else {
+      stroke = { type: editorTool, color: set.color, width: set.width, points: [[x, y]] };
+    }
+    stroke.pageIndex = index;
+    page.annotations.push(stroke);
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!stroke || stroke.pageIndex !== index) return;
+    const [x, y] = pointOn(e);
+    if (stroke.points) {
+      stroke.points.push([x, y]);
+    } else if (stroke.type === 'arrow') {
+      stroke.x2 = x;
+      stroke.y2 = y;
+    } else {
+      stroke.x = Math.min(stroke.ox, x);
+      stroke.y = Math.min(stroke.oy, y);
+      stroke.w = Math.abs(x - stroke.ox);
+      stroke.h = Math.abs(y - stroke.oy);
+    }
+    window.Annotator.renderPage(canvas, page);
+  });
+
+  function end() {
+    if (!stroke || stroke.pageIndex !== index) return;
+    // A tap that drew nothing shouldn't leave an invisible mark behind
+    let empty;
+    if (stroke.points) empty = stroke.points.length < 2;
+    else if (stroke.type === 'arrow') empty = Math.hypot(stroke.x2 - stroke.x1, stroke.y2 - stroke.y1) < 0.01;
+    else empty = stroke.w < 0.005 || stroke.h < 0.005;
+    if (empty) page.annotations.pop();
+    stroke = null;
+    window.Annotator.renderPage(canvas, page);
   }
-  window.Annotator.renderPage(editorCanvas, editorDoc.pages[editorPage]);
-});
-
-function endStroke() {
-  if (!stroke || !editorDoc) { stroke = null; return; }
-  const page = editorDoc.pages[editorPage];
-  // A tap that drew nothing shouldn't leave an invisible mark behind
-  let empty;
-  if (stroke.points) empty = stroke.points.length < 2;
-  else if (stroke.type === 'arrow') empty = Math.hypot(stroke.x2 - stroke.x1, stroke.y2 - stroke.y1) < 0.01;
-  else empty = stroke.w < 0.005 || stroke.h < 0.005;
-  if (empty) page.annotations.pop();
-  stroke = null;
-  window.Annotator.renderPage(editorCanvas, page);
-}
-
-editorCanvas.addEventListener('pointerup', endStroke);
-editorCanvas.addEventListener('pointercancel', endStroke);
-
-/*
- * A document this app didn't make, opened on its own: rasterised, marked up, and saved back out
- * as a new PDF. The original is never modified — what comes out is a flattened copy, which is
- * the point where redaction becomes permanent.
- */
-async function openForMarkup(file) {
-  uploadError.hidden = true;
-  try {
-    const doc = await window.Annotator.readFile(file);
-    openEditor(doc, (finished) => {
-      if (!finished) return;
-      const { jsPDF } = window.jspdf;
-      const out = new jsPDF({ unit: 'pt', format: 'letter' });
-      out.deletePage(1);                       // start empty; every page comes from the document
-      appendPagesTo(out, finished.pages);
-      openPdfViewer(out, finished.name.replace(/\.pdf$/i, '') + ' - marked up.pdf');
-    });
-  } catch (err) {
-    showUploadError('Couldn’t open that file: ' + err.message);
-  }
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
 }
 
 /* ---------- Attachment list on a form ---------- */
@@ -2862,7 +2927,7 @@ function renderAttachmentList(type) {
     const thumb = document.createElement('canvas');
     thumb.className = 'dc-attach-thumb';
     thumb.width = 44;
-    thumb.height = Math.max(20, Math.round(44 * doc.pages[0].base.height / doc.pages[0].base.width));
+    thumb.height = Math.max(20, Math.round(44 * doc.pages[0].view.height / doc.pages[0].view.width));
     window.Annotator.renderPage(thumb, doc.pages[0]);
 
     const label = document.createElement('span');
@@ -2879,10 +2944,7 @@ function renderAttachmentList(type) {
     remove.type = 'button';
     remove.className = 'dc-attach-action is-danger';
     remove.textContent = 'Remove';
-    remove.addEventListener('click', () => {
-      docs.splice(i, 1);
-      renderAttachmentList(type);
-    });
+    remove.addEventListener('click', () => { docs.splice(i, 1); renderAttachmentList(type); });
 
     row.append(thumb, label, edit, remove);
     host.appendChild(row);
@@ -2902,9 +2964,7 @@ function pickAttachment(type) {
   picker.accept = 'application/pdf,image/*';
   picker.multiple = true;
   picker.addEventListener('change', async () => {
-    for (const file of Array.from(picker.files || [])) {
-      await addAttachment(type, file);
-    }
+    for (const file of Array.from(picker.files || [])) await addAttachment(type, file);
   });
   picker.click();
 }
@@ -2928,26 +2988,51 @@ async function addAttachment(type, file) {
   }
 }
 
-/*
- * Appends the attached pages to a finished form. Each page goes on its own sheet, sized to fit
- * the page with its proportions kept, so nothing is stretched or cropped.
+/* ---------- Producing the finished PDF ----------
+ * Without attachments the jsPDF document goes straight to the viewer, which keeps its own
+ * Download. With attachments, pdf-lib stitches the originals on afterwards and the result is
+ * handed over as bytes, so nothing about those pages is redrawn.
  */
-function appendPagesTo(doc, pages) {
-  const pageW = 612, pageH = 792, margin = 24;
-  pages.forEach(page => {
-    const flat = window.Annotator.flatten(page);
-    const scale = Math.min((pageW - margin * 2) / flat.width, (pageH - margin * 2) / flat.height);
-    const w = flat.width * scale;
-    const h = flat.height * scale;
-    doc.addPage();
-    doc.addImage(flat.toDataURL('image/jpeg', 0.86), 'JPEG',
-      (pageW - w) / 2, (pageH - h) / 2, w, h);
-  });
-  return doc;
+async function openWithAttachments(doc, type, filename) {
+  const docs = attachmentsFor(type);
+  if (!docs.length) { openPdfViewer(doc, filename); return; }
+
+  const button = document.querySelector('#form-' + type + ' .dc-toolbar button[type=submit]');
+  const wording = button ? button.textContent : null;
+  if (button) { button.disabled = true; button.textContent = 'Building…'; }
+  try {
+    const bytes = await window.Annotator.appendTo(doc.output('arraybuffer'), docs);
+    showPdf(new Blob([bytes], { type: 'application/pdf' }), filename, null);
+  } catch (err) {
+    showPdf(doc.output('blob'), filename, doc);
+    console.error('Attachments could not be added:', err);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = wording; }
+  }
 }
 
-function appendAttachments(doc, type) {
-  const docs = attachmentsFor(type);
-  docs.forEach(item => appendPagesTo(doc, item.pages));
-  return doc;
+/*
+ * A document this app didn't make, opened on its own: marked up and saved back out under
+ * whatever name was typed in the editor. The original pages are carried through untouched.
+ */
+async function openForMarkup(file) {
+  uploadError.hidden = true;
+  try {
+    const item = await window.Annotator.readFile(file);
+    openEditor(item, async (finished) => {
+      if (!finished) return;
+      try {
+        const bytes = await window.Annotator.standalone(finished);
+        showPdf(new Blob([bytes], { type: 'application/pdf' }), finished.name, null);
+      } catch (err) {
+        showUploadError('Couldn’t save that document: ' + err.message);
+      }
+    });
+  } catch (err) {
+    showUploadError('Couldn’t open that file: ' + err.message);
+  }
 }
+
+window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX,
+                 get attachments() { return attachments; },
+                 TOOL_SETTINGS, INK_COLOURS, HIGHLIGHT_COLOURS };

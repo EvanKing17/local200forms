@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=33">
+<link rel="stylesheet" href="style.css?v=36">
 </head>
 <body>
 
@@ -822,11 +822,9 @@
         <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
       </svg>
     </button>
-    <span class="editor-name" id="editorName"></span>
-    <div class="editor-pager">
-      <button type="button" id="editorPrev" aria-label="Previous page">&#8249;</button>
-      <span id="editorPageLabel">Page 1 of 1</span>
-      <button type="button" id="editorNext" aria-label="Next page">&#8250;</button>
+    <div class="editor-title">
+      <input type="text" id="editorName" class="editor-name" aria-label="Document name" spellcheck="false">
+      <span class="editor-count" id="editorPageLabel"></span>
     </div>
     <div class="editor-bar-actions">
       <button type="button" class="btn-secondary" id="editorUndo">Undo</button>
@@ -837,13 +835,44 @@
   <div class="editor-body">
     <div class="editor-tools" id="editorTools">
       <div class="tool-group" role="group" aria-label="Tool">
-        <button type="button" class="tool" data-tool="pen" aria-pressed="true">Draw</button>
-        <button type="button" class="tool" data-tool="highlight" aria-pressed="false">Highlight</button>
-        <button type="button" class="tool" data-tool="arrow" aria-pressed="false">Arrow</button>
-        <button type="button" class="tool" data-tool="rect" aria-pressed="false">Box</button>
-        <button type="button" class="tool" data-tool="ellipse" aria-pressed="false">Oval</button>
-        <button type="button" class="tool" data-tool="redact" aria-pressed="false">Black out</button>
-        <button type="button" class="tool" data-tool="pixelate" aria-pressed="false">Pixelate</button>
+        <button type="button" class="tool" data-tool="pen" aria-pressed="true">
+          <span class="tool-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path>
+            </svg>
+          </span>Draw</button>
+        <button type="button" class="tool" data-tool="highlight" aria-pressed="false">
+          <span class="tool-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 11l-4 4v4h4l4-4"></path><path d="M13 15L21 7a2 2 0 0 0-3-3l-8 8"></path>
+            </svg>
+          </span>Highlight</button>
+        <button type="button" class="tool" data-tool="arrow" aria-pressed="false">
+          <span class="tool-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="19" x2="19" y2="5"></line><polyline points="11 5 19 5 19 13"></polyline>
+            </svg>
+          </span>Arrow</button>
+        <button type="button" class="tool" data-tool="rect" aria-pressed="false">
+          <span class="tool-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+              <rect x="4" y="6" width="16" height="12" rx="1.5"></rect>
+            </svg>
+          </span>Box</button>
+        <button type="button" class="tool" data-tool="ellipse" aria-pressed="false">
+          <span class="tool-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+              <ellipse cx="12" cy="12" rx="8" ry="6"></ellipse>
+            </svg>
+          </span>Oval</button>
+        <button type="button" class="tool" data-tool="pixelate" aria-pressed="false">
+          <span class="tool-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <rect x="4" y="6" width="4" height="4"></rect><rect x="10" y="6" width="4" height="4" opacity=".5"></rect>
+              <rect x="16" y="6" width="4" height="4"></rect><rect x="4" y="12" width="4" height="4" opacity=".5"></rect>
+              <rect x="10" y="12" width="4" height="4"></rect><rect x="16" y="12" width="4" height="4" opacity=".5"></rect>
+            </svg>
+          </span>Blur</button>
       </div>
 
       <div class="tool-row" id="colourRow">
@@ -852,22 +881,23 @@
       </div>
 
       <div class="tool-row" id="widthRow">
-        <span class="tool-label">Thickness</span>
-        <input type="range" id="editorWidth" min="1" max="12" value="4" aria-label="Thickness">
+        <span class="tool-label">Thickness <b id="widthValue">4</b></span>
+        <input type="range" id="editorWidth" min="1" max="14" value="4" aria-label="Thickness">
       </div>
 
       <label class="tool-check" id="fillRow">
-        <input type="checkbox" id="editorFill"> Fill the shape
+        <input type="checkbox" id="editorFill"> Solid fill
       </label>
 
-      <p class="tool-note" id="redactNote" hidden>
-        Black out removes what is underneath. Pixelate only scrambles it, so use black out for
-        anything that must not be recoverable.
+      <p class="tool-note" id="fillNote" hidden>
+        A solid box covers what is under it in the picture, but the text stays in the file
+        beneath. Treat it as hiding, not deleting.
       </p>
     </div>
 
     <div class="editor-stage" id="editorStage">
-      <canvas id="editorCanvas"></canvas>
+      <div class="editor-pages" id="editorPages"></div>
+      <div class="brush-cursor" id="brushCursor" hidden aria-hidden="true"></div>
     </div>
   </div>
 </div>
@@ -940,7 +970,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=33"></script>
-<script src="script.js?v=33"></script>
+<script src="annotate.js?v=36"></script>
+<script src="script.js?v=36"></script>
 </body>
 </html>

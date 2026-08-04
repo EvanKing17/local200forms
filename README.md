@@ -24,7 +24,8 @@ because the page on screen *is* the page that comes out.
   "Clear form" is how you throw one away.
 - **Attach supporting documents.** Add PDFs or photos to a form and they're
   appended after it, so the grievance and its evidence go in as one file.
-- **Mark them up** — draw, highlight, arrows, boxes and ovals, and redaction.
+- **Mark them up** — draw, highlight, arrows, boxes and ovals, and blur. Each
+  tool keeps its own colour and thickness; the highlighter has its own palette.
 - **Re-open a finished PDF.** Drop one anywhere on the page, or use the link
   under the form list. A PDF this app made fills the form back in — it
   recognises its own files from data embedded invisibly in them. Anything else
@@ -83,13 +84,18 @@ variables. Change one and you must change both.
 `VERSION` in `sw.js` together.** Both GitHub Pages and the service worker cache
 those files, so a stale number keeps serving the previous build.
 
-**Attachments are rasterised, on purpose.** A black box drawn over a PDF that
-keeps its text layer hides nothing — the words stay in the file and copy
-straight out, which is how redacted names have leaked from court filings. Every
-attached page is turned into pixels before it can be marked up, so blacking
-something out destroys it. The cost is that attached PDFs are no longer
-searchable and files are larger. pdf.js (1.7MB) does the rasterising; it loads
-only when a PDF is actually opened, but is precached so this works offline.
+**Attached pages are never redrawn.** pdf.js renders each one to a canvas so
+there is something to look at and draw on, but the output is assembled by
+pdf-lib from the untouched originals with the marks added as vector shapes on
+top — so attached PDFs stay sharp at any zoom and stay searchable.
+
+The consequence to know: **a filled box covers text, it does not remove it.**
+The words are still in the file underneath and can be copied out. Treat it as
+hiding, not deleting. Blur is the same. Anything that genuinely must not be
+recoverable has to be removed before the file is attached.
+
+Both libraries load only when a document is actually attached, and both are
+precached, so this works offline.
 
 Run `tests.html` before pushing. It drives the real app and checks that every
 form still builds at the right page count, with its data surviving a round-trip
