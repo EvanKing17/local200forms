@@ -1192,7 +1192,8 @@ function buildInvestigationDoc(data) {
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Date of Infraction', value: fmtDateFit(doc, data.dateInfraction, w4 - CELL_X * 2), width: w4 },
     { label: 'Time', value: data.time, width: w4 },
-    { label: 'Name of Witnesses', value: data.witnessNames, width: w4 * 2 },
+    { label: 'Date Filed', value: fmtDateFit(doc, data.dateFiled, w4 - CELL_X * 2), width: w4 },
+    { label: 'Name of Witnesses', value: data.witnessNames, width: w4 },
   ]);
   y += 10;
   y = boxedGrid(doc, marginX, y, W, [

@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=43">
+<link rel="stylesheet" href="style.css?v=44">
 </head>
 <body>
 
@@ -757,7 +757,8 @@
         </label>
       </div>
 
-      <div class="dc-field-grid dc-cols-112 dc-standalone dc-block">
+      <!-- Quarters, so the dividers line up with the row above -->
+      <div class="dc-field-grid dc-cols-4 dc-standalone dc-block">
         <label>
           <span class="dc-field-label">Date of Infraction</span>
           <input type="date" name="dateInfraction">
@@ -765,6 +766,10 @@
         <label>
           <span class="dc-field-label">Time</span>
           <textarea class="dc-value" name="time" rows="1" autocomplete="off"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Date Filed</span>
+          <input type="date" name="dateFiled">
         </label>
         <label>
           <span class="dc-field-label">Name of Witnesses</span>
@@ -992,7 +997,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=43"></script>
-<script src="script.js?v=43"></script>
+<script src="annotate.js?v=44"></script>
+<script src="script.js?v=44"></script>
 </body>
 </html>

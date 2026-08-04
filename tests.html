@@ -164,7 +164,7 @@ function run(win, doc) {
     { type: 'ford', build: 'buildFordDoc', form: 'fordForm', pages: 2, fields: 14 },
     { type: 'policy', build: 'buildPolicyDoc', form: 'policyForm', pages: 1, fields: 8 },
     { type: 'unifor', build: 'buildUniforDoc', form: 'uniforForm', pages: 5, fields: 37 },
-    { type: 'investigation', build: 'buildInvestigationDoc', form: 'investigationForm', pages: 1, fields: 12 },
+    { type: 'investigation', build: 'buildInvestigationDoc', form: 'investigationForm', pages: 1, fields: 13 },
   ];
 
   const g1 = group('Loads');
@@ -358,8 +358,8 @@ function run(win, doc) {
              'witnesses','pastPractice','priorViolation','priorViolationWhen','companyAction','settleEffort',
              'madeOffer','willingToDo','statementsTrue','statementsFalse','reasonableSettlement','otherComments',
              'submittedBy','shift','committeepersonComments','plantChairComments'],
-    investigation: ['step','supervisorName','area','deptNum','dateInfraction','time','witnessNames',
-                    'uniforRep','hrRep','investigation','supervisorRemarks','resolution'],
+    investigation: ['step','supervisorName','area','deptNum','dateInfraction','time','dateFiled',
+                    'witnessNames','uniforRep','hrRep','investigation','supervisorRemarks','resolution'],
   };
 
   function fieldNames(win, form) {
