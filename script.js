@@ -131,6 +131,7 @@ const pdfViewerFrame = document.getElementById('pdfViewerFrame');
 const pdfViewerName = document.getElementById('pdfViewerName');
 let viewerDoc = null;
 let viewerBlob = null;
+let viewerBack = null;
 let viewerFilename = '';
 let viewerUrl = null;
 
@@ -139,22 +140,39 @@ function openPdfViewer(doc, filename) {
 }
 
 /* Shows any PDF. `doc` is optional — present when we built it, absent for an uploaded file. */
-function showPdf(blob, filename, doc) {
+function showPdf(blob, filename, doc, onBack) {
   viewerDoc = doc || null;
   viewerBlob = blob;
   viewerFilename = filename;
+  viewerBack = onBack || null;
   if (viewerUrl) URL.revokeObjectURL(viewerUrl);
   viewerUrl = URL.createObjectURL(blob);
 
-  pdfViewerName.textContent = filename;
-  // Toolbar left on — that's what gives the viewer its own print, zoom and page controls.
-  // zoom=100 rather than view=FitH: FitH fits the page to whatever width the frame happens to
-  // be, so the window ends up deciding the magnification. 100% is a Letter page at its actual
-  // size. Viewers that ignore zoom fall back to fitting the frame, which is capped in CSS.
-  pdfViewerFrame.src = viewerUrl + '#navpanes=0&zoom=100';
+  pdfViewerName.value = filename.replace(/\.pdf$/i, '');
   pdfViewer.hidden = false;
   document.body.style.overflow = 'hidden';
+
+  /*
+   * Revealed before the file is handed over: a PDF plugin asked to start inside a hidden
+   * container can give up and fall back to a download card instead of rendering.
+   *
+   * Toolbar left on — that's what gives the viewer its own print, zoom and page controls.
+   * zoom=100 rather than view=FitH: FitH fits the page to whatever width the frame happens to
+   * be, so the window ends up deciding the magnification. 100% is a Letter page at actual size.
+   */
+  requestAnimationFrame(() => {
+    pdfViewerFrame.src = viewerUrl + '#navpanes=0&zoom=100';
+  });
+  setTimeout(() => {
+    if (!pdfViewerFrame.getAttribute('src')) pdfViewerFrame.src = viewerUrl + '#navpanes=0&zoom=100';
+  }, 60);
   document.getElementById('pdfViewerClose').focus();
+}
+
+/* The name typed in the viewer is what the file is saved as */
+function viewerName() {
+  const typed = pdfViewerName.value.trim();
+  return (typed || viewerFilename.replace(/\.pdf$/i, '')) + '.pdf';
 }
 
 function closePdfViewer() {
@@ -168,18 +186,23 @@ function closePdfViewer() {
   }
   viewerDoc = null;
   viewerBlob = null;
+  viewerBack = null;
 }
 
 document.getElementById('pdfViewerClose').addEventListener('click', closePdfViewer);
-document.getElementById('pdfViewerBack').addEventListener('click', closePdfViewer);
+document.getElementById('pdfViewerBack').addEventListener('click', () => {
+  const back = viewerBack;
+  closePdfViewer();
+  if (back) back();
+});
 
 document.getElementById('pdfViewerDownload').addEventListener('click', () => {
-  if (viewerDoc) { download(viewerDoc, viewerFilename); return; }
+  if (viewerDoc) { download(viewerDoc, viewerName()); return; }
   if (!viewerBlob) return;
   // An uploaded file has no jsPDF document behind it, so save the blob directly
   const link = document.createElement('a');
   link.href = viewerUrl;
-  link.download = viewerFilename;
+  link.download = viewerName();
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -2798,6 +2821,9 @@ function openEditor(doc, onDone) {
   syncToolOptions();
   layoutPages();
   editorStage.scrollTop = 0;
+  history = [];
+  undone = [];
+  syncHistoryButtons();
 }
 
 function closeEditor() {
@@ -2816,17 +2842,54 @@ function closeEditor() {
 document.getElementById('editorBack').addEventListener('click', closeEditor);
 document.getElementById('editorDone').addEventListener('click', closeEditor);
 
-/* Undo takes the last mark made anywhere in the document, not just on one page */
+/* ---------- Undo and redo ----------
+ * A single record of what was done, in the order it happened, rather than looking for the last
+ * page that has anything on it — that undid whatever was furthest down the document instead of
+ * whatever was drawn most recently, which is why the order felt arbitrary.
+ */
+let history = [];
+let undone = [];
+
+function recordStroke(pageIndex, annotation) {
+  history.push({ pageIndex, annotation });
+  undone = [];                     // a new mark ends the branch that could have been redone
+  syncHistoryButtons();
+}
+
+function forgetStroke(annotation) {
+  const at = history.findIndex(h => h.annotation === annotation);
+  if (at > -1) history.splice(at, 1);
+  syncHistoryButtons();
+}
+
+function syncHistoryButtons() {
+  document.getElementById('editorUndo').disabled = history.length === 0;
+  document.getElementById('editorRedo').disabled = undone.length === 0;
+}
+
+function repaint(pageIndex) {
+  const page = editorDoc.pages[pageIndex];
+  if (page && pageCanvases[pageIndex]) window.Annotator.renderPage(pageCanvases[pageIndex], page);
+}
+
 document.getElementById('editorUndo').addEventListener('click', () => {
-  if (!editorDoc) return;
-  for (let i = editorDoc.pages.length - 1; i >= 0; i--) {
-    const page = editorDoc.pages[i];
-    if (page.annotations.length) {
-      page.annotations.pop();
-      window.Annotator.renderPage(pageCanvases[i], page);
-      return;
-    }
-  }
+  if (!editorDoc || !history.length) return;
+  const step = history.pop();
+  const page = editorDoc.pages[step.pageIndex];
+  const at = page.annotations.indexOf(step.annotation);
+  if (at > -1) page.annotations.splice(at, 1);
+  undone.push(step);
+  repaint(step.pageIndex);
+  syncHistoryButtons();
+});
+
+document.getElementById('editorRedo').addEventListener('click', () => {
+  if (!editorDoc || !undone.length) return;
+  const step = undone.pop();
+  editorDoc.pages[step.pageIndex].annotations.push(step.annotation);
+  history.push(step);
+  repaint(step.pageIndex);
+  syncHistoryButtons();
 });
 
 /* ---------- Marking up ---------- */
@@ -2863,6 +2926,7 @@ function attachDrawing(canvas, page, index) {
     }
     stroke.pageIndex = index;
     page.annotations.push(stroke);
+    recordStroke(index, stroke);
   });
 
   canvas.addEventListener('pointermove', (e) => {
@@ -2889,7 +2953,7 @@ function attachDrawing(canvas, page, index) {
     if (stroke.points) empty = stroke.points.length < 2;
     else if (stroke.type === 'arrow') empty = Math.hypot(stroke.x2 - stroke.x1, stroke.y2 - stroke.y1) < 0.01;
     else empty = stroke.w < 0.005 || stroke.h < 0.005;
-    if (empty) page.annotations.pop();
+    if (empty) { page.annotations.pop(); forgetStroke(stroke); }
     stroke = null;
     window.Annotator.renderPage(canvas, page);
   }
@@ -3019,18 +3083,28 @@ async function openForMarkup(file) {
   uploadError.hidden = true;
   try {
     const item = await window.Annotator.readFile(file);
-    openEditor(item, async (finished) => {
-      if (!finished) return;
-      try {
-        const bytes = await window.Annotator.standalone(finished);
-        showPdf(new Blob([bytes], { type: 'application/pdf' }), finished.name, null);
-      } catch (err) {
-        showUploadError('Couldn’t save that document: ' + err.message);
-      }
-    });
+    markUp(item);
   } catch (err) {
     showUploadError('Couldn’t open that file: ' + err.message);
   }
+}
+
+/*
+ * Marks up a document and previews the result. Backing out of the preview returns to the
+ * editor with the marks still in place, rather than throwing the work away and landing on the
+ * form list.
+ */
+function markUp(item) {
+  openEditor(item, async (finished) => {
+    if (!finished) return;
+    try {
+      const bytes = await window.Annotator.standalone(finished);
+      showPdf(new Blob([bytes], { type: 'application/pdf' }), finished.name, null,
+              () => markUp(finished));
+    } catch (err) {
+      showUploadError('Couldn’t save that document: ' + err.message);
+    }
+  });
 }
 
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX,

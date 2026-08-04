@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=36">
+<link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
 
@@ -59,7 +59,7 @@
        has nothing to drag with. -->
   <div class="home-actions">
     <button type="button" class="home-action is-danger" id="clearAllForms" hidden>Clear all forms</button>
-    <label class="home-action" for="uploadInput">Open a PDF made here</label>
+    <label class="home-action" for="uploadInput">Upload a PDF</label>
     <input type="file" id="uploadInput" accept="application/pdf" hidden>
   </div>
   <p class="upload-error" id="uploadError" hidden></p>
@@ -828,6 +828,7 @@
     </div>
     <div class="editor-bar-actions">
       <button type="button" class="btn-secondary" id="editorUndo">Undo</button>
+      <button type="button" class="btn-secondary" id="editorRedo">Redo</button>
       <button type="button" class="btn-primary" id="editorDone">Done</button>
     </div>
   </div>
@@ -957,7 +958,7 @@
         <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
       </svg>
     </button>
-    <span class="pdf-viewer-name" id="pdfViewerName"></span>
+    <input type="text" class="pdf-viewer-name" id="pdfViewerName" aria-label="File name" spellcheck="false">
     <div class="pdf-viewer-actions">
       <button type="button" class="btn-secondary" id="pdfViewerPrint">Print</button>
       <button type="button" class="btn-primary" id="pdfViewerDownload">Download</button>
@@ -970,7 +971,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=36"></script>
-<script src="script.js?v=36"></script>
+<script src="annotate.js?v=39"></script>
+<script src="script.js?v=39"></script>
 </body>
 </html>

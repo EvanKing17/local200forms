@@ -225,7 +225,7 @@ function run(win, doc) {
     const foreign = new win.Blob([new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52])], { type: 'application/pdf' });
     win.showPdf(foreign, 'someone-elses.pdf', null);
     const open = !doc.getElementById('pdfViewer').hidden;
-    const named = doc.getElementById('pdfViewerName').textContent === 'someone-elses.pdf';
+    const named = win.viewerName() === 'someone-elses.pdf';   // the field holds the stem
     doc.getElementById('pdfViewerClose').click();
     return (open && named) || { detail: 'open=' + open + ' named=' + named };
   });
@@ -711,6 +711,107 @@ function run(win, doc) {
     doc.getElementById('editorName').value = 'Smith grievance evidence';
     doc.getElementById('editorDone').click();
     return saved === 'Smith grievance evidence.pdf' || { detail: 'saved as ' + saved };
+  });
+
+  const g9 = group('Editing and exporting');
+
+  checkAsync(g9, 'A marked-up upload exports with no blank page in front', async () => {
+    // A fresh document used to be saved empty and reloaded, which left an A4 sheet ahead of it
+    const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'Raw.pdf'));
+    const bytes = await win.Annotator.standalone(item);
+    const PDFLib = await win.Annotator.loadPdfLib();
+    const saved = await PDFLib.PDFDocument.load(bytes);
+    return saved.getPageCount() === item.pages.length ||
+      { detail: item.pages.length + ' in, ' + saved.getPageCount() + ' out' };
+  });
+
+  checkAsync(g9, 'Undo reverses the most recent mark, whichever page it is on', async () => {
+    const src = win.buildUniforDoc(win.fd(doc.getElementById('uniforForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'Order.pdf'));
+    win.openEditor(item, () => {});
+    const canvases = doc.querySelectorAll('#editorPages .editor-canvas');
+    const mark = (pageIndex, tool, y) => {
+      const c = canvases[pageIndex], r = c.getBoundingClientRect();
+      doc.querySelector('#editorTools .tool[data-tool="' + tool + '"]').click();
+      const ev = (t, p) => new win.PointerEvent(t, { clientX: r.left + p[0] * r.width,
+        clientY: r.top + p[1] * r.height, pointerId: 1, bubbles: true, cancelable: true });
+      c.dispatchEvent(ev('pointerdown', [0.2, y]));
+      c.dispatchEvent(ev('pointermove', [0.6, y + 0.03]));
+      c.dispatchEvent(ev('pointerup', [0.6, y + 0.03]));
+    };
+    const state = () => item.pages.map(p => p.annotations.map(a => a.type).join('+') || '-').join('|');
+    mark(2, 'pen', 0.2);
+    mark(0, 'rect', 0.3);
+    mark(2, 'arrow', 0.5);
+    doc.getElementById('editorUndo').click();
+    const first = state();          // the arrow, drawn last, should be the one that goes
+    doc.getElementById('editorUndo').click();
+    const second = state();         // then the rect on the first page
+    doc.getElementById('editorDone').click();
+    return (first === 'rect|-|pen|-|-' && second === '-|-|pen|-|-') ||
+      { detail: 'after one: ' + first + ', after two: ' + second };
+  });
+
+  checkAsync(g9, 'Redo puts back what undo took, and a new mark ends that branch', async () => {
+    const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'Redo.pdf'));
+    win.openEditor(item, () => {});
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
+    const r = canvas.getBoundingClientRect();
+    const draw = (tool, y) => {
+      doc.querySelector('#editorTools .tool[data-tool="' + tool + '"]').click();
+      const ev = (t, p) => new win.PointerEvent(t, { clientX: r.left + p[0] * r.width,
+        clientY: r.top + p[1] * r.height, pointerId: 1, bubbles: true, cancelable: true });
+      canvas.dispatchEvent(ev('pointerdown', [0.2, y]));
+      canvas.dispatchEvent(ev('pointermove', [0.6, y + 0.03]));
+      canvas.dispatchEvent(ev('pointerup', [0.6, y + 0.03]));
+    };
+    draw('pen', 0.2);
+    draw('rect', 0.4);
+    doc.getElementById('editorUndo').click();
+    doc.getElementById('editorRedo').click();
+    const restored = item.pages[0].annotations.length;
+    doc.getElementById('editorUndo').click();
+    draw('ellipse', 0.6);
+    const branchClosed = doc.getElementById('editorRedo').disabled;
+    doc.getElementById('editorDone').click();
+    return (restored === 2 && branchClosed) ||
+      { detail: 'restored=' + restored + ' redoDisabled=' + branchClosed };
+  });
+
+  checkAsync(g9, 'The preview can be renamed before downloading', async () => {
+    win.showPdf(new win.Blob([new Uint8Array([37, 80, 68, 70])], { type: 'application/pdf' }),
+                'original.pdf', null);
+    const field = doc.getElementById('pdfViewerName');
+    const isInput = field.tagName === 'INPUT';
+    field.value = 'Renamed on export';
+    const used = win.viewerName();
+    doc.getElementById('pdfViewerClose').click();
+    return (isInput && used === 'Renamed on export.pdf') ||
+      { detail: 'input=' + isInput + ' name=' + used };
+  });
+
+  checkAsync(g9, 'Backing out of the preview returns to the editor', async () => {
+    const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'Back.pdf'));
+    let returned = false;
+    win.showPdf(new win.Blob([item.bytes], { type: 'application/pdf' }), 'Back.pdf', null,
+                () => { returned = true; });
+    doc.getElementById('pdfViewerBack').click();
+    return returned || { detail: 'back went somewhere else' };
+  });
+
+  checkAsync(g9, 'The preview is revealed before the file is handed to it', async () => {
+    // A PDF plugin started inside a hidden container can fall back to a download card
+    const source = win.showPdf.toString();
+    const revealBeforeSrc = source.indexOf('pdfViewer.hidden = false') < source.indexOf('pdfViewerFrame.src');
+    return revealBeforeSrc || { detail: 'the frame is still loaded while hidden' };
+  });
+
+  checkAsync(g9, 'The upload link no longer claims the PDF must be ours', async () => {
+    const label = doc.querySelector('label[for=uploadInput]').textContent.trim();
+    return label === 'Upload a PDF' || { detail: label };
   });
 
   const g7 = group('Drafts');

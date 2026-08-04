@@ -2090,3 +2090,31 @@ input[type="radio"] { width: 15px; height: 15px; }
 @media print {
   .editor, .dc-attachments { display: none !important; }
 }
+
+/* The file name is editable in the preview, so it can be set before it's saved */
+.pdf-viewer-name {
+  min-width: 0;
+  flex: 0 1 360px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+}
+.pdf-viewer-name:hover { background: rgba(255, 255, 255, 0.16); }
+.pdf-viewer-name:focus {
+  outline: none;
+  background: #fff;
+  color: var(--dc-ink);
+  border-color: #fff;
+}
+
+.editor-bar-actions .btn-secondary:disabled,
+.editor-bar-actions .btn-secondary[disabled] {
+  opacity: 0.4;
+  cursor: default;
+  background: transparent;
+}

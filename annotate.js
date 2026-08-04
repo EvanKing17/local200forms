@@ -270,10 +270,7 @@
    * Appends each attached document to `formBytes`, keeping the original pages as they are and
    * putting the marks on top of them. Returns the finished PDF as bytes.
    */
-  async function appendTo(formBytes, docs) {
-    const PDFLib = await loadPdfLib();
-    const out = await PDFLib.PDFDocument.load(formBytes);
-
+  async function appendInto(PDFLib, out, docs) {
     for (const item of docs) {
       if (item.kind === 'pdf') {
         const src = await PDFLib.PDFDocument.load(item.bytes, { ignoreEncryption: true });
@@ -300,6 +297,13 @@
         }, page);
       }
     }
+    return out;
+  }
+
+  async function appendTo(formBytes, docs) {
+    const PDFLib = await loadPdfLib();
+    const out = await PDFLib.PDFDocument.load(formBytes);
+    await appendInto(PDFLib, out, docs);
     return out.save();
   }
 
@@ -313,11 +317,16 @@
     return moved;
   }
 
-  /* A document opened on its own, marked up and saved back out */
+  /*
+   * A document opened on its own, marked up and saved back out. Built straight into a fresh
+   * document rather than saved empty and reloaded — that round trip was leaving a blank A4
+   * sheet in front of the pages.
+   */
   async function standalone(item) {
     const PDFLib = await loadPdfLib();
     const out = await PDFLib.PDFDocument.create();
-    return appendTo(await out.save(), [item]);
+    await appendInto(PDFLib, out, [item]);
+    return out.save();
   }
 
   window.Annotator = {
