@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=31">
+<link rel="stylesheet" href="style.css?v=33">
 </head>
 <body>
 
@@ -243,6 +243,9 @@
         </div>
       </div>
     </form>
+
+    <!-- Outside the sheet: these are appended after the form, not printed on it -->
+    <div class="dc-attachments" aria-label="Supporting documents"></div>
   </section>
 
 
@@ -363,6 +366,9 @@
         </div>
       </div>
     </form>
+
+    <!-- Outside the sheet: these are appended after the form, not printed on it -->
+    <div class="dc-attachments" aria-label="Supporting documents"></div>
   </section>
 
   <!-- ================= UNIFOR FACT SHEET (document view) =================
@@ -706,6 +712,9 @@
         <div class="dc-page-foot"><span>Unifor Local 200</span><span>PRIVATE</span><span>pg. 5 / 5</span></div>
       </div>
     </form>
+
+    <!-- Outside the sheet: these are appended after the form, not printed on it -->
+    <div class="dc-attachments" aria-label="Supporting documents"></div>
   </section>
 
   <!-- ================= 4.01 INVESTIGATION FORM (document view) ================= -->
@@ -795,9 +804,73 @@
         </div>
       </div>
     </form>
+
+    <!-- Outside the sheet: these are appended after the form, not printed on it -->
+    <div class="dc-attachments" aria-label="Supporting documents"></div>
   </section>
 
 </main>
+
+
+<!-- Mark-up editor for attached pages. Opened from a form's attachment list, or straight from
+     a PDF dropped on the page that this app didn't make. -->
+<div class="editor" id="editor" hidden role="dialog" aria-modal="true" aria-label="Mark up document">
+  <div class="editor-bar">
+    <button type="button" class="editor-back" id="editorBack" aria-label="Close editor">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+      </svg>
+    </button>
+    <span class="editor-name" id="editorName"></span>
+    <div class="editor-pager">
+      <button type="button" id="editorPrev" aria-label="Previous page">&#8249;</button>
+      <span id="editorPageLabel">Page 1 of 1</span>
+      <button type="button" id="editorNext" aria-label="Next page">&#8250;</button>
+    </div>
+    <div class="editor-bar-actions">
+      <button type="button" class="btn-secondary" id="editorUndo">Undo</button>
+      <button type="button" class="btn-primary" id="editorDone">Done</button>
+    </div>
+  </div>
+
+  <div class="editor-body">
+    <div class="editor-tools" id="editorTools">
+      <div class="tool-group" role="group" aria-label="Tool">
+        <button type="button" class="tool" data-tool="pen" aria-pressed="true">Draw</button>
+        <button type="button" class="tool" data-tool="highlight" aria-pressed="false">Highlight</button>
+        <button type="button" class="tool" data-tool="arrow" aria-pressed="false">Arrow</button>
+        <button type="button" class="tool" data-tool="rect" aria-pressed="false">Box</button>
+        <button type="button" class="tool" data-tool="ellipse" aria-pressed="false">Oval</button>
+        <button type="button" class="tool" data-tool="redact" aria-pressed="false">Black out</button>
+        <button type="button" class="tool" data-tool="pixelate" aria-pressed="false">Pixelate</button>
+      </div>
+
+      <div class="tool-row" id="colourRow">
+        <span class="tool-label">Colour</span>
+        <div class="swatches" id="editorSwatches" role="group" aria-label="Colour"></div>
+      </div>
+
+      <div class="tool-row" id="widthRow">
+        <span class="tool-label">Thickness</span>
+        <input type="range" id="editorWidth" min="1" max="12" value="4" aria-label="Thickness">
+      </div>
+
+      <label class="tool-check" id="fillRow">
+        <input type="checkbox" id="editorFill"> Fill the shape
+      </label>
+
+      <p class="tool-note" id="redactNote" hidden>
+        Black out removes what is underneath. Pixelate only scrambles it, so use black out for
+        anything that must not be recoverable.
+      </p>
+    </div>
+
+    <div class="editor-stage" id="editorStage">
+      <canvas id="editorCanvas"></canvas>
+    </div>
+  </div>
+</div>
 
 <!-- Shown only while a file is over the window -->
 <div class="drop-overlay" id="dropOverlay" hidden aria-hidden="true">
@@ -867,6 +940,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="script.js?v=31"></script>
+<script src="annotate.js?v=33"></script>
+<script src="script.js?v=33"></script>
 </body>
 </html>

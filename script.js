@@ -798,7 +798,7 @@ const fordForm = document.getElementById('fordForm');
 fordForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
-  const doc = buildFordDoc(data);
+  const doc = appendAttachments(buildFordDoc(data), 'ford');
   openPdfViewer(doc, buildFilename(data.employeeName, 'Grievance Claim', data.dateIncident));
 });
 
@@ -876,7 +876,7 @@ const policyForm = document.getElementById('policyForm');
 policyForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
-  const doc = buildPolicyDoc(data);
+  const doc = appendAttachments(buildPolicyDoc(data), 'policy');
   openPdfViewer(doc, buildFilename(data.employeeName, 'Policy Grievance', data.dateIncident));
 });
 
@@ -1106,7 +1106,7 @@ const uniforForm = document.getElementById('uniforForm');
 uniforForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
-  const doc = buildUniforDoc(data);
+  const doc = appendAttachments(buildUniforDoc(data), 'unifor');
   openPdfViewer(doc, buildFilename(data.grievorName, 'Fact Sheet', data.uniforDateIncident));
 });
 
@@ -1168,7 +1168,7 @@ const investigationForm = document.getElementById('investigationForm');
 investigationForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const data = fd(e.target);
-  const doc = buildInvestigationDoc(data);
+  const doc = appendAttachments(buildInvestigationDoc(data), 'investigation');
   openPdfViewer(doc, buildFilename(data.supervisorName, 'Investigation Form', data.dateInfraction));
 });
 
@@ -1276,6 +1276,7 @@ function showForm(type, data) {
   entry.form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
   updatePageBreaks(type);
   if (entry.syncSheet) entry.syncSheet();
+  renderAttachmentList(type);
 }
 
 document.querySelectorAll('.form-card').forEach(card => {
@@ -1308,15 +1309,25 @@ function showUploadError(message, file) {
   uploadError.appendChild(text);
 
   if (file) {
-    const open = document.createElement('button');
-    open.type = 'button';
-    open.className = 'upload-error-action';
-    open.textContent = 'Open it anyway';
-    open.addEventListener('click', () => {
+    const markUp = document.createElement('button');
+    markUp.type = 'button';
+    markUp.className = 'upload-error-action';
+    markUp.textContent = 'Open and mark it up';
+    markUp.addEventListener('click', () => {
+      uploadError.hidden = true;
+      openForMarkup(file);
+    });
+
+    const view = document.createElement('button');
+    view.type = 'button';
+    view.className = 'upload-error-action is-quiet';
+    view.textContent = 'Just view it';
+    view.addEventListener('click', () => {
       uploadError.hidden = true;
       showPdf(file, file.name, null);
     });
-    uploadError.appendChild(open);
+
+    uploadError.append(markUp, view);
   }
   uploadError.hidden = false;
 }
@@ -2445,7 +2456,7 @@ Object.keys(FORM_BUILDERS).forEach(type => {
  * that to one named object makes the contract obvious, instead of tests quietly depending on
  * whichever internals happen to be function declarations.
  */
-window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX };
+window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX, get attachments() { return attachments; } };
 
 /* ============ Which forms have something in them ============
  *
@@ -2616,3 +2627,327 @@ function buildSheetNav(type) {
 }
 
 Object.keys(FORM_BUILDERS).forEach(buildSheetNav);
+
+/* ============ Attachments and the mark-up editor ============
+ *
+ * Supporting documents ride along with the grievance so the whole thing goes in as one PDF.
+ * Pages are rasterised on the way in (annotate.js explains why that matters for redaction) and
+ * appended after the form when the PDF is built.
+ */
+const COLOURS = ['#C31A1A', '#002855', '#1a7f37', '#EAAA00', '#000000', '#FFFFFF'];
+const DRAG_TOOLS = ['rect', 'ellipse', 'redact', 'pixelate', 'arrow'];
+
+const attachments = { ford: [], policy: [], unifor: [], investigation: [] };
+
+const editor = document.getElementById('editor');
+const editorCanvas = document.getElementById('editorCanvas');
+const editorStage = document.getElementById('editorStage');
+const editorName = document.getElementById('editorName');
+const editorPageLabel = document.getElementById('editorPageLabel');
+
+let editorDoc = null;
+let editorPage = 0;
+let editorTool = 'pen';
+let editorColour = COLOURS[0];
+let editorWidth = 4;
+let editorFill = false;
+let editorOnDone = null;
+
+function buildSwatches() {
+  const host = document.getElementById('editorSwatches');
+  host.innerHTML = '';
+  COLOURS.forEach(colour => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'swatch';
+    button.style.background = colour;
+    button.setAttribute('aria-label', colour);
+    button.setAttribute('aria-pressed', String(colour === editorColour));
+    button.addEventListener('click', () => {
+      editorColour = colour;
+      host.querySelectorAll('.swatch').forEach(s => s.setAttribute('aria-pressed', String(s === button)));
+    });
+    host.appendChild(button);
+  });
+}
+
+/* Redaction has no colour or thickness, and only a box or oval can be filled */
+function syncToolOptions() {
+  const redacting = editorTool === 'redact' || editorTool === 'pixelate';
+  document.getElementById('colourRow').hidden = redacting;
+  document.getElementById('widthRow').hidden = redacting;
+  document.getElementById('fillRow').hidden = !(editorTool === 'rect' || editorTool === 'ellipse');
+  document.getElementById('redactNote').hidden = !redacting;
+  document.querySelectorAll('#editorTools .tool').forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.tool === editorTool));
+  });
+}
+
+document.querySelectorAll('#editorTools .tool').forEach(button => {
+  button.addEventListener('click', () => { editorTool = button.dataset.tool; syncToolOptions(); });
+});
+document.getElementById('editorWidth').addEventListener('input', (e) => { editorWidth = +e.target.value; });
+document.getElementById('editorFill').addEventListener('change', (e) => { editorFill = e.target.checked; });
+
+/* Sized to fit the stage, so a whole page is visible without scrolling around it */
+function fitCanvas() {
+  if (!editorDoc) return;
+  const page = editorDoc.pages[editorPage];
+  const stage = editorStage.getBoundingClientRect();
+  const room = { w: Math.max(160, stage.width - 32), h: Math.max(160, stage.height - 32) };
+  const scale = Math.min(room.w / page.base.width, room.h / page.base.height, 1.6);
+  editorCanvas.width = Math.round(page.base.width * scale);
+  editorCanvas.height = Math.round(page.base.height * scale);
+  window.Annotator.renderPage(editorCanvas, page);
+}
+
+function showEditorPage(index) {
+  if (!editorDoc) return;
+  editorPage = Math.max(0, Math.min(index, editorDoc.pages.length - 1));
+  editorPageLabel.textContent = 'Page ' + (editorPage + 1) + ' of ' + editorDoc.pages.length;
+  document.getElementById('editorPrev').disabled = editorPage === 0;
+  document.getElementById('editorNext').disabled = editorPage === editorDoc.pages.length - 1;
+  fitCanvas();
+}
+
+document.getElementById('editorPrev').addEventListener('click', () => showEditorPage(editorPage - 1));
+document.getElementById('editorNext').addEventListener('click', () => showEditorPage(editorPage + 1));
+
+document.getElementById('editorUndo').addEventListener('click', () => {
+  if (!editorDoc) return;
+  editorDoc.pages[editorPage].annotations.pop();
+  window.Annotator.renderPage(editorCanvas, editorDoc.pages[editorPage]);
+});
+
+function openEditor(doc, onDone) {
+  editorDoc = doc;
+  editorOnDone = onDone || null;
+  editorName.textContent = doc.name;
+  editor.hidden = false;
+  document.body.style.overflow = 'hidden';
+  buildSwatches();
+  syncToolOptions();
+  showEditorPage(0);
+}
+
+function closeEditor() {
+  editor.hidden = true;
+  document.body.style.overflow = '';
+  const finished = editorDoc;
+  const done = editorOnDone;
+  editorDoc = null;
+  editorOnDone = null;
+  if (done) done(finished);
+}
+
+document.getElementById('editorBack').addEventListener('click', closeEditor);
+document.getElementById('editorDone').addEventListener('click', closeEditor);
+window.addEventListener('resize', () => { if (!editor.hidden) fitCanvas(); });
+
+/* ---------- Marking up ----------
+ * Pointer events rather than separate mouse and touch handling, so a finger, a stylus and a
+ * mouse all work through one path. Positions are kept 0..1 across the page, so the same marks
+ * land correctly on the small preview and again at full size on export.
+ */
+let stroke = null;
+
+function pointOn(e) {
+  const r = editorCanvas.getBoundingClientRect();
+  return [
+    Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+    Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
+  ];
+}
+
+editorCanvas.addEventListener('pointerdown', (e) => {
+  if (!editorDoc) return;
+  e.preventDefault();
+  editorCanvas.setPointerCapture(e.pointerId);
+  const [x, y] = pointOn(e);
+
+  if (editorTool === 'arrow') {
+    stroke = { type: 'arrow', color: editorColour, width: editorWidth, x1: x, y1: y, x2: x, y2: y };
+  } else if (DRAG_TOOLS.includes(editorTool)) {
+    stroke = { type: editorTool, color: editorColour, width: editorWidth, fill: editorFill,
+               x, y, w: 0, h: 0, ox: x, oy: y };
+  } else {
+    stroke = { type: editorTool, color: editorColour, width: editorWidth, points: [[x, y]] };
+  }
+  editorDoc.pages[editorPage].annotations.push(stroke);
+});
+
+editorCanvas.addEventListener('pointermove', (e) => {
+  if (!stroke || !editorDoc) return;
+  const [x, y] = pointOn(e);
+  if (stroke.points) {
+    stroke.points.push([x, y]);
+  } else if (stroke.type === 'arrow') {
+    stroke.x2 = x;
+    stroke.y2 = y;
+  } else {
+    // Dragging in any direction, so normalise back to a positive width and height
+    stroke.x = Math.min(stroke.ox, x);
+    stroke.y = Math.min(stroke.oy, y);
+    stroke.w = Math.abs(x - stroke.ox);
+    stroke.h = Math.abs(y - stroke.oy);
+  }
+  window.Annotator.renderPage(editorCanvas, editorDoc.pages[editorPage]);
+});
+
+function endStroke() {
+  if (!stroke || !editorDoc) { stroke = null; return; }
+  const page = editorDoc.pages[editorPage];
+  // A tap that drew nothing shouldn't leave an invisible mark behind
+  let empty;
+  if (stroke.points) empty = stroke.points.length < 2;
+  else if (stroke.type === 'arrow') empty = Math.hypot(stroke.x2 - stroke.x1, stroke.y2 - stroke.y1) < 0.01;
+  else empty = stroke.w < 0.005 || stroke.h < 0.005;
+  if (empty) page.annotations.pop();
+  stroke = null;
+  window.Annotator.renderPage(editorCanvas, page);
+}
+
+editorCanvas.addEventListener('pointerup', endStroke);
+editorCanvas.addEventListener('pointercancel', endStroke);
+
+/*
+ * A document this app didn't make, opened on its own: rasterised, marked up, and saved back out
+ * as a new PDF. The original is never modified — what comes out is a flattened copy, which is
+ * the point where redaction becomes permanent.
+ */
+async function openForMarkup(file) {
+  uploadError.hidden = true;
+  try {
+    const doc = await window.Annotator.readFile(file);
+    openEditor(doc, (finished) => {
+      if (!finished) return;
+      const { jsPDF } = window.jspdf;
+      const out = new jsPDF({ unit: 'pt', format: 'letter' });
+      out.deletePage(1);                       // start empty; every page comes from the document
+      appendPagesTo(out, finished.pages);
+      openPdfViewer(out, finished.name.replace(/\.pdf$/i, '') + ' - marked up.pdf');
+    });
+  } catch (err) {
+    showUploadError('Couldn’t open that file: ' + err.message);
+  }
+}
+
+/* ---------- Attachment list on a form ---------- */
+function attachmentsFor(type) {
+  return attachments[type] || (attachments[type] = []);
+}
+
+function totalAttachedPages(type) {
+  return attachmentsFor(type).reduce((n, doc) => n + doc.pages.length, 0);
+}
+
+function renderAttachmentList(type) {
+  const host = document.querySelector('#form-' + type + ' .dc-attachments');
+  if (!host) return;
+  const docs = attachmentsFor(type);
+  host.innerHTML = '';
+
+  const heading = document.createElement('div');
+  heading.className = 'dc-attach-head';
+  const pages = totalAttachedPages(type);
+  heading.textContent = docs.length
+    ? 'Supporting documents — ' + pages + (pages === 1 ? ' page' : ' pages') + ' added after the form'
+    : 'Supporting documents';
+  host.appendChild(heading);
+
+  docs.forEach((doc, i) => {
+    const row = document.createElement('div');
+    row.className = 'dc-attach-row';
+
+    const thumb = document.createElement('canvas');
+    thumb.className = 'dc-attach-thumb';
+    thumb.width = 44;
+    thumb.height = Math.max(20, Math.round(44 * doc.pages[0].base.height / doc.pages[0].base.width));
+    window.Annotator.renderPage(thumb, doc.pages[0]);
+
+    const label = document.createElement('span');
+    label.className = 'dc-attach-name';
+    label.textContent = doc.name + ' · ' + doc.pages.length + (doc.pages.length === 1 ? ' page' : ' pages');
+
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'dc-attach-action';
+    edit.textContent = 'Mark up';
+    edit.addEventListener('click', () => openEditor(doc, () => renderAttachmentList(type)));
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'dc-attach-action is-danger';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => {
+      docs.splice(i, 1);
+      renderAttachmentList(type);
+    });
+
+    row.append(thumb, label, edit, remove);
+    host.appendChild(row);
+  });
+
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'dc-attach-add';
+  add.textContent = docs.length ? 'Add another document' : 'Add a PDF or photo';
+  add.addEventListener('click', () => pickAttachment(type));
+  host.appendChild(add);
+}
+
+function pickAttachment(type) {
+  const picker = document.createElement('input');
+  picker.type = 'file';
+  picker.accept = 'application/pdf,image/*';
+  picker.multiple = true;
+  picker.addEventListener('change', async () => {
+    for (const file of Array.from(picker.files || [])) {
+      await addAttachment(type, file);
+    }
+  });
+  picker.click();
+}
+
+async function addAttachment(type, file) {
+  const host = document.querySelector('#form-' + type + ' .dc-attachments');
+  if (host) host.classList.add('is-busy');
+  try {
+    const doc = await window.Annotator.readFile(file);
+    attachmentsFor(type).push(doc);
+    renderAttachmentList(type);
+  } catch (err) {
+    if (host) {
+      const problem = document.createElement('p');
+      problem.className = 'dc-attach-error';
+      problem.textContent = 'Couldn’t read ' + file.name + ': ' + err.message;
+      host.appendChild(problem);
+    }
+  } finally {
+    if (host) host.classList.remove('is-busy');
+  }
+}
+
+/*
+ * Appends the attached pages to a finished form. Each page goes on its own sheet, sized to fit
+ * the page with its proportions kept, so nothing is stretched or cropped.
+ */
+function appendPagesTo(doc, pages) {
+  const pageW = 612, pageH = 792, margin = 24;
+  pages.forEach(page => {
+    const flat = window.Annotator.flatten(page);
+    const scale = Math.min((pageW - margin * 2) / flat.width, (pageH - margin * 2) / flat.height);
+    const w = flat.width * scale;
+    const h = flat.height * scale;
+    doc.addPage();
+    doc.addImage(flat.toDataURL('image/jpeg', 0.86), 'JPEG',
+      (pageW - w) / 2, (pageH - h) / 2, w, h);
+  });
+  return doc;
+}
+
+function appendAttachments(doc, type) {
+  const docs = attachmentsFor(type);
+  docs.forEach(item => appendPagesTo(doc, item.pages));
+  return doc;
+}

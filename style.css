@@ -1755,3 +1755,297 @@ input[type="radio"] { width: 15px; height: 15px; }
 @media (max-width: 900px) {
   .home-view { padding-right: 68px; }
 }
+
+/* ---------- Supporting documents on a form ---------- */
+.dc-attachments {
+  max-width: 816px;
+  margin: 18px auto 0;
+  padding: 16px 18px;
+  background: var(--c-surface);
+  border: 1px dashed var(--c-border-strong);
+  border-radius: var(--radius-lg);
+}
+.dc-attachments.is-busy { opacity: 0.6; pointer-events: none; }
+
+.dc-attach-head {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+  margin-bottom: 12px;
+}
+
+.dc-attach-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--c-border);
+}
+
+.dc-attach-thumb {
+  flex-shrink: 0;
+  border: 1px solid var(--c-border);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.dc-attach-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dc-attach-action {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-accent);
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.dc-attach-action:hover { text-decoration: underline; }
+.dc-attach-action.is-danger { color: #b91c1c; }
+
+.dc-attach-add {
+  margin-top: 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  cursor: pointer;
+}
+.dc-attach-add:hover { border-color: var(--c-accent); color: var(--c-accent); }
+
+.dc-attach-error {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: #b91c1c;
+}
+
+.upload-error-action.is-quiet {
+  color: var(--c-text-muted);
+  border-color: var(--c-border-strong);
+}
+
+/* ---------- Mark-up editor ---------- */
+.editor {
+  position: fixed;
+  inset: 0;
+  z-index: 125;
+  display: flex;
+  flex-direction: column;
+  background: #33312d;
+}
+.editor[hidden] { display: none; }
+
+.editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--dc-primary);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.editor-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.editor-back:hover { background: rgba(255, 255, 255, 0.15); }
+
+.editor-name {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40%;
+}
+
+.editor-pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.editor-pager button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.editor-pager button:disabled { opacity: 0.35; cursor: default; }
+.editor-pager button:not(:disabled):hover { background: rgba(255, 255, 255, 0.15); }
+
+.editor-bar-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.editor-bar-actions .btn-secondary {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+}
+.editor-bar-actions .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+
+.editor-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.editor-tools {
+  width: 210px;
+  flex-shrink: 0;
+  padding: 16px 14px;
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-border);
+  overflow-y: auto;
+}
+
+.tool-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.tool {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 6px;
+  cursor: pointer;
+}
+.tool:hover { border-color: var(--c-accent); color: var(--c-accent); }
+.tool[aria-pressed="true"] {
+  background: var(--dc-primary);
+  border-color: var(--dc-primary);
+  color: #fff;
+}
+
+.tool-row { margin-bottom: 16px; }
+.tool-row[hidden] { display: none; }
+
+.tool-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+  margin-bottom: 8px;
+}
+
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--c-border-strong);
+  cursor: pointer;
+  padding: 0;
+}
+.swatch[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--dc-primary);
+}
+
+#editorWidth { width: 100%; }
+
+.tool-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-text);
+  margin-bottom: 14px;
+}
+.tool-check[hidden] { display: none; }
+
+.tool-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--c-text-muted);
+  background: #fdf6e3;
+  border: 1px solid #f0dfae;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.tool-note[hidden] { display: none; }
+
+.editor-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 16px;
+  overflow: auto;
+}
+
+#editorCanvas {
+  background: #fff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  cursor: crosshair;
+  touch-action: none;        /* the page must not pan while a mark is being drawn */
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  .editor-body { flex-direction: column; }
+  .editor-tools {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--c-border);
+    max-height: 42vh;
+  }
+  .tool-group { grid-template-columns: repeat(4, 1fr); }
+  .editor-name { max-width: 100%; }
+}
+
+@media print {
+  .editor, .dc-attachments { display: none !important; }
+}

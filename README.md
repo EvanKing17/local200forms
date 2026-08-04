@@ -22,10 +22,13 @@ because the page on screen *is* the page that comes out.
 - **Works offline.** Install it (below) and it runs with no signal at all.
 - **Drafts save as you type**, so a closed tab or a dead battery costs nothing.
   "Clear form" is how you throw one away.
+- **Attach supporting documents.** Add PDFs or photos to a form and they're
+  appended after it, so the grievance and its evidence go in as one file.
+- **Mark them up** — draw, highlight, arrows, boxes and ovals, and redaction.
 - **Re-open a finished PDF.** Drop one anywhere on the page, or use the link
   under the form list. A PDF this app made fills the form back in — it
   recognises its own files from data embedded invisibly in them. Anything else
-  can still be opened and read, just not filled in.
+  opens in the mark-up editor and can be saved back out.
 - **Enter moves to the next field**, and Shift+Enter back — these were spreadsheets
   before they were this, and the muscle memory is real. In the big narrative
   boxes Enter makes a new paragraph, and Ctrl+Enter moves on.
@@ -67,6 +70,7 @@ No build step — edit and push, GitHub Pages redeploys.
 | `script.js` | one `build*Doc()` per form, plus everything else |
 | `style.css` | the design system, including the print rules |
 | `forms.config.js` | form names (see Renaming above) |
+| `annotate.js` | attachments: rasterising, mark-up, flattening |
 | `sw.js` | offline caching |
 | `tests.html` | checks — serve the folder and open it |
 
@@ -78,6 +82,14 @@ variables. Change one and you must change both.
 **When `style.css` or `script.js` changes, bump `?v=` in `index.html` and
 `VERSION` in `sw.js` together.** Both GitHub Pages and the service worker cache
 those files, so a stale number keeps serving the previous build.
+
+**Attachments are rasterised, on purpose.** A black box drawn over a PDF that
+keeps its text layer hides nothing — the words stay in the file and copy
+straight out, which is how redacted names have leaked from court filings. Every
+attached page is turned into pixels before it can be marked up, so blacking
+something out destroys it. The cost is that attached PDFs are no longer
+searchable and files are larger. pdf.js (1.7MB) does the rasterising; it loads
+only when a PDF is actually opened, but is precached so this works offline.
 
 Run `tests.html` before pushing. It drives the real app and checks that every
 form still builds at the right page count, with its data surviving a round-trip
