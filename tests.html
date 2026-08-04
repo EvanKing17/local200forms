@@ -802,11 +802,70 @@ function run(win, doc) {
     return returned || { detail: 'back went somewhere else' };
   });
 
-  checkAsync(g9, 'The preview is revealed before the file is handed to it', async () => {
-    // A PDF plugin started inside a hidden container can fall back to a download card
-    const source = win.showPdf.toString();
-    const revealBeforeSrc = source.indexOf('pdfViewer.hidden = false') < source.indexOf('pdfViewerFrame.src');
-    return revealBeforeSrc || { detail: 'the frame is still loaded while hidden' };
+  checkAsync(g9, 'The preview draws the pages itself', async () => {
+    // Not handed to the browser's PDF plugin, which can decline to render inline and show a
+    // download card instead of the document
+    const form = doc.getElementById('fordForm');
+    win.clearForm(form);
+    const built = win.buildFordDoc(win.fd(form));
+    await win.showPdf(built.output('blob'), 'Preview.pdf', built);
+    const pages = doc.querySelectorAll('#pdfViewerPages .pdf-viewer-page');
+    const noIframe = !doc.getElementById('pdfViewerFrame');
+    let drew = false;
+    if (pages.length) {
+      const c = pages[0];
+      const px = c.getContext('2d').getImageData(Math.round(c.width * 0.5), Math.round(c.height * 0.115), 1, 1).data;
+      drew = !(px[0] === 255 && px[1] === 255 && px[2] === 255);   // the section band
+    }
+    doc.getElementById('pdfViewerClose').click();
+    return (pages.length === built.getNumberOfPages() && noIframe && drew) ||
+      { detail: pages.length + ' pages, iframeGone=' + noIframe + ', drewContent=' + drew };
+  });
+
+  checkAsync(g9, 'Downloading says where the file went', async () => {
+    const built = win.buildFordDoc(win.fd(doc.getElementById('fordForm')));
+    await win.showPdf(built.output('blob'), 'Feedback.pdf', built);
+    doc.getElementById('pdfViewerName').value = 'Told you so';
+    doc.getElementById('pdfViewerDownload').click();
+    const said = doc.getElementById('pdfViewerStatus').textContent;
+    doc.getElementById('pdfViewerClose').click();
+    return /Told you so\.pdf/.test(said) || { detail: said || '(said nothing)' };
+  });
+
+  checkAsync(g9, 'Backing out of mark-up asks before throwing it away', async () => {
+    const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'Discard.pdf'));
+    const asked = [];
+    const realConfirm = win.confirm;
+    let answer = false;
+    win.confirm = (m) => { asked.push(m); return answer; };
+
+    win.openEditor(item, () => {});
+    doc.getElementById('editorBack').click();
+    const quietWhenClean = asked.length === 0;
+
+    win.openEditor(item, () => {});
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
+    const r = canvas.getBoundingClientRect();
+    const ev = (t, p) => new win.PointerEvent(t, { clientX: r.left + p[0] * r.width,
+      clientY: r.top + p[1] * r.height, pointerId: 1, bubbles: true, cancelable: true });
+    doc.querySelector('#editorTools .tool[data-tool="pen"]').click();
+    canvas.dispatchEvent(ev('pointerdown', [0.2, 0.3]));
+    canvas.dispatchEvent(ev('pointermove', [0.6, 0.4]));
+    canvas.dispatchEvent(ev('pointerup', [0.6, 0.4]));
+
+    doc.getElementById('editorBack').click();
+    const askedOnce = asked.length === 1;
+    const stayedOpen = !doc.getElementById('editor').hidden;
+    const keptMark = item.pages[0].annotations.length === 1;
+
+    answer = true;
+    doc.getElementById('editorBack').click();
+    const closed = doc.getElementById('editor').hidden;
+    win.confirm = realConfirm;
+    return (quietWhenClean && askedOnce && stayedOpen && keptMark && closed) ||
+      { detail: 'clean=' + quietWhenClean + ' asked=' + askedOnce + ' stayed=' + stayedOpen +
+                ' kept=' + keptMark + ' closed=' + closed };
   });
 
   checkAsync(g9, 'The upload link no longer claims the PDF must be ours', async () => {

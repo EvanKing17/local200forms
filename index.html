@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=39">
+<link rel="stylesheet" href="style.css?v=41">
 </head>
 <body>
 
@@ -965,13 +965,17 @@
       <button type="button" class="pdf-viewer-close" id="pdfViewerClose" aria-label="Close preview">&times;</button>
     </div>
   </div>
-  <iframe id="pdfViewerFrame" title="PDF preview"></iframe>
+  <!-- Drawn here rather than handed to the browser's PDF plugin: with "always download PDFs"
+       switched on, or the plugin otherwise declining to render inline, an embedded viewer shows
+       a download card instead of the document. Rendering it ourselves always shows something. -->
+  <div class="pdf-viewer-pages" id="pdfViewerPages"></div>
+  <p class="pdf-viewer-status" id="pdfViewerStatus" role="status"></p>
 </div>
 
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=39"></script>
-<script src="script.js?v=39"></script>
+<script src="annotate.js?v=41"></script>
+<script src="script.js?v=41"></script>
 </body>
 </html>

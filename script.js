@@ -127,20 +127,31 @@ function download(doc, filename) {
 
 /* ============ Full-screen PDF preview ============ */
 const pdfViewer = document.getElementById('pdfViewer');
-const pdfViewerFrame = document.getElementById('pdfViewerFrame');
+const pdfViewerPages = document.getElementById('pdfViewerPages');
+const pdfViewerStatus = document.getElementById('pdfViewerStatus');
 const pdfViewerName = document.getElementById('pdfViewerName');
 let viewerDoc = null;
 let viewerBlob = null;
 let viewerBack = null;
 let viewerFilename = '';
 let viewerUrl = null;
+let viewerToken = 0;
 
 function openPdfViewer(doc, filename) {
   showPdf(doc.output('blob'), filename, doc);
 }
 
-/* Shows any PDF. `doc` is optional — present when we built it, absent for an uploaded file. */
-function showPdf(blob, filename, doc, onBack) {
+/*
+ * Shows any PDF. `doc` is optional — present when we built it with jsPDF, absent when the
+ * bytes came from somewhere else. `onBack` is where the back arrow should return to.
+ *
+ * The pages are drawn here rather than handed to the browser's own PDF plugin. An embedded
+ * plugin can decline to render inline — "always download PDFs" is a setting, and some builds
+ * fall back to it on their own — and what you get then is a card with an Open button instead
+ * of the document. Drawing it means there is always something on screen.
+ */
+async function showPdf(blob, filename, doc, onBack) {
+  const token = ++viewerToken;
   viewerDoc = doc || null;
   viewerBlob = blob;
   viewerFilename = filename;
@@ -149,24 +160,41 @@ function showPdf(blob, filename, doc, onBack) {
   viewerUrl = URL.createObjectURL(blob);
 
   pdfViewerName.value = filename.replace(/\.pdf$/i, '');
+  pdfViewerPages.innerHTML = '';
+  setViewerStatus('Preparing the preview…');
   pdfViewer.hidden = false;
   document.body.style.overflow = 'hidden';
-
-  /*
-   * Revealed before the file is handed over: a PDF plugin asked to start inside a hidden
-   * container can give up and fall back to a download card instead of rendering.
-   *
-   * Toolbar left on — that's what gives the viewer its own print, zoom and page controls.
-   * zoom=100 rather than view=FitH: FitH fits the page to whatever width the frame happens to
-   * be, so the window ends up deciding the magnification. 100% is a Letter page at actual size.
-   */
-  requestAnimationFrame(() => {
-    pdfViewerFrame.src = viewerUrl + '#navpanes=0&zoom=100';
-  });
-  setTimeout(() => {
-    if (!pdfViewerFrame.getAttribute('src')) pdfViewerFrame.src = viewerUrl + '#navpanes=0&zoom=100';
-  }, 60);
   document.getElementById('pdfViewerClose').focus();
+
+  try {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const canvases = await window.Annotator.renderToCanvases(bytes, 1.5);
+    if (token !== viewerToken) return;        // a newer preview opened while this one rendered
+    pdfViewerPages.innerHTML = '';
+    canvases.forEach((canvas, i) => {
+      canvas.className = 'pdf-viewer-page';
+      const wrap = document.createElement('div');
+      wrap.className = 'pdf-viewer-sheet';
+      const number = document.createElement('span');
+      number.className = 'pdf-viewer-page-number';
+      number.textContent = 'Page ' + (i + 1) + ' of ' + canvases.length;
+      wrap.append(canvas, number);
+      pdfViewerPages.appendChild(wrap);
+    });
+    setViewerStatus('');
+  } catch (err) {
+    if (token !== viewerToken) return;
+    setViewerStatus('The preview couldn’t be drawn, but the file is fine — use Download.');
+  }
+}
+
+let statusTimer = null;
+
+function setViewerStatus(message, fade) {
+  clearTimeout(statusTimer);
+  pdfViewerStatus.textContent = message || '';
+  pdfViewerStatus.hidden = !message;
+  if (message && fade) statusTimer = setTimeout(() => { pdfViewerStatus.hidden = true; }, 4000);
 }
 
 /* The name typed in the viewer is what the file is saved as */
@@ -177,8 +205,8 @@ function viewerName() {
 
 function closePdfViewer() {
   pdfViewer.hidden = true;
-  // Drop the src before revoking, or the viewer can blank out mid-teardown
-  pdfViewerFrame.removeAttribute('src');
+  pdfViewerPages.innerHTML = '';
+  setViewerStatus('');
   document.body.style.overflow = '';
   if (viewerUrl) {
     URL.revokeObjectURL(viewerUrl);
@@ -197,25 +225,28 @@ document.getElementById('pdfViewerBack').addEventListener('click', () => {
 });
 
 document.getElementById('pdfViewerDownload').addEventListener('click', () => {
-  if (viewerDoc) { download(viewerDoc, viewerName()); return; }
-  if (!viewerBlob) return;
-  // An uploaded file has no jsPDF document behind it, so save the blob directly
-  const link = document.createElement('a');
-  link.href = viewerUrl;
-  link.download = viewerName();
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+  const name = viewerName();
+  if (viewerDoc) {
+    download(viewerDoc, name);
+  } else if (viewerBlob) {
+    // No jsPDF document behind it, so the blob is saved directly
+    const link = document.createElement('a');
+    link.href = viewerUrl;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } else {
+    return;
+  }
+  // Downloads land silently in a folder, so say where it went
+  setViewerStatus('Saved as “' + name + '” — check your downloads.', true);
 });
 
 document.getElementById('pdfViewerPrint').addEventListener('click', () => {
-  // Printing an embedded PDF is inconsistent across browsers, so fall back to opening the
-  // file in its own tab where the viewer's own print button is always available.
-  try {
-    pdfViewerFrame.contentWindow.print();
-  } catch {
-    window.open(viewerUrl, '_blank', 'noopener');
-  }
+  // Printing goes through the browser's own viewer in a new tab, which always has a print
+  // command even when it won't render inside this page
+  window.open(viewerUrl, '_blank', 'noopener');
 });
 
 document.addEventListener('keydown', (e) => {
@@ -2826,7 +2857,18 @@ function openEditor(doc, onDone) {
   syncHistoryButtons();
 }
 
-function closeEditor() {
+function markCount() {
+  return editorDoc ? editorDoc.pages.reduce((n, p) => n + p.annotations.length, 0) : 0;
+}
+
+/* Backing out throws the marks away, so it asks first — Done keeps them and doesn't */
+function closeEditor(discarding) {
+  if (discarding && markCount()) {
+    const marks = markCount();
+    const what = marks === 1 ? 'one mark' : marks + ' marks';
+    if (!confirm('Go back without keeping this mark-up? ' + what + ' will be lost.')) return;
+    editorDoc.pages.forEach(page => { page.annotations.length = 0; });
+  }
   editor.hidden = true;
   brushCursor.hidden = true;
   document.body.style.overflow = '';
@@ -2839,8 +2881,8 @@ function closeEditor() {
   if (done) done(finished);
 }
 
-document.getElementById('editorBack').addEventListener('click', closeEditor);
-document.getElementById('editorDone').addEventListener('click', closeEditor);
+document.getElementById('editorBack').addEventListener('click', () => closeEditor(true));
+document.getElementById('editorDone').addEventListener('click', () => closeEditor(false));
 
 /* ---------- Undo and redo ----------
  * A single record of what was done, in the order it happened, rather than looking for the last

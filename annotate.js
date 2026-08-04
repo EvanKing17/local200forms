@@ -329,8 +329,28 @@
     return out.save();
   }
 
+  /* Renders finished PDF bytes to canvases, for showing a document we've just produced */
+  async function renderToCanvases(bytes, scale) {
+    const pdfjs = await loadPdfJs();
+    const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+    const canvases = [];
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const page = await pdf.getPage(n);
+      const viewport = page.getViewport({ scale: scale || 1.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(viewport.width);
+      canvas.height = Math.round(viewport.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      canvases.push(canvas);
+    }
+    return canvases;
+  }
+
   window.Annotator = {
-    readFile, renderPage, drawAnnotation, appendTo, standalone,
+    readFile, renderPage, drawAnnotation, appendTo, standalone, renderToCanvases,
     loadPdfJs, loadPdfLib, strokeWidthFor,
   };
 })();
