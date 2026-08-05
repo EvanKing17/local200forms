@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=46">
+<link rel="stylesheet" href="style.css?v=47">
 </head>
 <body>
 
@@ -26,7 +26,7 @@
 
 <!-- ================= HOME: FORM LIBRARY ================= -->
 <div class="home-view" id="homeView">
-  <h1 class="home-title">Forms</h1>
+  <h1 class="home-title" id="homeTitle">Forms</h1>
   <p class="home-sub">Pick a form to fill in.</p>
 
   <div class="skeleton" id="skeleton" hidden aria-hidden="true"></div>
@@ -933,6 +933,27 @@
   </div>
 </div>
 
+<!-- Pasting a grievance. No way in from the page itself: Ctrl+V on the Forms page, or a
+     long press on the "Forms" heading for tablets, which have no Ctrl+V. See the paste
+     handler in script.js for why this has no button of its own. -->
+<div class="admin-overlay" id="pasteOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="pasteTitle">
+  <div class="admin-modal">
+    <h2 class="admin-title" id="pasteTitle">Paste a grievance</h2>
+    <p class="admin-lede">
+      Copy the grievance in the other app, then use the button below. If nothing arrives,
+      press and hold in the box and choose Paste.
+    </p>
+    <button type="button" class="btn-secondary" id="pasteFromClipboard">Paste from clipboard</button>
+    <textarea id="pasteBox" class="paste-box" rows="7" spellcheck="false"
+              placeholder="The copied grievance goes here"></textarea>
+    <p class="admin-status" id="pasteStatus"></p>
+    <div class="admin-actions">
+      <button type="button" class="btn-secondary" data-paste-close>Cancel</button>
+      <button type="button" class="btn-primary" id="pasteConfirm">Read it</button>
+    </div>
+  </div>
+</div>
+
 <!-- Shown only while a file is over the window -->
 <div class="drop-overlay" id="dropOverlay" hidden aria-hidden="true">
   <span class="drop-overlay-text">Drop a PDF to open it</span>
@@ -1005,7 +1026,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=46"></script>
-<script src="script.js?v=46"></script>
+<script src="annotate.js?v=47"></script>
+<script src="script.js?v=47"></script>
 </body>
 </html>

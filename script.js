@@ -1485,6 +1485,7 @@ document.querySelectorAll('[data-save-grv]').forEach(button => {
 document.addEventListener('paste', (e) => {
   if (homeView.hidden) return;                       // only on the Forms page
   if (!importOverlay.hidden || !adminOverlay.hidden || !pdfViewer.hidden || !editor.hidden) return;
+  if (!pasteOverlay.hidden) return;                  // that dialog reads the clipboard itself
 
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;  // let a real field have its paste
@@ -1494,14 +1495,106 @@ document.addEventListener('paste', (e) => {
   if (text.charAt(0) !== '{' || text.charAt(text.length - 1) !== '}') return;
 
   e.preventDefault();
+  usePastedText(text, err => showUploadError('That paste didn’t work: ' + err.message + '.'));
+});
+
+/* The one place a pasted grievance is read, whichever way it arrived */
+function usePastedText(text, onError) {
   try {
     const result = readGrievanceJson(text);
     uploadError.hidden = true;              // clear anything left over from a previous attempt
     showImport(result, 'What you pasted');
+    return true;
   } catch (err) {
-    showUploadError('That paste didn’t work: ' + err.message + '.');
+    onError(err);
+    return false;
+  }
+}
+
+/*
+ * The same shortcut for a tablet, which has no Ctrl+V to press. A long press on the "Forms"
+ * heading opens a box to paste into — still nothing on screen advertising it, and still on the
+ * heading rather than anywhere on the page so an ordinary long press doesn't trip it.
+ *
+ * It can't be silent the way Ctrl+V is: reading the clipboard on Android needs a gesture and a
+ * permission prompt, so there has to be something to tap. That's what the box is for, and it
+ * doubles as the fallback when the browser won't hand the clipboard over — press and hold, Paste.
+ */
+const pasteOverlay = document.getElementById('pasteOverlay');
+const pasteBox = document.getElementById('pasteBox');
+const pasteStatus = document.getElementById('pasteStatus');
+const homeTitle = document.getElementById('homeTitle');
+
+function setPasteStatus(message, kind) {
+  pasteStatus.textContent = message || '';
+  pasteStatus.className = 'admin-status' + (kind ? ' is-' + kind : '');
+}
+
+function openPaste() {
+  pasteBox.value = '';
+  setPasteStatus('');
+  pasteOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+  document.getElementById('pasteFromClipboard').focus();
+}
+
+function closePaste() {
+  pasteOverlay.hidden = true;
+  pasteBox.value = '';
+  document.body.style.overflow = '';
+}
+
+document.querySelectorAll('[data-paste-close]').forEach(b => b.addEventListener('click', closePaste));
+
+document.getElementById('pasteFromClipboard').addEventListener('click', async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) {
+      setPasteStatus('The clipboard is empty.', 'warn');
+      return;
+    }
+    pasteBox.value = text;
+    setPasteStatus('Read the clipboard. Now press “Read it”.', 'ok');
+  } catch (err) {
+    // Denied, or a browser that won't read the clipboard without a user's say-so
+    pasteBox.focus();
+    setPasteStatus('This browser won’t hand over the clipboard. Press and hold in the box ' +
+                   'above and choose Paste.', 'warn');
   }
 });
+
+document.getElementById('pasteConfirm').addEventListener('click', () => {
+  const text = pasteBox.value.trim();
+  if (!text) {
+    setPasteStatus('Nothing in the box yet.', 'warn');
+    return;
+  }
+  // showImport replaces this dialog, so it only closes once the text is known to be usable
+  const ok = usePastedText(text, err => setPasteStatus('That didn’t work: ' + err.message + '.', 'warn'));
+  if (ok) closePaste();
+});
+
+/* A long press, not a tap — the heading has to stay an ordinary heading for everyone else */
+if (homeTitle) {
+  let holdTimer = null;
+  let heldAt = null;
+  const cancelHold = () => { clearTimeout(holdTimer); heldAt = null; };
+
+  homeTitle.addEventListener('pointerdown', (e) => {
+    clearTimeout(holdTimer);
+    heldAt = { x: e.clientX, y: e.clientY };
+    holdTimer = setTimeout(() => { if (!homeView.hidden) openPaste(); }, 700);
+  });
+  homeTitle.addEventListener('pointermove', (e) => {
+    // A finger is never perfectly still; only a real drag should call this off
+    if (!heldAt) return;
+    if (Math.abs(e.clientX - heldAt.x) > 10 || Math.abs(e.clientY - heldAt.y) > 10) cancelHold();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt =>
+    homeTitle.addEventListener(evt, cancelHold));
+  // Otherwise Android raises its own text-selection menu over the top of the dialog
+  homeTitle.addEventListener('contextmenu', e => e.preventDefault());
+}
 
 /* ---------- Arriving from somewhere else ---------- */
 
