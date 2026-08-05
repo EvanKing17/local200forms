@@ -1506,18 +1506,91 @@ document.addEventListener('paste', (e) => {
 /* ---------- Arriving from somewhere else ---------- */
 
 /*
- * Android's share sheet posts the file to ./share, which the service worker answers by parking
- * it in a cache and sending the browser here. Collected once, then cleared, so a later reload
- * doesn't reopen it.
+ * A grievance carried in the address, for the other app to hand one over with a plain link:
+ *
+ *   https://evanking17.github.io/local200forms/#grv=<base64 of the JSON>
+ *
+ * It goes after the # deliberately. A fragment is never sent in the HTTP request, so the
+ * grievance never reaches GitHub's servers — put the same thing in a ?query and it lands in
+ * their logs. On Android an installed copy claims links inside its own scope, so a link like
+ * this opens the app; without it installed the same link opens the site and still works.
+ */
+function decodeGrvPayload(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) throw new Error('the link carried nothing');
+  let text;
+  try {
+    text = decodeURIComponent(trimmed);
+  } catch (err) {
+    throw new Error('the link couldn’t be decoded');   // stray % escapes, usually a mangled paste
+  }
+  if (!text) throw new Error('the link carried nothing');
+  if (text.charAt(0) === '{') return text;             // sent as plain JSON, already readable
+
+  // base64, in either alphabet, with the padding the sender may well have trimmed
+  let b64 = text.replace(/-/g, '+').replace(/_/g, '/');
+  b64 += '='.repeat((4 - (b64.length % 4)) % 4);
+  try {
+    return fromBase64(b64);
+  } catch (err) {
+    throw new Error('the link couldn’t be decoded');
+  }
+}
+
+/* Pulls the payload out of a whole URL, since a shared link arrives as one */
+function grvFromUrl(text) {
+  const m = String(text).match(/[#&?]grv=([^&\s]+)/);
+  return m ? m[1] : null;
+}
+
+function readGrvLink(payload) {
+  const json = decodeGrvPayload(payload);
+  return readGrievanceJson(json);
+}
+
+function consumeGrvLink() {
+  const payload = grvFromUrl(location.hash);
+  if (!payload) return;
+  // Out of the address before anything else: a reload shouldn't offer the same import twice,
+  // and a grievance has no business sitting in a visible URL
+  window.history.replaceState(null, '', location.pathname + location.search);
+  try {
+    showImport(readGrvLink(payload), 'That link');
+  } catch (err) {
+    showUploadError('That link didn’t work: ' + err.message + '.');
+  }
+}
+
+// Android may hand the link to a copy that's already open, which only changes the fragment
+window.addEventListener('hashchange', consumeGrvLink);
+
+/*
+ * Android's share sheet posts to ./share, which the service worker answers by parking what was
+ * shared and sending the browser here. Collected once, then cleared, so a later reload doesn't
+ * reopen it. A share can be a file or plain text — copying a grievance in another app puts JSON
+ * on the clipboard, and sharing that sends text with no file attached.
  */
 async function collectSharedFile() {
-  if (!/[?&]shared=1/.test(location.search) || !window.caches) return;
-  history.replaceState(null, '', location.pathname);
+  const mode = (location.search.match(/[?&]shared=(\w+)/) || [])[1];
+  if (!mode || !window.caches) return;
+  window.history.replaceState(null, '', location.pathname);
   try {
     const cache = await caches.open('local200forms-share');
     const response = await cache.match('shared-file');
     if (!response) return;
     await cache.delete('shared-file');
+
+    if (mode === 'text') {
+      const text = (await response.text()).trim();
+      const link = grvFromUrl(text);                   // a shared link rather than the JSON itself
+      try {
+        showImport(link ? readGrvLink(link) : readGrievanceJson(text), 'What was shared');
+      } catch (err) {
+        showUploadError('That share didn’t work: ' + err.message + '.');
+      }
+      return;
+    }
+
     const name = decodeURIComponent(response.headers.get('x-shared-name') || 'shared');
     const type = response.headers.get('content-type') || '';
     await handleIncomingFile(new File([await response.blob()], name, { type }));
@@ -1525,7 +1598,6 @@ async function collectSharedFile() {
     showUploadError('Something was shared here, but it couldn’t be read.');
   }
 }
-collectSharedFile();
 
 /* And on the desktop, a .grv opened from the file manager arrives through the launch queue */
 if (window.launchQueue && 'files' in window.LaunchParams.prototype) {
@@ -2974,7 +3046,7 @@ function openEditor(doc, onDone) {
   syncToolOptions();
   layoutPages();
   editorStage.scrollTop = 0;
-  history = [];
+  markHistory = [];
   undone = [];
   syncHistoryButtons();
 }
@@ -3011,23 +3083,23 @@ document.getElementById('editorDone').addEventListener('click', () => closeEdito
  * page that has anything on it — that undid whatever was furthest down the document instead of
  * whatever was drawn most recently, which is why the order felt arbitrary.
  */
-let history = [];
+let markHistory = [];
 let undone = [];
 
 function recordStroke(pageIndex, annotation) {
-  history.push({ pageIndex, annotation });
+  markHistory.push({ pageIndex, annotation });
   undone = [];                     // a new mark ends the branch that could have been redone
   syncHistoryButtons();
 }
 
 function forgetStroke(annotation) {
-  const at = history.findIndex(h => h.annotation === annotation);
-  if (at > -1) history.splice(at, 1);
+  const at = markHistory.findIndex(h => h.annotation === annotation);
+  if (at > -1) markHistory.splice(at, 1);
   syncHistoryButtons();
 }
 
 function syncHistoryButtons() {
-  document.getElementById('editorUndo').disabled = history.length === 0;
+  document.getElementById('editorUndo').disabled = markHistory.length === 0;
   document.getElementById('editorRedo').disabled = undone.length === 0;
 }
 
@@ -3037,8 +3109,8 @@ function repaint(pageIndex) {
 }
 
 document.getElementById('editorUndo').addEventListener('click', () => {
-  if (!editorDoc || !history.length) return;
-  const step = history.pop();
+  if (!editorDoc || !markHistory.length) return;
+  const step = markHistory.pop();
   const page = editorDoc.pages[step.pageIndex];
   const at = page.annotations.indexOf(step.annotation);
   if (at > -1) page.annotations.splice(at, 1);
@@ -3051,7 +3123,7 @@ document.getElementById('editorRedo').addEventListener('click', () => {
   if (!editorDoc || !undone.length) return;
   const step = undone.pop();
   editorDoc.pages[step.pageIndex].annotations.push(step.annotation);
-  history.push(step);
+  markHistory.push(step);
   repaint(step.pageIndex);
   syncHistoryButtons();
 });
@@ -3521,3 +3593,11 @@ async function handleJsonImport(file) {
     showUploadError('Couldn’t use ' + file.name + ': ' + err.message + '.');
   }
 }
+
+/*
+ * Kick off the ways a grievance can arrive from outside. Down here on purpose: these reach the
+ * import dialog and the form registry, which are declared further up but only initialised as
+ * this file runs, so calling them where they're defined would be too early.
+ */
+consumeGrvLink();
+collectSharedFile();

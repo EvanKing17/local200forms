@@ -836,10 +836,23 @@ function run(win, doc) {
     const built = win.buildFordDoc(win.fd(doc.getElementById('fordForm')));
     await win.showPdf(built.output('blob'), 'Feedback.pdf', built);
     doc.getElementById('pdfViewerName').value = 'Told you so';
-    doc.getElementById('pdfViewerDownload').click();
+
+    // Saving for real opens the browser's save dialog, which stops the run dead and drops a
+    // file in someone's Downloads every time this suite is opened. Only the message is under
+    // test, so the save itself is held back and the name it was called with is checked instead.
+    const realDownload = win.download;
+    let savedAs = null;
+    win.download = (d, name) => { savedAs = name; };
+    try {
+      doc.getElementById('pdfViewerDownload').click();
+    } finally {
+      win.download = realDownload;
+    }
+
     const said = doc.getElementById('pdfViewerStatus').textContent;
     doc.getElementById('pdfViewerClose').click();
-    return /Told you so\.pdf/.test(said) || { detail: said || '(said nothing)' };
+    return (savedAs === 'Told you so.pdf' && /Told you so\.pdf/.test(said)) ||
+      { detail: 'saved as ' + savedAs + ', said ' + (said || '(nothing)') };
   });
 
   checkAsync(g9, 'Backing out of mark-up asks before throwing it away', async () => {
@@ -1125,6 +1138,100 @@ function run(win, doc) {
     const ignored = doc.getElementById('importOverlay').hidden;
     win.showHome();
     return ignored || { detail: 'it fired while a form was on screen' };
+  });
+
+  const g13 = group('A grievance carried in a link');
+
+  const b64 = (obj) => win.btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+  const GRIEVANCE = { form: 'monetary', fields: { employeeName: 'Linked Person',
+                      globalId: '002173535', dateIncident: '2026-07-22' } };
+
+  check(g13, 'A base64 payload is read back', () => {
+    const read = win.readGrvLink(b64(GRIEVANCE));
+    return (read.type === 'ford' && read.values.employeeName === 'Linked Person') ||
+      { detail: JSON.stringify(read) };
+  });
+
+  check(g13, 'The sender can skip base64 and send plain JSON', () => {
+    const read = win.readGrvLink(encodeURIComponent(JSON.stringify(GRIEVANCE)));
+    return read.values.employeeName === 'Linked Person' || { detail: JSON.stringify(read.values) };
+  });
+
+  check(g13, 'base64url and missing padding are both accepted', () => {
+    // A sender that URL-safes its base64, and one that trims the =
+    const plain = b64(GRIEVANCE);
+    const urlSafe = plain.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const unpadded = plain.replace(/=+$/, '');
+    const bad = [urlSafe, unpadded].filter(p => {
+      try { return win.readGrvLink(p).values.employeeName !== 'Linked Person'; }
+      catch (e) { return true; }
+    });
+    return bad.length === 0 || { detail: bad.length + ' of 2 shapes failed' };
+  });
+
+  check(g13, 'Accented names survive the trip', () => {
+    const read = win.readGrvLink(b64({ form: 'policy', fields: { employeeName: 'Zoë Gagné' } }));
+    return read.values.employeeName === 'Zoë Gagné' || { detail: read.values.employeeName };
+  });
+
+  check(g13, 'The payload is found inside a whole URL', () => {
+    const url = 'https://evanking17.github.io/local200forms/#grv=' + b64(GRIEVANCE);
+    const found = win.grvFromUrl(url);
+    return (found && win.readGrvLink(found).values.employeeName === 'Linked Person') ||
+      { detail: 'pulled ' + found };
+  });
+
+  check(g13, 'A link with nothing in it is refused, not guessed at', () => {
+    const bad = [];
+    [['', 'nothing'], ['bm90IGpzb24=', 'JSON'], ['%%%', 'decoded']].forEach(([payload, expect]) => {
+      try { win.readGrvLink(payload); bad.push(payload + ' was accepted'); }
+      catch (err) { if (err.message.indexOf(expect) === -1) bad.push(payload + ' said: ' + err.message); }
+    });
+    return bad.length === 0 || { detail: bad.join(' | ') };
+  });
+
+  check(g13, 'A grievance link is taken out of the address bar', () => {
+    const before = win.location.href;
+    win.location.hash = 'grv=' + b64(GRIEVANCE);
+    win.consumeGrvLink();
+    const offered = !doc.getElementById('importOverlay').hidden;
+    const gone = win.location.hash === '' || win.location.hash === '#';
+    doc.querySelector('[data-import-close]').click();
+    return (offered && gone) ||
+      { detail: 'offered=' + offered + ' hash left as ' + win.location.hash };
+  });
+
+  check(g13, 'The payload rides in the fragment, never the query', () => {
+    // A fragment is not sent in the request; a query string would reach GitHub's logs
+    const fromHash = win.consumeGrvLink.toString().indexOf('grvFromUrl(location.hash)') !== -1;
+    return fromHash || { detail: 'the payload is read from somewhere other than the fragment' };
+  });
+
+  check(g13, 'Rewriting the address uses the browser history, not a local variable', () => {
+    // The editor's undo stack was once called `history`, which shadowed window.history for the
+    // whole file and made this throw — silently breaking the share pickup as well
+    let threw = null;
+    win.location.hash = 'grv=' + b64(GRIEVANCE);
+    try { win.consumeGrvLink(); } catch (err) { threw = err.message; }
+    if (!doc.getElementById('importOverlay').hidden) doc.querySelector('[data-import-close]').click();
+    win.location.hash = '';
+    return threw === null || { detail: threw };
+  });
+
+  check(g13, 'Ordinary fragments are left alone', () => {
+    win.location.hash = 'section-b';
+    win.consumeGrvLink();
+    const quiet = doc.getElementById('importOverlay').hidden;
+    const kept = win.location.hash === '#section-b';
+    win.location.hash = '';
+    return (quiet && kept) || { detail: 'quiet=' + quiet + ' hash=' + win.location.hash };
+  });
+
+  check(g13, 'The worker keeps shared text, not just shared files', () => {
+    const takesText = SW_SOURCE.indexOf("form.get('text')") !== -1;
+    const marks = SW_SOURCE.indexOf('shared=text') !== -1 && SW_SOURCE.indexOf('shared=file') !== -1;
+    return (takesText && marks) ||
+      { detail: 'text=' + takesText + ' distinguishes the two=' + marks };
   });
 
   const g7 = group('Drafts');

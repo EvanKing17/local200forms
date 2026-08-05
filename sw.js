@@ -8,7 +8,7 @@
  * CACHE is versioned: bump it whenever a precached file changes, or browsers will keep serving
  * the old copy. Old caches are deleted on activate.
  */
-const VERSION = '48';
+const VERSION = '49';
 const CACHE = 'local200forms-v' + VERSION;
 
 /* Must match the ?v= in index.html — bump both together, or the worker will keep serving the
@@ -66,16 +66,32 @@ const SHARE_CACHE = 'local200forms-share';
 async function receiveShare(request) {
   try {
     const form = await request.formData();
+    const cache = await caches.open(SHARE_CACHE);
     const file = form.get('file');
+
     if (file && file.name) {
-      const cache = await caches.open(SHARE_CACHE);
       await cache.put('shared-file', new Response(file, {
         headers: {
           'content-type': file.type || 'application/octet-stream',
           'x-shared-name': encodeURIComponent(file.name),
         },
       }));
-      return Response.redirect('./?shared=1', 303);
+      return Response.redirect('./?shared=file', 303);
+    }
+
+    /*
+     * Sharing text rather than a file is the more likely half of this: copying a grievance in
+     * another app puts JSON on the clipboard, and its share sheet sends that as text with no
+     * file attached. Handling only files meant those shares arrived and vanished.
+     */
+    const text = [form.get('text'), form.get('url'), form.get('title')]
+      .map(v => (typeof v === 'string' ? v.trim() : ''))
+      .find(v => v);
+    if (text) {
+      await cache.put('shared-file', new Response(text, {
+        headers: { 'content-type': 'text/plain' },
+      }));
+      return Response.redirect('./?shared=text', 303);
     }
   } catch (err) {
     /* fall through and just open the app */

@@ -93,14 +93,41 @@ Four ways in, all landing on the same confirmation step:
 
 - **Drop it on the page**, or pick it with the upload link.
 - **Share it to the app.** Once Union Forms is installed, it appears in
-  Android's share sheet. Sharing a grievance file from another app opens it
-  here directly. This is the easiest route on a tablet.
+  Android's share sheet. Share either the file or the JSON as text — both work.
+- **Open a link.** The other app can build one and the app fills itself in;
+  see below.
 - **Open a `.grv`.** On a desktop with the app installed, double-clicking a
   `.grv` opens it in Union Forms.
 
 `.grv` is the same JSON under a private extension. It is deliberately *not*
 `.json` — registering that would make this app the default for every JSON file
 on the machine.
+
+### A grievance in a link
+
+The other app can hand one over as a plain link, with the JSON base64'd into
+the fragment:
+
+```
+https://evanking17.github.io/local200forms/#grv=<base64 of the JSON>
+```
+
+On Android an installed copy claims links inside its own scope, so this opens
+the app itself. Without it installed the same link opens the site and still
+works. Either way it lands on the usual confirmation step.
+
+**The `#` matters.** A fragment is never sent in the HTTP request, so the
+grievance never reaches GitHub's servers. The same payload in a `?query` would
+land in their request logs. Nothing about this app should put a member's
+grievance on someone else's disk.
+
+Plain percent-encoded JSON works too if base64 is inconvenient, and base64url
+with the padding trimmed is accepted. Building one, in whatever language:
+
+```js
+const url = 'https://evanking17.github.io/local200forms/#grv=' +
+            btoa(unescape(encodeURIComponent(JSON.stringify(grievance))));
+```
 
 ### The paste shortcut
 
