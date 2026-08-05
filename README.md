@@ -86,7 +86,10 @@ Anything it can't place is listed on screen rather than dropped quietly.
 
 ### Getting the file here
 
-Three ways in, all landing on the same confirmation step:
+Four ways in, all landing on the same confirmation step:
+
+- **Paste it.** On the Forms page, Ctrl+V with the JSON on the clipboard. There
+  is no button for this and no sign it exists — see below.
 
 - **Drop it on the page**, or pick it with the upload link.
 - **Share it to the app.** Once Union Forms is installed, it appears in
@@ -98,6 +101,27 @@ Three ways in, all landing on the same confirmation step:
 `.grv` is the same JSON under a private extension. It is deliberately *not*
 `.json` — registering that would make this app the default for every JSON file
 on the machine.
+
+### The paste shortcut
+
+Copy a grievance as JSON in the other app, then press **Ctrl+V** on the Forms
+page. It reads the clipboard and offers to fill the form, same as a dropped
+file.
+
+There is deliberately no button. This is one rep's shortcut, and a control on
+screen is a thing every other rep has to wonder about. So it stays quiet unless
+the clipboard genuinely holds a grievance: a stray Ctrl+V with a phone number
+or half an email on it does nothing at all — no error, no flicker, no hint the
+feature is there. It only speaks up when the text really is JSON but can't be
+used, because by then someone is deliberately pasting and silence would be
+worse than an explanation.
+
+It is a shortcut, not a secret. Anyone reading the source will find it; it is
+hidden to keep the page uncluttered, not to keep anyone out. Nothing behind it
+is privileged — it fills in a form, which anyone can do by typing.
+
+Keyboard only, so it's a desktop route. On a tablet, share the file to the app
+or open a `.grv`.
 
 ## Handing a form to another device
 

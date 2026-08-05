@@ -1472,6 +1472,37 @@ document.querySelectorAll('[data-save-grv]').forEach(button => {
   });
 });
 
+/*
+ * Pasting a grievance straight onto the Forms page. Ctrl+V, nothing else — no button, no menu
+ * item, no hint. It's one rep's shortcut for moving a grievance across from another app, and a
+ * control on screen would be a thing every other rep has to wonder about.
+ *
+ * Which is why this is silent unless the clipboard genuinely holds a grievance. A stray Ctrl+V
+ * with a phone number or half an email on the clipboard does nothing whatsoever — no error, no
+ * flicker. The only time it speaks up is when the text really is JSON but can't be used, because
+ * at that point someone is deliberately pasting and an unexplained silence would be worse.
+ */
+document.addEventListener('paste', (e) => {
+  if (homeView.hidden) return;                       // only on the Forms page
+  if (!importOverlay.hidden || !adminOverlay.hidden || !pdfViewer.hidden || !editor.hidden) return;
+
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;  // let a real field have its paste
+
+  const text = ((e.clipboardData || window.clipboardData).getData('text') || '').trim();
+  // The cheap test first: anything that isn't a JSON object isn't ours, and isn't worth a word
+  if (text.charAt(0) !== '{' || text.charAt(text.length - 1) !== '}') return;
+
+  e.preventDefault();
+  try {
+    const result = readGrievanceJson(text);
+    uploadError.hidden = true;              // clear anything left over from a previous attempt
+    showImport(result, 'What you pasted');
+  } catch (err) {
+    showUploadError('That paste didn’t work: ' + err.message + '.');
+  }
+});
+
 /* ---------- Arriving from somewhere else ---------- */
 
 /*

@@ -1060,6 +1060,73 @@ function run(win, doc) {
       { detail: 'activate would delete the parked share' };
   });
 
+  const g12 = group('Pasting a grievance');
+
+  // Ctrl+V on the Forms page, as the browser delivers it
+  const paste = (text) => {
+    const ev = new win.Event('paste', { bubbles: true, cancelable: true });
+    ev.clipboardData = { getData: () => text };
+    win.document.dispatchEvent(ev);
+    return ev;
+  };
+  const quiet = () => doc.getElementById('importOverlay').hidden &&
+                       doc.getElementById('uploadError').hidden;
+
+  check(g12, 'A pasted grievance offers to fill the form', () => {
+    win.showHome();
+    doc.getElementById('uploadError').hidden = true;
+    paste(JSON.stringify({ form: 'policy', fields: { employeeName: 'Pasted Person' } }));
+    const offered = !doc.getElementById('importOverlay').hidden;
+    if (offered) doc.getElementById('importConfirm').click();
+    const form = doc.getElementById('policyForm');
+    const filled = form.elements.employeeName.value === 'Pasted Person';
+    win.clearForm(form);
+    win.showHome();
+    return (offered && filled) || { detail: 'offered=' + offered + ' filled=' + filled };
+  });
+
+  check(g12, 'A stray paste of ordinary text says nothing at all', () => {
+    win.showHome();
+    doc.getElementById('uploadError').hidden = true;
+    const noisy = [];
+    // What actually ends up on a clipboard around here
+    ['519-555-0142', 'Wes Macauley', '', 'https://example.com',
+     'see attached', '{ not json at all'].forEach(text => {
+      const ev = paste(text);
+      if (!quiet()) noisy.push(text || '(empty)');
+      if (ev.defaultPrevented) noisy.push('swallowed: ' + text);
+    });
+    doc.getElementById('uploadError').hidden = true;
+    return noisy.length === 0 || { detail: 'reacted to ' + noisy.join(', ') };
+  });
+
+  check(g12, 'JSON that cannot be used explains itself', () => {
+    win.showHome();
+    paste(JSON.stringify({ fields: { employeeName: 'No type given' } }));
+    const said = doc.getElementById('uploadError').textContent;
+    doc.getElementById('uploadError').hidden = true;
+    return (said.indexOf('monetary') !== -1 && doc.getElementById('importOverlay').hidden) ||
+      { detail: said || '(said nothing)' };
+  });
+
+  check(g12, 'Pasting into a form field is left alone', () => {
+    win.showForm('policy');
+    const field = doc.getElementById('policyForm').elements.employeeName;
+    field.focus();
+    const ev = paste(JSON.stringify({ form: 'policy', fields: { employeeName: 'Hijacked' } }));
+    const untouched = doc.getElementById('importOverlay').hidden && !ev.defaultPrevented;
+    win.showHome();
+    return untouched || { detail: 'the page took a paste meant for a field' };
+  });
+
+  check(g12, 'Paste is ignored once a form is open', () => {
+    win.showForm('ford');
+    paste(JSON.stringify({ form: 'policy', fields: { employeeName: 'Wrong moment' } }));
+    const ignored = doc.getElementById('importOverlay').hidden;
+    win.showHome();
+    return ignored || { detail: 'it fired while a form was on screen' };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {
