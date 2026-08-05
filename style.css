@@ -354,26 +354,6 @@ input[type="radio"] { width: 15px; height: 15px; }
 .btn-quiet:hover { background: var(--c-surface-alt); color: var(--c-text); }
 .btn-quiet:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
 
-/* The box in the paste dialog. Monospaced because what goes in it is JSON, and a wrong
-   character is easier to spot when the characters line up. */
-.paste-box {
-  width: 100%;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--c-border-strong);
-  border-radius: 8px;
-  background: var(--c-input-bg);
-  color: var(--c-text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.5;
-  resize: vertical;
-}
-.paste-box:focus { outline: 2px solid var(--c-accent); outline-offset: 1px; }
-
-/* The long press that opens that dialog would otherwise start selecting the heading */
-.home-title { -webkit-user-select: none; user-select: none; }
-
 .btn-primary:focus-visible, .btn-secondary:focus-visible, .form-card:focus-visible {
   outline: 2px solid var(--c-accent);
   outline-offset: 2px;

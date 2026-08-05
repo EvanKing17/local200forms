@@ -120,16 +120,9 @@ It is a shortcut, not a secret. Anyone reading the source will find it; it is
 hidden to keep the page uncluttered, not to keep anyone out. Nothing behind it
 is privileged — it fills in a form, which anyone can do by typing.
 
-**On a tablet there is no Ctrl+V**, so the same shortcut opens another way:
-**press and hold the "Forms" heading** for about a second. A box appears with a
-**Paste from clipboard** button. If the browser won't hand the clipboard over —
-Android asks permission, and can refuse — press and hold in the box itself and
-choose Paste, then **Read it**.
-
-That route can't be as silent as Ctrl+V: reading the clipboard on Android needs
-a gesture and a permission prompt, so there has to be something to tap. The way
-in is still hidden — an ordinary tap on the heading does nothing, and a drag
-calls it off.
+Keyboard only, so it needs a keyboard — but that includes a tablet with one
+attached, which is where it gets used. On a tablet with no keyboard, share the
+file to the app or open a `.grv` instead.
 
 ## Handing a form to another device
 
