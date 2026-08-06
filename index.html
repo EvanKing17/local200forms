@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=51">
+<link rel="stylesheet" href="style.css?v=52">
 </head>
 <body>
 
@@ -27,7 +27,6 @@
 <!-- ================= HOME: FORM LIBRARY ================= -->
 <div class="home-view" id="homeView">
   <h1 class="home-title">Forms</h1>
-  <p class="home-sub">Pick a form to fill in.</p>
 
   <div class="skeleton" id="skeleton" hidden aria-hidden="true"></div>
 
@@ -85,10 +84,9 @@
 
   <div class="builder-drop" id="builderDrop">
     <p class="builder-hint">
-      Press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste a screenshot, drop files anywhere on this page,
+      Press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste a screenshot, drop images or PDFs here,
       or <label class="builder-pick" for="builderInput">choose files</label>.
     </p>
-    <p class="builder-sub">Images and PDFs. They come out in the order below.</p>
     <input type="file" id="builderInput" accept="image/*,application/pdf" multiple hidden>
   </div>
 
@@ -114,7 +112,7 @@
         Forms
       </button>
       <button type="button" class="btn-quiet" data-save-grv="ford"
-              title="Save what is typed here as a file you can open on another device">Save .grv</button>
+              title="Save these values to open on another device">Save .grv</button>
       <button type="button" class="btn-secondary" id="fordClear">Clear form</button>
       <button type="submit" class="btn-primary" form="fordForm">Preview PDF</button>
     </div>
@@ -296,7 +294,7 @@
         Forms
       </button>
       <button type="button" class="btn-quiet" data-save-grv="policy"
-              title="Save what is typed here as a file you can open on another device">Save .grv</button>
+              title="Save these values to open on another device">Save .grv</button>
       <button type="button" class="btn-secondary" id="policyClear">Clear form</button>
       <button type="submit" class="btn-primary" form="policyForm">Preview PDF</button>
     </div>
@@ -421,7 +419,7 @@
         Forms
       </button>
       <button type="button" class="btn-quiet" data-save-grv="unifor"
-              title="Save what is typed here as a file you can open on another device">Save .grv</button>
+              title="Save these values to open on another device">Save .grv</button>
       <button type="button" class="btn-secondary" id="uniforClear">Clear form</button>
       <button type="submit" class="btn-primary" form="uniforForm">Preview PDF</button>
     </div>
@@ -766,7 +764,7 @@
         Forms
       </button>
       <button type="button" class="btn-quiet" data-save-grv="investigation"
-              title="Save what is typed here as a file you can open on another device">Save .grv</button>
+              title="Save these values to open on another device">Save .grv</button>
       <button type="button" class="btn-secondary" id="investigationClear">Clear form</button>
       <button type="submit" class="btn-primary" form="investigationForm">Preview PDF</button>
     </div>
@@ -935,9 +933,12 @@
         <input type="checkbox" id="editorFill"> Solid fill
       </label>
 
+      <!-- Deliberately spelled out. Someone covering a name will assume it's gone, and being
+           wrong about that is the one mistake in this app with a real cost. -->
       <p class="tool-note" id="fillNote" hidden>
-        A solid box covers what is under it in the picture, but the text stays in the file
-        beneath. Treat it as hiding, not deleting.
+        This hides the content, it doesn’t remove it. Whatever is underneath stays in the file
+        and can be recovered by anyone who opens it. Don’t rely on it to redact names, addresses
+        or anything else confidential.
       </p>
     </div>
 
@@ -980,16 +981,16 @@
 
     <div id="adminAuth">
       <p class="admin-lede">
-        Publishing a rename commits <code>forms.config.js</code> to the site's repository, so the
-        new names show up for everyone once the site rebuilds.
+        Renaming commits <code>forms.config.js</code> to the repository. The new names appear
+        once the site rebuilds.
       </p>
       <label class="admin-field">
         <span>GitHub token</span>
         <input type="password" id="adminToken" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
       </label>
       <p class="admin-hint">
-        A fine-grained token with <strong>Contents: Read and write</strong> on this repository only.
-        It isn't saved anywhere — you'll paste it again next time.
+        Fine-grained token, <strong>Contents: Read and write</strong>, this repository only.
+        Not saved — paste it again next time.
       </p>
       <div class="admin-actions">
         <button type="button" class="btn-secondary" data-admin-close>Cancel</button>
@@ -1037,7 +1038,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=51"></script>
-<script src="script.js?v=51"></script>
+<script src="annotate.js?v=52"></script>
+<script src="script.js?v=52"></script>
 </body>
 </html>

@@ -393,15 +393,6 @@ input[type="radio"] { width: 15px; height: 15px; }
   padding: 7px 9px;
 }
 
-/* The sentence under the control that says what the choice actually does */
-.layout-help {
-  margin: 7px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--c-text-muted);
-  max-width: 62ch;
-}
-
 .builder-markup {
   font-family: var(--font-sans);
   font-size: 12px;

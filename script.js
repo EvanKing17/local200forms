@@ -184,7 +184,7 @@ async function showPdf(blob, filename, doc, onBack) {
     setViewerStatus('');
   } catch (err) {
     if (token !== viewerToken) return;
-    setViewerStatus('The preview couldn’t be drawn, but the file is fine — use Download.');
+    setViewerStatus('Couldn’t draw the preview. The file is fine — use Download.');
   }
 }
 
@@ -240,7 +240,7 @@ document.getElementById('pdfViewerDownload').addEventListener('click', () => {
     return;
   }
   // Downloads land silently in a folder, so say where it went
-  setViewerStatus('Saved as “' + name + '” — check your downloads.', true);
+  setViewerStatus('Saved “' + name + '” to your downloads.', true);
 });
 
 document.getElementById('pdfViewerPrint').addEventListener('click', () => {
@@ -1414,7 +1414,7 @@ async function handleIncomingFile(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const payload = readEmbeddedFormData(bytes);
   if (!payload) {
-    showUploadError('This PDF wasn’t made here, so its fields can’t be filled in automatically.', file);
+    showUploadError('This PDF wasn’t made here, so its fields can’t be filled in.', file);
     return;
   }
   if (!FORM_BUILDERS[payload.formType]) {
@@ -1462,7 +1462,7 @@ document.querySelectorAll('[data-save-grv]').forEach(button => {
   button.addEventListener('click', () => {
     const type = button.dataset.saveGrv;
     if (!formHasContent(type)) {
-      showUploadError('There is nothing in this form to save yet.');
+      showUploadError('Nothing to save yet.');
       return;
     }
     const name = saveGrv(type);
@@ -1507,20 +1507,14 @@ document.addEventListener('paste', (e) => {
 
 /* ============ How pictures are laid out on a page ============
  *
- * One control, the same three choices and the same words wherever pictures turn into pages —
- * the builder and a form's supporting documents both. Learning it once is enough.
- *
- * Each choice carries a sentence saying what it does, shown for whichever one is picked. These
- * forms are used by reps who work with computers all day and by reps who don't, and "Fit to
- * Letter" means nothing to the second kind. Nobody should have to try all three to find out.
+ * One control, the same three choices wherever pictures turn into pages — the builder and a
+ * form's supporting documents both. The labels say what happens; there is no help text under
+ * them, because a line of prose explaining "Two pictures per page" would be worse than nothing.
  */
 const PAGE_LAYOUTS = [
-  { value: 'image', label: 'Page fits the picture',
-    help: 'Every picture gets a page its own size and shape. Nothing is shrunk, turned or cut off. Best for screenshots.' },
-  { value: 'letter', label: 'One picture per page',
-    help: 'Each picture is centred on a letter page, and the page turns sideways when the picture is wider than it is tall.' },
-  { value: 'pair', label: 'Two pictures per page',
-    help: 'Pictures are stacked two to a letter page, in the order shown. A PDF still contributes its own pages.' },
+  { value: 'image', label: 'Page fits the picture' },
+  { value: 'letter', label: 'One picture per page' },
+  { value: 'pair', label: 'Two pictures per page' },
 ];
 
 function layoutPicker(current, onChange) {
@@ -1542,22 +1536,10 @@ function layoutPicker(current, onChange) {
     select.appendChild(el);
   });
   select.value = current;
-
-  const help = document.createElement('p');
-  help.className = 'layout-help';
-  const describe = () => {
-    const picked = PAGE_LAYOUTS.find(o => o.value === select.value) || PAGE_LAYOUTS[0];
-    help.textContent = picked.help;
-  };
-  describe();
-
-  select.addEventListener('change', () => {
-    describe();
-    onChange(select.value);
-  });
+  select.addEventListener('change', () => onChange(select.value));
 
   row.append(caption, select);
-  wrap.append(row, help);
+  wrap.appendChild(row);
   return wrap;
 }
 
@@ -1836,7 +1818,7 @@ async function collectSharedFile() {
     const type = response.headers.get('content-type') || '';
     await handleIncomingFile(new File([await response.blob()], name, { type }));
   } catch (err) {
-    showUploadError('Something was shared here, but it couldn’t be read.');
+    showUploadError('Couldn’t read what was shared.');
   }
 }
 
@@ -3485,7 +3467,7 @@ function renderAttachmentList(type) {
   heading.className = 'dc-attach-head';
   const pages = totalAttachedPages(type);
   heading.textContent = docs.length
-    ? 'Supporting documents — ' + pages + (pages === 1 ? ' page' : ' pages') + ' added after the form'
+    ? 'Supporting documents — ' + pages + (pages === 1 ? ' page' : ' pages')
     : 'Supporting documents';
   host.appendChild(heading);
 
@@ -3622,6 +3604,7 @@ function markUp(item) {
 // reference would go on pointing at the old array
 Object.defineProperty(window, 'builderItems', { get: () => builderItems });
 window.attachmentFit = attachmentFit;
+Object.defineProperty(window, 'builderFit', { get: () => builderFit });
 
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX,
                  get attachments() { return attachments; },

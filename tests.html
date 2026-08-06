@@ -1044,7 +1044,7 @@ function run(win, doc) {
     doc.querySelector('[data-save-grv="policy"]').click();
     const said = doc.getElementById('uploadError').textContent;
     doc.getElementById('uploadError').hidden = true;
-    return said.indexOf('nothing in this form') !== -1 || { detail: said || '(said nothing)' };
+    return said.indexOf('Nothing to save') !== -1 || { detail: said || '(said nothing)' };
   });
 
   check(g11, 'The share target and the .grv handler are declared', () => {
@@ -1403,25 +1403,37 @@ function run(win, doc) {
       { detail: 'builder ' + inBuilder.join(', ') + ' vs form ' + onForm.join(', ') };
   });
 
-  checkAsync(g14, 'Every choice explains itself in plain words', async () => {
+  checkAsync(g14, 'Choosing a layout is what the PDF is built with', async () => {
+    win.showBuilder();
+    win.builderItems.length = 0;
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(800, 400)));
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(800, 400)));
+    win.renderBuilder();
+    const select = doc.querySelector('#builderLayout .layout-select');
+    select.value = 'pair';
+    select.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const bytes = await win.Annotator.compile(win.builderItems, win.builderFit);
+    const sizes = await sizesOf(bytes);
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    // two pictures, paired, so one sheet — proof the choice reached the output
+    return sizes.length === 1 || { detail: 'built ' + sizes.length + ' pages: ' + sizes.join(' ') };
+  });
+
+  checkAsync(g14, 'The layout control is a label and a menu, with no paragraph under it', async () => {
     win.showBuilder();
     win.builderItems.length = 0;
     win.builderItems.push(await win.Annotator.readFile(await madeImage(400, 200)));
     win.renderBuilder();
-    const select = doc.querySelector('#builderLayout .layout-select');
-    const help = doc.querySelector('#builderLayout .layout-help');
-    const seen = [];
-    ['image', 'letter', 'pair'].forEach(value => {
-      select.value = value;
-      select.dispatchEvent(new win.Event('change', { bubbles: true }));
-      seen.push(help.textContent);
-    });
+    const host = doc.getElementById('builderLayout');
+    const prose = Array.from(host.querySelectorAll('p'))
+      .map(p => p.textContent.trim()).filter(Boolean);
     win.builderItems.length = 0;
     win.renderBuilder();
     win.showHome();
-    const distinct = new Set(seen).size === 3;
-    const wordy = seen.every(s => s.length > 40 && !/letter$/i.test(s.trim()));
-    return (distinct && wordy) || { detail: seen.join(' // ') };
+    // The option names carry it. Prose under a three-item menu is noise, not help.
+    return prose.length === 0 || { detail: 'prose under the menu: ' + prose.join(' | ') };
   });
 
   checkAsync(g14, 'The choice on a form is the one its PDF is built with', async () => {
