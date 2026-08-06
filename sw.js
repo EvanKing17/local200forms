@@ -8,7 +8,7 @@
  * CACHE is versioned: bump it whenever a precached file changes, or browsers will keep serving
  * the old copy. Old caches are deleted on activate.
  */
-const VERSION = '55';
+const VERSION = '56';
 const CACHE = 'local200forms-v' + VERSION;
 
 /* Must match the ?v= in index.html — bump both together, or the worker will keep serving the

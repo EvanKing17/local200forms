@@ -2286,17 +2286,23 @@ input[type="radio"] { width: 15px; height: 15px; }
 /* Freehand tools hide the crosshair and show the actual nib instead */
 .editor-stage:has(.editor-canvas) .editor-canvas { cursor: crosshair; }
 
+/* A ring, not a blob: it shows how wide the nib is without covering what's under it */
 .brush-cursor {
   position: absolute;
   z-index: 3;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  border: 1px solid rgba(0, 0, 0, 0.35);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 .brush-cursor[hidden] { display: none; }
 
-.editor.is-freehand .editor-canvas { cursor: none; }
+/*
+ * The real pointer is never hidden. It used to be, so the size marker could stand in for it —
+ * but at a thin nib that marker is a four-pixel dot, which is far less than a cursor. With
+ * nothing on screen to aim with you lose track of the mouse entirely and can't even find it to
+ * move off the page. The marker shows the nib size; the cursor shows where you are.
+ */
+.editor.is-freehand .editor-canvas { cursor: crosshair; }
 
 @media (max-width: 760px) {
   .editor-body { flex-direction: column; }

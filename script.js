@@ -1556,7 +1556,8 @@ const builderView = document.getElementById('builderView');
 const builderPages = document.getElementById('builderPages');
 const builderError = document.getElementById('builderError');
 let builderItems = [];
-let builderFit = 'image';        // screenshots are what this is for, so pages match them
+const DEFAULT_BUILDER_FIT = 'letter';   // ordinary paper, one picture to a sheet
+let builderFit = DEFAULT_BUILDER_FIT;
 
 function showBuilder() {
   currentFormType = null;
@@ -1917,8 +1918,15 @@ window.addEventListener('dragenter', (e) => {
   dragDepth += 1;
   // The builder highlights its own drop area instead — the overlay's wording is about opening
   // a PDF, which is not what dropping one in there does
-  if (!builderView.hidden) builderView.classList.add('is-dragging');
-  else dropOverlay.hidden = false;
+  if (!builderView.hidden) {
+    builderView.classList.add('is-dragging');
+  } else {
+    // On a form it lands in the supporting documents, so the overlay says so rather than
+    // promising to open it
+    dropOverlay.querySelector('.drop-overlay-text').textContent =
+      currentFormType && !workspace.hidden ? 'Add to this form' : 'Drop a PDF to open it';
+    dropOverlay.hidden = false;
+  }
 });
 
 window.addEventListener('dragover', (e) => {
@@ -1949,7 +1957,19 @@ window.addEventListener('drop', (e) => {
     addToBuilder(files);
     return;
   }
-  // Images have nowhere to go on a form, but they're exactly what the builder is for
+
+  /*
+   * With a form open, anything dropped becomes one of its supporting documents. Nothing dropped
+   * on a form replaces it: a photo used to jump to the builder and take the form off screen,
+   * and a recognised PDF would have filled the form over top of whatever was already typed.
+   * To open a saved grievance, drop it on the Forms page.
+   */
+  if (currentFormType && !workspace.hidden) {
+    files.forEach(file => addAttachment(currentFormType, file));
+    return;
+  }
+
+  // Images have nowhere else to go, and they're exactly what the builder is for
   if (files.every(f => /^image\//.test(f.type))) {
     showBuilder();
     addToBuilder(files);
@@ -3307,8 +3327,14 @@ function updateBrushCursor() {
   brushCursor.style.width = size + 'px';
   brushCursor.style.height = size + 'px';
   brushCursor.style.borderRadius = editorTool === 'highlight' ? '2px' : '50%';
-  brushCursor.style.background = settings().color;
-  brushCursor.style.opacity = editorTool === 'highlight' ? '0.45' : '0.85';
+  /*
+   * The highlighter's nib is wide and flat, so a translucent swatch reads as what it will lay
+   * down. Everything else is an outline, so the marker never hides the thing being drawn on.
+   */
+  const highlighting = editorTool === 'highlight';
+  brushCursor.style.background = highlighting ? settings().color : 'transparent';
+  brushCursor.style.border = highlighting ? 'none' : '1.5px solid ' + settings().color;
+  brushCursor.style.opacity = highlighting ? '0.45' : '0.9';
 }
 
 let lastPointer = null;
@@ -3734,7 +3760,7 @@ Object.defineProperty(window, 'builderItems', { get: () => builderItems });
 window.attachmentFit = attachmentFit;
 Object.defineProperty(window, 'builderFit', { get: () => builderFit });
 
-window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX,
+window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX, defaultBuilderFit: DEFAULT_BUILDER_FIT,
                  get attachments() { return attachments; },
                  TOOL_SETTINGS, INK_COLOURS, HIGHLIGHT_COLOURS };
 

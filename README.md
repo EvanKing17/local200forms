@@ -201,8 +201,9 @@ screenshot doesn't cost the work — add it and mark up again. The marked pages
 become a single document in the list at that point, so put them in the order
 you want before marking up. Back leaves without keeping anything.
 
-Dropping images on the Forms page opens this directly — they have nowhere to go
-on a form, and this is what they're for.
+Dropping images on the Forms page opens this directly. With a form open they
+attach to that form instead — nothing dropped on a form ever replaces it. To
+open a saved grievance PDF back into its form, drop it on the Forms page.
 
 ### Page layout
 
@@ -211,12 +212,12 @@ documents, with the same three choices and the same words. It only shows up
 once a picture has been added, since a stack of PDFs keeps its own pages
 whatever is chosen.
 
-- **Match each picture (any size)** — no paper size at all: each page comes out
-  exactly as big as the picture on it. A full-screen grab makes a page the size
-  of your screen. Best for reading on a screen, and the builder's default.
 - **Letter paper, one per page** — normal paper, one picture centred on it,
-  turned sideways when the picture is wider than it is tall. A form's default,
-  since a grievance gets printed and handed over.
+  turned sideways when the picture is wider than it is tall. The default in both
+  places: these documents get printed and handed over.
+- **Match each picture (any size)** — no paper size at all: each page comes out
+  exactly as big as the picture on it, so a full-screen grab makes a page the
+  size of your screen. Good for reading on a screen, awkward to print.
 - **Letter paper, two per page** — two pictures stacked on one sheet, for the
   ones that go together. A PDF between two pictures breaks the pair rather than
   reaching past it, and an odd one out takes the top half rather than being

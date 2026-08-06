@@ -1557,6 +1557,50 @@ function run(win, doc) {
                 'px off before, ' + after.toFixed(1) + 'px off after' };
   });
 
+  checkAsync(g14, 'Dropping on an open form attaches, and never replaces it', async () => {
+    win.showForm('ford');
+    const form = doc.getElementById('fordForm');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Half Typed Grievance';
+    win.__app.attachments.ford.length = 0;
+
+    const drop = (files) => {
+      const ev = new win.Event('drop', { bubbles: true, cancelable: true });
+      ev.dataTransfer = { files, types: ['Files'] };
+      win.dispatchEvent(ev);
+    };
+    drop([await madeImage(600, 400)]);
+    await new Promise(r => win.setTimeout(r, 900));
+
+    const stillOnForm = !doc.getElementById('form-ford').classList.contains('active') ? false
+      : doc.getElementById('builderView').hidden && !doc.getElementById('workspace').hidden;
+    const kept = form.elements.employeeName.value === 'Half Typed Grievance';
+    const attached = win.__app.attachments.ford.length;
+
+    win.__app.attachments.ford.length = 0;
+    win.renderAttachmentList('ford');
+    win.clearForm(form);
+    win.showHome();
+    return (stillOnForm && kept && attached === 1) ||
+      { detail: 'onForm=' + stillOnForm + ' textKept=' + kept + ' attached=' + attached };
+  });
+
+  check(g14, 'The real pointer is never hidden while drawing', () => {
+    // It used to be, leaving a four-pixel dot to aim with and no way to find the mouse
+    const rules = Array.from(doc.styleSheets)
+      .flatMap(sheet => { try { return Array.from(sheet.cssRules); } catch (e) { return []; } })
+      .filter(rule => rule.selectorText && rule.selectorText.indexOf('.editor-canvas') !== -1)
+      .map(rule => rule.selectorText + ' -> ' + (rule.style.cursor || ''))
+      .filter(text => text.indexOf('-> ') !== text.length - 3);
+    const hidesIt = rules.filter(t => / none$/.test(t));
+    return hidesIt.length === 0 || { detail: hidesIt.join(' | ') };
+  });
+
+  check(g14, 'The builder starts on ordinary paper, not picture-sized pages', () => {
+    return win.__app.defaultBuilderFit === 'letter' ||
+      { detail: 'starts on ' + win.__app.defaultBuilderFit };
+  });
+
   check(g14, 'Scrolling is not blocked over the page', () => {
     // touch-action: none on the canvas stopped two fingers on a trackpad moving the document
     const rules = Array.from(doc.styleSheets)
