@@ -3101,23 +3101,30 @@ function documentZoom() {
 
 function applyTextSize(large) {
   document.body.classList.toggle('is-large-text', large);
-  const button = document.getElementById('textSizeToggle');
-  if (button) {
+  // Every copy of the control, wherever it is, shows the same state
+  const label = large ? 'Normal text' : 'Larger text';
+  document.querySelectorAll('[data-text-size]').forEach(button => {
     button.setAttribute('aria-pressed', String(large));
-    const label = large ? 'Normal text' : 'Larger text';
     button.setAttribute('title', label);
     button.setAttribute('aria-label', label);
-  }
+  });
   if (currentFormType) {
     FORM_BUILDERS[currentFormType].form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
     updatePageBreaks(currentFormType);
   }
 }
 
-document.getElementById('textSizeToggle').addEventListener('click', () => {
-  const large = !document.body.classList.contains('is-large-text');
-  applyTextSize(large);
-  try { localStorage.setItem(TEXT_SIZE_KEY, large ? 'large' : 'normal'); } catch { /* not fatal */ }
+/*
+ * One control, several places. The fixed button sits under the editor and the preview, which
+ * cover the whole window, so each of those carries its own — someone who needs larger text
+ * needs it there too, and a floating button over a document would be in the way.
+ */
+document.querySelectorAll('[data-text-size]').forEach(button => {
+  button.addEventListener('click', () => {
+    const large = !document.body.classList.contains('is-large-text');
+    applyTextSize(large);
+    try { localStorage.setItem(TEXT_SIZE_KEY, large ? 'large' : 'normal'); } catch { /* not fatal */ }
+  });
 });
 
 try {

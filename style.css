@@ -1867,7 +1867,46 @@ input[type="radio"] { width: 15px; height: 15px; }
  * the PDF, so growing the type alone would push it out of cells built to fit it.
  */
 .is-large-text .home-view,
-.is-large-text .form-panel { zoom: 1.25; }
+.is-large-text .form-panel,
+.is-large-text .builder-view { zoom: 1.25; }
+
+/*
+ * The editor and the preview cover the whole window, so they need it too — but only the parts
+ * made of words. Zooming a whole overlay would scale the document with it and there is nowhere
+ * for a page already sized to the window to grow into; the pages have their own fit.
+ */
+.is-large-text .editor-bar,
+.is-large-text .editor-tools,
+.is-large-text .pdf-viewer-bar,
+.is-large-text .admin-modal,
+.is-large-text .upload-error,
+.is-large-text .drop-overlay-text { zoom: 1.2; }
+
+/* The tool list grows with its type rather than clipping it */
+.is-large-text .editor-tools { width: auto; min-width: 200px; }
+
+/* A control in a bar that already has buttons: same mark, sized to sit beside them */
+.bar-text-size {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1px;
+  width: 42px;
+  height: 38px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.bar-text-size:hover { background: rgba(255, 255, 255, 0.14); }
+.bar-text-size[aria-pressed="true"] {
+  background: #fff;
+  color: var(--dc-primary, #002855);
+  border-color: #fff;
+}
 
 /* ---------- Sheet navigation ---------- */
 .dc-sheet-nav { position: relative; }
@@ -1927,7 +1966,8 @@ input[type="radio"] { width: 15px; height: 15px; }
 @media print {
   .dc-sheet-nav { display: none !important; }
   .is-large-text .home-view,
-  .is-large-text .form-panel { zoom: 1; }   /* paper is paper */
+  .is-large-text .form-panel,
+  .is-large-text .builder-view { zoom: 1; }   /* paper is paper */
   .text-size-toggle { display: none !important; }
 }
 

@@ -14,12 +14,12 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=57">
+<link rel="stylesheet" href="style.css?v=58">
 </head>
 <body>
 
 <!-- Fixed rather than part of either page, so it's in the same place whichever one you're on -->
-<button type="button" class="text-size-toggle" id="textSizeToggle"
+<button type="button" class="text-size-toggle" id="textSizeToggle" data-text-size
         aria-pressed="false" title="Larger text" aria-label="Larger text">
   <span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span>
 </button>
@@ -875,6 +875,8 @@
       <span class="editor-count" id="editorPageLabel"></span>
     </div>
     <div class="editor-bar-actions">
+      <button type="button" class="bar-text-size" data-text-size
+              aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span></button>
       <button type="button" class="btn-secondary" id="editorUndo">Undo</button>
       <button type="button" class="btn-secondary" id="editorRedo">Redo</button>
       <button type="button" class="btn-primary" id="editorDone">Done</button>
@@ -1028,6 +1030,8 @@
     </button>
     <input type="text" class="pdf-viewer-name" id="pdfViewerName" aria-label="File name" spellcheck="false">
     <div class="pdf-viewer-actions">
+      <button type="button" class="bar-text-size" data-text-size
+              aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span></button>
       <button type="button" class="btn-secondary" id="pdfViewerPrint">Print</button>
       <button type="button" class="btn-primary" id="pdfViewerDownload">Download</button>
       <button type="button" class="pdf-viewer-close" id="pdfViewerClose" aria-label="Close preview">&times;</button>
@@ -1043,7 +1047,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=57"></script>
-<script src="script.js?v=57"></script>
+<script src="annotate.js?v=58"></script>
+<script src="script.js?v=58"></script>
 </body>
 </html>

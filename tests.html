@@ -1635,6 +1635,53 @@ function run(win, doc) {
       { detail: pages + ' pages in the editor, named ' + named };
   });
 
+  checkAsync(g14, 'Larger text reaches the builder, the editor and the preview', async () => {
+    const zoomOf = (sel) => {
+      const el = doc.querySelector(sel);
+      return el ? parseFloat(win.getComputedStyle(el).zoom) || 1 : null;
+    };
+    win.applyTextSize(false);
+    win.showBuilder();
+    win.builderItems.length = 0;
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(600, 400)));
+    win.renderBuilder();
+    const builderNormal = zoomOf('#builderView');
+
+    win.applyTextSize(true);
+    const builderLarge = zoomOf('#builderView');
+
+    doc.getElementById('builderMarkup').click();
+    await new Promise(r => win.setTimeout(r, 1500));
+    const bar = zoomOf('.editor-bar');
+    const tools = zoomOf('.editor-tools');
+    doc.getElementById('editorBack').click();
+
+    win.applyTextSize(false);
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    return (builderNormal === 1 && builderLarge > 1 && bar > 1 && tools > 1) ||
+      { detail: 'builder ' + builderNormal + '->' + builderLarge +
+                ', editor bar ' + bar + ', tools ' + tools };
+  });
+
+  check(g14, 'The control is reachable on every screen, and agrees with itself', () => {
+    // The fixed button sits under the editor and the preview, which cover the whole window
+    const all = Array.from(doc.querySelectorAll('[data-text-size]'));
+    const inEditor = all.some(b => b.closest('#editor'));
+    const inViewer = all.some(b => b.closest('#pdfViewer'));
+    const fixed = all.some(b => !b.closest('#editor') && !b.closest('#pdfViewer'));
+
+    win.applyTextSize(true);
+    const allOn = all.every(b => b.getAttribute('aria-pressed') === 'true');
+    win.applyTextSize(false);
+    const allOff = all.every(b => b.getAttribute('aria-pressed') === 'false');
+
+    return (all.length >= 3 && inEditor && inViewer && fixed && allOn && allOff) ||
+      { detail: all.length + ' controls; editor=' + inEditor + ' viewer=' + inViewer +
+                ' fixed=' + fixed + ' agreeOn=' + allOn + ' agreeOff=' + allOff };
+  });
+
   check(g14, 'The real pointer is never hidden while drawing', () => {
     // It used to be, leaving a four-pixel dot to aim with and no way to find the mouse
     const rules = Array.from(doc.styleSheets)
