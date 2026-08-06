@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=49">
+<link rel="stylesheet" href="style.css?v=50">
 </head>
 <body>
 
@@ -59,10 +59,49 @@
        has nothing to drag with. -->
   <div class="home-actions">
     <button type="button" class="home-action is-danger" id="clearAllForms" hidden>Clear all forms</button>
+    <button type="button" class="home-action" id="openBuilder">New PDF from images</button>
     <label class="home-action" for="uploadInput">Upload a PDF</label>
     <input type="file" id="uploadInput" accept="application/pdf,application/json,.json,.grv" hidden>
   </div>
   <p class="upload-error" id="uploadError" hidden></p>
+</div>
+
+<!-- ================= BUILD A PDF FROM IMAGES =================
+     For sending a pile of screenshots as one document. Each image becomes a page; a PDF
+     dropped in contributes its own pages unchanged. -->
+<div class="builder-view" id="builderView" hidden>
+  <div class="dc-toolbar">
+    <button type="button" class="dc-back" data-back-to-forms>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+      </svg>
+      Forms
+    </button>
+    <span class="builder-count" id="builderCount">Nothing added yet</span>
+    <label class="builder-fit">
+      <span>Page size</span>
+      <select id="builderFit">
+        <option value="image">Match each image</option>
+        <option value="letter">One per page, turned to fit</option>
+        <option value="pair">Two per page</option>
+      </select>
+    </label>
+    <button type="button" class="btn-secondary" id="builderClear">Start over</button>
+    <button type="button" class="btn-primary" id="builderPreview">Preview PDF</button>
+  </div>
+
+  <div class="builder-drop" id="builderDrop">
+    <p class="builder-hint">
+      Press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste a screenshot, drop files anywhere on this page,
+      or <label class="builder-pick" for="builderInput">choose files</label>.
+    </p>
+    <p class="builder-sub">Images and PDFs. They come out in the order below.</p>
+    <input type="file" id="builderInput" accept="image/*,application/pdf" multiple hidden>
+  </div>
+
+  <p class="upload-error" id="builderError" hidden></p>
+  <div class="builder-pages" id="builderPages"></div>
 </div>
 
 <main class="workspace" id="workspace" hidden>
@@ -1005,7 +1044,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=49"></script>
-<script src="script.js?v=49"></script>
+<script src="annotate.js?v=50"></script>
+<script src="script.js?v=50"></script>
 </body>
 </html>

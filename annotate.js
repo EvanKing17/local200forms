@@ -270,40 +270,133 @@
    * Appends each attached document to `formBytes`, keeping the original pages as they are and
    * putting the marks on top of them. Returns the finished PDF as bytes.
    */
-  async function appendInto(PDFLib, out, docs) {
-    for (const item of docs) {
+  async function appendInto(PDFLib, out, docs, fit) {
+    for (let i = 0; i < docs.length; i++) {
+      const item = docs[i];
+
       if (item.kind === 'pdf') {
         const src = await PDFLib.PDFDocument.load(item.bytes, { ignoreEncryption: true });
         const copied = await out.copyPages(src, src.getPageIndices());
-        for (let i = 0; i < copied.length; i++) {
-          out.addPage(copied[i]);
-          await drawOnPdfPage(PDFLib, out, copied[i], item.pages[i]);
+        for (let n = 0; n < copied.length; n++) {
+          out.addPage(copied[n]);
+          await drawOnPdfPage(PDFLib, out, copied[n], item.pages[n]);
         }
-      } else {
-        const image = item.kind === 'png' ? await out.embedPng(item.bytes) : await out.embedJpg(item.bytes);
-        const page = item.pages[0];
-        const sheet = out.addPage([612, 792]);
-        const scale = Math.min((612 - 48) / image.width, (792 - 48) / image.height);
-        const w = image.width * scale, h = image.height * scale;
-        sheet.drawImage(image, { x: (612 - w) / 2, y: (792 - h) / 2, width: w, height: h });
-        // The marks were placed against the image, so they are drawn in that same box
-        await drawOnPdfPage(PDFLib, out, {
-          getSize: () => ({ width: w, height: h }),
-          drawLine: (o) => sheet.drawLine(shift(o, (612 - w) / 2, (792 - h) / 2)),
-          drawRectangle: (o) => sheet.drawRectangle(shift(o, (612 - w) / 2, (792 - h) / 2)),
-          drawEllipse: (o) => sheet.drawEllipse(shift(o, (612 - w) / 2, (792 - h) / 2)),
-          drawSvgPath: (p, o) => sheet.drawSvgPath(p, shift(o, (612 - w) / 2, (792 - h) / 2)),
-          drawImage: (img, o) => sheet.drawImage(img, shift(o, (612 - w) / 2, (792 - h) / 2)),
-        }, page);
+        continue;
       }
+
+      /*
+       * Two to a sheet. Pictures that belong together usually arrive together, so consecutive
+       * images pair up; a PDF between them breaks the pair rather than reaching past it, and an
+       * odd one out takes the top half on its own instead of being stretched to fill the page.
+       */
+      if (fit === 'pair') {
+        const next = docs[i + 1];
+        const partner = next && next.kind !== 'pdf' ? next : null;
+        const first = await embedImage(out, item);
+        const second = partner ? await embedImage(out, partner) : null;
+        const layout = pairBoxes(first, second);
+        const sheet = out.addPage(layout.page);
+
+        sheet.drawImage(first, layout.top);
+        await drawOnPdfPage(PDFLib, out, boxProxy(sheet, layout.top), item.pages[0]);
+        if (second) {
+          sheet.drawImage(second, layout.bottom);
+          await drawOnPdfPage(PDFLib, out, boxProxy(sheet, layout.bottom), partner.pages[0]);
+          i++;                                  // the partner has been used up
+        }
+        continue;
+      }
+
+      const image = await embedImage(out, item);
+      const box = imageBox(image, fit);
+      const sheet = out.addPage(box.page);
+      sheet.drawImage(image, box);
+      // The marks were placed against the image, so they are drawn in that same box
+      await drawOnPdfPage(PDFLib, out, boxProxy(sheet, box), item.pages[0]);
     }
     return out;
+  }
+
+  function embedImage(out, item) {
+    return item.kind === 'png' ? out.embedPng(item.bytes) : out.embedJpg(item.bytes);
+  }
+
+  /* Makes a box on a sheet look like a page, so marks land where the picture actually is */
+  function boxProxy(sheet, box) {
+    return {
+      getSize: () => ({ width: box.width, height: box.height }),
+      drawLine: (o) => sheet.drawLine(shift(o, box.x, box.y)),
+      drawRectangle: (o) => sheet.drawRectangle(shift(o, box.x, box.y)),
+      drawEllipse: (o) => sheet.drawEllipse(shift(o, box.x, box.y)),
+      drawSvgPath: (p, o) => sheet.drawSvgPath(p, shift(o, box.x, box.y)),
+      drawImage: (img, o) => sheet.drawImage(img, shift(o, box.x, box.y)),
+    };
   }
 
   async function appendTo(formBytes, docs) {
     const PDFLib = await loadPdfLib();
     const out = await PDFLib.PDFDocument.load(formBytes);
-    await appendInto(PDFLib, out, docs);
+    await appendInto(PDFLib, out, docs, 'letter');
+    return out.save();
+  }
+
+  /*
+   * Where an image sits on its page, and how big that page is.
+   *
+   * 'image' gives the picture a page of its own exactly its own size, which is what a pile of
+   * screenshots wants — no margin, no shrinking, nothing to line up. Screenshots are measured in
+   * CSS pixels, so they convert at 96 to the inch.
+   *
+   * 'letter' is the sheet a form's attachments have always been put on: centred, with a margin,
+   * on paper that matches the rest of the document.
+   */
+  const PT_PER_PX = 72 / 96;
+  const SHEET = 612, SHEET_LONG = 792, MARGIN = 24, PAIR_GAP = 24;
+
+  function imageBox(image, fit) {
+    if (fit === 'image') {
+      const width = Math.max(1, Math.round(image.width * PT_PER_PX));
+      const height = Math.max(1, Math.round(image.height * PT_PER_PX));
+      return { page: [width, height], x: 0, y: 0, width, height };
+    }
+    /*
+     * The paper turns to match the picture. A screenshot is nearly always wider than it is tall,
+     * and on portrait paper it came out as a strip across the middle with half the sheet empty.
+     */
+    const landscape = image.width > image.height;
+    const pw = landscape ? SHEET_LONG : SHEET;
+    const ph = landscape ? SHEET : SHEET_LONG;
+    return { page: [pw, ph], ...fitInside(image, MARGIN, MARGIN, pw - MARGIN * 2, ph - MARGIN * 2) };
+  }
+
+  /* Two on a portrait sheet, one above the other, each centred in its half */
+  function pairBoxes(first, second) {
+    const slotH = (SHEET_LONG - MARGIN * 2 - PAIR_GAP) / 2;
+    const slotW = SHEET - MARGIN * 2;
+    return {
+      page: [SHEET, SHEET_LONG],
+      top: fitInside(first, MARGIN, MARGIN + slotH + PAIR_GAP, slotW, slotH),
+      bottom: second ? fitInside(second, MARGIN, MARGIN, slotW, slotH) : null,
+    };
+  }
+
+  /* Largest the picture can be inside a slot without distorting it, centred there */
+  function fitInside(image, slotX, slotY, slotW, slotH) {
+    const scale = Math.min(slotW / image.width, slotH / image.height);
+    const width = image.width * scale, height = image.height * scale;
+    return { x: slotX + (slotW - width) / 2, y: slotY + (slotH - height) / 2, width, height };
+  }
+
+  /*
+   * A new document built from nothing but what's handed to it — images each becoming a page,
+   * PDFs contributing their pages as they are. Used by the builder on the Forms page, where a
+   * dozen screenshots get compiled into one thing to send off.
+   */
+  async function compile(items, fit) {
+    const PDFLib = await loadPdfLib();
+    const out = await PDFLib.PDFDocument.create();
+    await appendInto(PDFLib, out, items, fit || 'image');
+    if (out.getPageCount() === 0) throw new Error('there are no pages to save');
     return out.save();
   }
 
@@ -325,7 +418,7 @@
   async function standalone(item) {
     const PDFLib = await loadPdfLib();
     const out = await PDFLib.PDFDocument.create();
-    await appendInto(PDFLib, out, [item]);
+    await appendInto(PDFLib, out, [item], 'letter');
     return out.save();
   }
 
@@ -350,7 +443,7 @@
   }
 
   window.Annotator = {
-    readFile, renderPage, drawAnnotation, appendTo, standalone, renderToCanvases,
+    readFile, renderPage, drawAnnotation, appendTo, standalone, renderToCanvases, compile, imageBox, pairBoxes,
     loadPdfJs, loadPdfLib, strokeWidthFor,
   };
 })();

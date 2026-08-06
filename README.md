@@ -182,6 +182,30 @@ real credential, it is never stored, and GitHub is what verifies it.
 `admin.html` does the same job offline, producing the file for you to commit by
 hand. It is the fallback if the token route ever gives trouble.
 
+## Building a PDF out of images
+
+**New PDF from images** on the Forms page, for sending a batch of screenshots as
+one document instead of a dozen attachments.
+
+Press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste a screenshot straight in, drop files
+anywhere on the page, or pick them. Images and PDFs both go in; a PDF
+contributes its own pages unchanged, still vector and still searchable. Pages
+come out in the order shown, and each one can be moved or removed.
+
+Three ways to size the pages:
+
+- **Match each image** — every picture gets a page exactly its own size. No
+  margins, no shrinking. This is the one for screenshots.
+- **One per page, turned to fit** — a Letter sheet, centred with a margin, and
+  the paper turns landscape when the picture is wider than it is tall. A wide
+  screenshot on portrait paper is a strip across the middle of an empty sheet.
+- **Two per page** — two pictures stacked on a Letter sheet, for the ones that
+  go together. A PDF between two images breaks the pair rather than reaching
+  past it, and an odd one out takes the top half instead of being stretched.
+
+Dropping images on the Forms page opens this directly — they have nowhere to go
+on a form, and this is what they're for.
+
 ## Editing
 
 No build step — edit and push, GitHub Pages redeploys.

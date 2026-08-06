@@ -1234,6 +1234,150 @@ function run(win, doc) {
       { detail: 'text=' + takesText + ' distinguishes the two=' + marks };
   });
 
+  const g14 = group('Building a PDF out of images');
+
+  // A real PNG, made here so there is nothing to fetch
+  const madeImage = (w, h) => new Promise(resolve => {
+    const c = doc.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#3355aa'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#fff'; ctx.fillRect(8, 8, Math.max(1, w - 16), Math.max(1, h - 16));
+    c.toBlob(b => resolve(new win.File([b], w + 'x' + h + '.png', { type: 'image/png' })), 'image/png');
+  });
+
+  const sizesOf = async (bytes) => {
+    const PDFLib = await win.Annotator.loadPdfLib();
+    const pdf = await PDFLib.PDFDocument.load(bytes);
+    return pdf.getPages().map(p => {
+      const s = p.getSize();
+      return Math.round(s.width) + 'x' + Math.round(s.height);
+    });
+  };
+
+  checkAsync(g14, 'Each image becomes a page its own size', async () => {
+    const items = [await win.Annotator.readFile(await madeImage(400, 200)),
+                   await win.Annotator.readFile(await madeImage(96, 96))];
+    const sizes = await sizesOf(await win.Annotator.compile(items, 'image'));
+    // 96 CSS pixels to the inch, 72 points to the inch
+    return (sizes.join(' ') === '300x150 72x72') || { detail: sizes.join(' ') };
+  });
+
+  checkAsync(g14, 'A wide picture turns the paper landscape', async () => {
+    const items = [await win.Annotator.readFile(await madeImage(1600, 900)),
+                   await win.Annotator.readFile(await madeImage(600, 1000))];
+    const sizes = await sizesOf(await win.Annotator.compile(items, 'letter'));
+    return (sizes.join(' ') === '792x612 612x792') || { detail: sizes.join(' ') };
+  });
+
+  checkAsync(g14, 'Two pictures share one sheet', async () => {
+    const items = [];
+    for (let i = 0; i < 4; i++) items.push(await win.Annotator.readFile(await madeImage(800, 400)));
+    const sizes = await sizesOf(await win.Annotator.compile(items, 'pair'));
+    return (sizes.length === 2 && sizes.every(s => s === '612x792')) || { detail: sizes.join(' ') };
+  });
+
+  checkAsync(g14, 'An odd one out gets the top half, not the whole page', async () => {
+    const items = [];
+    for (let i = 0; i < 3; i++) items.push(await win.Annotator.readFile(await madeImage(800, 400)));
+    const sizes = await sizesOf(await win.Annotator.compile(items, 'pair'));
+    const alone = win.Annotator.pairBoxes({ width: 800, height: 400 }, null);
+    return (sizes.length === 2 && alone.bottom === null && alone.top.height < 792 / 2) ||
+      { detail: sizes.length + ' pages, lone top height ' + (alone.top && alone.top.height) };
+  });
+
+  checkAsync(g14, 'Pictures keep their shape, whatever the page', async () => {
+    const wrong = [];
+    [['image', 1600, 900], ['letter', 1600, 900], ['letter', 400, 1200]].forEach(([fit, w, h]) => {
+      const box = win.Annotator.imageBox({ width: w, height: h }, fit);
+      if (Math.abs(box.width / box.height - w / h) > 0.01) wrong.push(fit + ' ' + w + 'x' + h);
+    });
+    const pair = win.Annotator.pairBoxes({ width: 800, height: 400 }, { width: 400, height: 800 });
+    if (Math.abs(pair.top.width / pair.top.height - 2) > 0.01) wrong.push('pair top');
+    if (Math.abs(pair.bottom.width / pair.bottom.height - 0.5) > 0.01) wrong.push('pair bottom');
+    return wrong.length === 0 || { detail: 'distorted: ' + wrong.join(', ') };
+  });
+
+  checkAsync(g14, 'The two halves do not overlap and stay on the sheet', async () => {
+    const p = win.Annotator.pairBoxes({ width: 800, height: 400 }, { width: 800, height: 400 });
+    const bottomTop = p.bottom.y + p.bottom.height;
+    const fits = p.bottom.y >= 0 && p.top.y + p.top.height <= 792 && bottomTop <= p.top.y;
+    return fits || { detail: 'bottom ends at ' + bottomTop.toFixed(1) + ', top starts at ' + p.top.y.toFixed(1) };
+  });
+
+  checkAsync(g14, 'A PDF added in keeps its own pages', async () => {
+    const src = win.buildFordDoc(win.fd(doc.getElementById('fordForm')));
+    const items = [await win.Annotator.readFile(await madeImage(400, 200)),
+                   await win.Annotator.readFile(asFile(src, 'Form.pdf'))];
+    const sizes = await sizesOf(await win.Annotator.compile(items, 'image'));
+    return (sizes.length === 3 && sizes[0] === '300x150' && sizes[1] === '612x792') ||
+      { detail: sizes.join(' ') };
+  });
+
+  checkAsync(g14, 'A PDF between two pictures breaks the pair rather than reaching past it', async () => {
+    const src = win.buildPolicyDoc(win.fd(doc.getElementById('policyForm')));
+    const items = [await win.Annotator.readFile(await madeImage(800, 400)),
+                   await win.Annotator.readFile(asFile(src, 'Between.pdf')),
+                   await win.Annotator.readFile(await madeImage(800, 400))];
+    const sizes = await sizesOf(await win.Annotator.compile(items, 'pair'));
+    // picture, form page, picture — three sheets, not the two a blind pairing would give
+    return sizes.length === 3 || { detail: sizes.length + ' pages: ' + sizes.join(' ') };
+  });
+
+  checkAsync(g14, 'Pages come out in the order they are listed, and can be reordered', async () => {
+    win.showBuilder();
+    win.builderItems.length = 0;
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(400, 200)));
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(120, 120)));
+    win.renderBuilder();
+
+    const before = await sizesOf(await win.Annotator.compile(win.builderItems, 'image'));
+    const cards = doc.querySelectorAll('#builderPages .builder-card');
+    const two = cards.length === 2;
+    cards[1].querySelector('.builder-move').click();          // the second one's "move earlier"
+    const after = await sizesOf(await win.Annotator.compile(win.builderItems, 'image'));
+
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    return (two && before.join(' ') === '300x150 90x90' && after.join(' ') === '90x90 300x150') ||
+      { detail: two + ' | ' + before.join(' ') + ' -> ' + after.join(' ') };
+  });
+
+  checkAsync(g14, 'Removing a page takes it out of the document', async () => {
+    win.showBuilder();
+    win.builderItems.length = 0;
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(400, 200)));
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(120, 120)));
+    win.renderBuilder();
+    doc.querySelector('#builderPages .builder-card .builder-remove').click();
+    const left = win.builderItems.length;
+    const sizes = await sizesOf(await win.Annotator.compile(win.builderItems, 'image'));
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    return (left === 1 && sizes.join(' ') === '90x90') || { detail: left + ' left: ' + sizes.join(' ') };
+  });
+
+  checkAsync(g14, 'A file that is neither picture nor PDF is named, not swallowed', async () => {
+    win.showBuilder();
+    win.builderItems.length = 0;
+    await win.addToBuilder([new win.File(['x'], 'notes.txt', { type: 'text/plain' })]);
+    const said = doc.getElementById('builderError').textContent;
+    const added = win.builderItems.length;
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    return (added === 0 && said.indexOf('notes.txt') !== -1) ||
+      { detail: 'added=' + added + ' said=' + (said || '(nothing)') };
+  });
+
+  check(g14, 'Attaching to a form still uses a letter sheet', () => {
+    // The builder's page sizing must not have leaked into the pile that rides on a grievance
+    const box = win.Annotator.imageBox({ width: 400, height: 200 }, 'letter');
+    return (box.page[0] === 792 && box.page[1] === 612) || { detail: box.page.join('x') };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {

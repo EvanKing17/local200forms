@@ -1272,6 +1272,7 @@ function showHome() {
   currentFormType = null;
   homeView.hidden = false;
   workspace.hidden = true;
+  builderView.hidden = true;
   refreshClearAllButton();
   refreshDraftFlags();
 }
@@ -1314,6 +1315,7 @@ function populateForm(form, data) {
 function showForm(type, data) {
   currentFormType = type;
   homeView.hidden = true;
+  builderView.hidden = true;
   workspace.hidden = false;
   panels.forEach(p => p.classList.remove('active'));
   document.getElementById('form-' + type).classList.add('active');
@@ -1503,6 +1505,172 @@ document.addEventListener('paste', (e) => {
   }
 });
 
+/* ============ Building a PDF out of images ============
+ *
+ * A dozen screenshots from the accounting software, sent as one document instead of a dozen
+ * attachments. Each image becomes a page; a PDF dropped in contributes its pages unchanged,
+ * still vector, still searchable.
+ *
+ * Separate from a form's attachments on purpose — that pile rides on the end of a grievance,
+ * this one is the whole document.
+ */
+const builderView = document.getElementById('builderView');
+const builderPages = document.getElementById('builderPages');
+const builderError = document.getElementById('builderError');
+let builderItems = [];
+
+function showBuilder() {
+  currentFormType = null;
+  homeView.hidden = true;
+  workspace.hidden = true;
+  builderView.hidden = false;
+  builderError.hidden = true;
+  renderBuilder();
+}
+
+function builderPageCount() {
+  return builderItems.reduce((n, item) => n + item.pages.length, 0);
+}
+
+function showBuilderError(message) {
+  builderError.textContent = message;
+  builderError.hidden = false;
+}
+
+function renderBuilder() {
+  const pages = builderPageCount();
+  document.getElementById('builderCount').textContent =
+    builderItems.length === 0 ? 'Nothing added yet'
+      : pages + (pages === 1 ? ' page' : ' pages') +
+        ' from ' + builderItems.length + (builderItems.length === 1 ? ' file' : ' files');
+  document.getElementById('builderPreview').disabled = builderItems.length === 0;
+  document.getElementById('builderClear').disabled = builderItems.length === 0;
+
+  builderPages.innerHTML = '';
+  let pageNumber = 1;
+  builderItems.forEach((item, index) => {
+    const card = document.createElement('div');
+    card.className = 'builder-card';
+
+    const thumb = document.createElement('div');
+    thumb.className = 'builder-thumb';
+    if (item.pages[0] && item.pages[0].view) thumb.appendChild(item.pages[0].view);
+
+    const name = document.createElement('span');
+    name.className = 'builder-name';
+    name.textContent = item.name;
+
+    const where = document.createElement('span');
+    where.className = 'builder-where';
+    where.textContent = item.pages.length === 1
+      ? 'Page ' + pageNumber
+      : 'Pages ' + pageNumber + '–' + (pageNumber + item.pages.length - 1);
+    pageNumber += item.pages.length;
+
+    const actions = document.createElement('div');
+    actions.className = 'builder-card-actions';
+    const move = (label, to, enabled) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'builder-move';
+      b.textContent = label;
+      b.disabled = !enabled;
+      b.title = label === '↑' ? 'Move earlier' : 'Move later';
+      b.addEventListener('click', () => {
+        const [moved] = builderItems.splice(index, 1);
+        builderItems.splice(to, 0, moved);
+        renderBuilder();
+      });
+      return b;
+    };
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'builder-remove';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => {
+      builderItems.splice(index, 1);
+      renderBuilder();
+    });
+    actions.append(move('↑', index - 1, index > 0),
+                   move('↓', index + 1, index < builderItems.length - 1),
+                   remove);
+
+    card.append(thumb, name, where, actions);
+    builderPages.appendChild(card);
+  });
+}
+
+/* Anything that can become a page. Rejected files are named rather than passed over in silence */
+async function addToBuilder(files) {
+  const list = Array.from(files || []);
+  if (!list.length) return;
+  const refused = [];
+  for (const file of list) {
+    const usable = /^image\//.test(file.type) || /\.(png|jpe?g)$/i.test(file.name) ||
+                   /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+    if (!usable) {
+      refused.push(file.name || 'that file');
+      continue;
+    }
+    try {
+      builderItems.push(await Annotator.readFile(file));
+    } catch (err) {
+      refused.push((file.name || 'that file') + ' (' + err.message + ')');
+    }
+  }
+  renderBuilder();
+  if (refused.length) showBuilderError('Couldn’t use ' + refused.join(', ') + '.');
+  else builderError.hidden = true;
+}
+
+document.getElementById('openBuilder').addEventListener('click', showBuilder);
+document.getElementById('builderInput').addEventListener('change', (e) => {
+  const files = e.target.files;
+  e.target.value = '';                       // so the same file can be picked again
+  addToBuilder(files);
+});
+document.getElementById('builderClear').addEventListener('click', () => {
+  if (builderItems.length && !confirm('Start over? The pages added so far will be dropped.')) return;
+  builderItems = [];
+  builderError.hidden = true;
+  renderBuilder();
+});
+
+document.getElementById('builderPreview').addEventListener('click', async () => {
+  if (!builderItems.length) return;
+  const button = document.getElementById('builderPreview');
+  const said = button.textContent;
+  button.textContent = 'Building…';
+  button.disabled = true;
+  try {
+    const fit = document.getElementById('builderFit').value;
+    const bytes = await Annotator.compile(builderItems, fit);
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    await showPdf(blob, builderFilename(), null, showBuilder);
+  } catch (err) {
+    showBuilderError('Couldn’t build that PDF: ' + err.message + '.');
+  } finally {
+    button.textContent = said;
+    button.disabled = false;
+  }
+});
+
+function builderFilename() {
+  const now = new Date();
+  const date = MONTH_NAMES_FULL[now.getMonth()] + ' ' + now.getDate() + ' ' + now.getFullYear();
+  return 'Supporting Documents - ' + date + '.pdf';
+}
+
+/* A screenshot on the clipboard is the whole point of this, so paste is the first-class way in */
+document.addEventListener('paste', (e) => {
+  if (builderView.hidden) return;
+  const items = Array.from((e.clipboardData && e.clipboardData.items) || []);
+  const files = items.filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean);
+  if (!files.length) return;
+  e.preventDefault();
+  addToBuilder(files);
+});
+
 /* ---------- Arriving from somewhere else ---------- */
 
 /*
@@ -1630,7 +1798,10 @@ window.addEventListener('dragenter', (e) => {
   if (!draggingFile(e)) return;
   e.preventDefault();
   dragDepth += 1;
-  dropOverlay.hidden = false;
+  // The builder highlights its own drop area instead — the overlay's wording is about opening
+  // a PDF, which is not what dropping one in there does
+  if (!builderView.hidden) builderView.classList.add('is-dragging');
+  else dropOverlay.hidden = false;
 });
 
 window.addEventListener('dragover', (e) => {
@@ -1641,7 +1812,10 @@ window.addEventListener('dragover', (e) => {
 window.addEventListener('dragleave', (e) => {
   if (!draggingFile(e)) return;
   dragDepth = Math.max(0, dragDepth - 1);
-  if (dragDepth === 0) dropOverlay.hidden = true;
+  if (dragDepth === 0) {
+    dropOverlay.hidden = true;
+    builderView.classList.remove('is-dragging');
+  }
 });
 
 window.addEventListener('drop', (e) => {
@@ -1649,7 +1823,22 @@ window.addEventListener('drop', (e) => {
   e.preventDefault();   // otherwise the browser navigates to the file
   dragDepth = 0;
   dropOverlay.hidden = true;
-  handleIncomingFile(e.dataTransfer.files[0]);
+  builderView.classList.remove('is-dragging');
+  const files = Array.from(e.dataTransfer.files || []);
+  if (!files.length) return;
+
+  // In the builder everything dropped is a page, and all of it at once rather than the first one
+  if (!builderView.hidden) {
+    addToBuilder(files);
+    return;
+  }
+  // Images have nowhere to go on a form, but they're exactly what the builder is for
+  if (files.every(f => /^image\//.test(f.type))) {
+    showBuilder();
+    addToBuilder(files);
+    return;
+  }
+  handleIncomingFile(files[0]);
 });
 
 /* ============ Clear all forms ============ */
@@ -3342,6 +3531,10 @@ function markUp(item) {
     }
   });
 }
+
+// A getter, not a copy: the list is replaced outright when the builder is cleared, and a plain
+// reference would go on pointing at the old array
+Object.defineProperty(window, 'builderItems', { get: () => builderItems });
 
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX,
                  get attachments() { return attachments; },
