@@ -1610,6 +1610,29 @@ function showBuilderError(message) {
   builderError.hidden = false;
 }
 
+/*
+ * A small copy of the first page for the card.
+ *
+ * The page's own canvas used to go straight into the card. It's rendered at up to 1800px so it
+ * can be drawn on, and the card shows it at about 170px — so a dozen screenshots put eighty-odd
+ * megabytes of canvas in the page for the compositor to rescale on every paint. None of that
+ * shows up in the heap, it just makes the whole app crawl. This is drawn once and kept.
+ */
+const THUMB_EDGE = 360;          // twice the size it's shown at, so it stays sharp
+
+function thumbnailOf(item) {
+  const source = item.pages[0] && item.pages[0].view;
+  if (!source) return null;
+  if (item.thumb) return item.thumb;
+  const scale = Math.min(1, THUMB_EDGE / Math.max(source.width, source.height));
+  const small = document.createElement('canvas');
+  small.width = Math.max(1, Math.round(source.width * scale));
+  small.height = Math.max(1, Math.round(source.height * scale));
+  small.getContext('2d').drawImage(source, 0, 0, small.width, small.height);
+  item.thumb = small;
+  return small;
+}
+
 function renderBuilder() {
   const plan = builderPagePlan();
   const pages = plan.pages;
@@ -1638,7 +1661,8 @@ function renderBuilder() {
 
     const thumb = document.createElement('div');
     thumb.className = 'builder-thumb';
-    if (item.pages[0] && item.pages[0].view) thumb.appendChild(item.pages[0].view);
+    const picture = thumbnailOf(item);
+    if (picture) thumb.appendChild(picture);
 
     const name = document.createElement('span');
     name.className = 'builder-name';
@@ -3741,6 +3765,45 @@ async function openForMarkup(file) {
  * editor with the marks still in place, rather than throwing the work away and landing on the
  * form list.
  */
+/*
+ * Mark up the whole thing: the form as it will print, with its supporting documents after it,
+ * as one scrolling document. Marking a single attachment on its own is still there, but this is
+ * the usual want — an arrow on the form pointing at the photo three pages later.
+ */
+const FORM_MARKUP_NAMES = {
+  ford: ['employeeName', 'Grievance Claim', 'dateIncident'],
+  policy: ['employeeName', 'Policy Grievance', 'dateIncident'],
+  unifor: ['grievorName', 'Fact Sheet', 'uniforDateIncident'],
+  investigation: ['supervisorName', 'Investigation Form', 'dateInfraction'],
+};
+
+async function markUpForm(type) {
+  const button = document.querySelector('[data-markup-form="' + type + '"]');
+  const wording = button ? button.textContent : null;
+  if (button) { button.disabled = true; button.textContent = 'Building…'; }
+  try {
+    const entry = FORM_BUILDERS[type];
+    const data = fd(entry.form);
+    const doc = entry.build(data);
+    const docs = attachmentsFor(type);
+    const bytes = docs.length
+      ? await window.Annotator.appendTo(doc.output('arraybuffer'), docs, attachmentFit[type])
+      : new Uint8Array(doc.output('arraybuffer'));
+
+    const [nameField, label, dateField] = FORM_MARKUP_NAMES[type];
+    const filename = buildFilename(data[nameField], label, data[dateField]);
+    markUp(await window.Annotator.readFile(new File([bytes], filename, { type: 'application/pdf' })));
+  } catch (err) {
+    showUploadError('Couldn’t open that for mark-up: ' + err.message);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = wording; }
+  }
+}
+
+document.querySelectorAll('[data-markup-form]').forEach(button => {
+  button.addEventListener('click', () => markUpForm(button.dataset.markupForm));
+});
+
 function markUp(item) {
   openEditor(item, async (finished) => {
     if (!finished) return;

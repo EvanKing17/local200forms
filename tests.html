@@ -1585,6 +1585,56 @@ function run(win, doc) {
       { detail: 'onForm=' + stillOnForm + ' textKept=' + kept + ' attached=' + attached };
   });
 
+  checkAsync(g14, 'Cards hold a small copy, not the full-size page canvas', async () => {
+    /*
+     * The page's own canvas is rendered at up to 1800px so it can be drawn on. Putting it
+     * straight in a card meant a dozen screenshots left eighty-odd megabytes of canvas for the
+     * compositor to rescale on every paint — invisible in the heap, and it made the whole app
+     * crawl. The card gets a small copy instead.
+     */
+    win.showBuilder();
+    win.builderItems.length = 0;
+    const shots = [];
+    for (let i = 0; i < 6; i++) shots.push(await madeImage(1920, 1080));
+    await win.addToBuilder(shots);
+
+    const cards = Array.from(doc.querySelectorAll('#builderPages .builder-thumb canvas'));
+    const backingMB = cards.reduce((n, c) => n + c.width * c.height * 4, 0) / 1048576;
+    const biggest = Math.max(...cards.map(c => Math.max(c.width, c.height)));
+    // and the page itself must keep its full-size canvas, which is what gets drawn on
+    const pageStillFull = Math.max(...win.builderItems.map(i => i.pages[0].view.width)) > 1000;
+
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    return (cards.length === 6 && biggest <= 400 && backingMB < 5 && pageStillFull) ||
+      { detail: cards.length + ' cards, biggest ' + biggest + 'px, ' +
+                backingMB.toFixed(0) + 'MB of canvas, pageFullSize=' + pageStillFull };
+  });
+
+  checkAsync(g14, 'A form marks up whole, with its supporting documents after it', async () => {
+    win.showForm('policy');
+    const form = doc.getElementById('policyForm');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Whole Packet';
+    win.__app.attachments.policy.length = 0;
+    win.__app.attachments.policy.push(await win.Annotator.readFile(await madeImage(800, 600)));
+
+    await win.markUpForm('policy');
+    await new Promise(r => win.setTimeout(r, 1200));
+    const pages = doc.querySelectorAll('#editorPages .editor-canvas').length;
+    const named = doc.getElementById('editorName').value;
+    doc.getElementById('editorBack').click();
+
+    win.__app.attachments.policy.length = 0;
+    win.renderAttachmentList('policy');
+    win.clearForm(form);
+    win.showHome();
+    // the form page, then the attachment — one document, not one or the other
+    return (pages === 2 && /Whole Packet/.test(named)) ||
+      { detail: pages + ' pages in the editor, named ' + named };
+  });
+
   check(g14, 'The real pointer is never hidden while drawing', () => {
     // It used to be, leaving a four-pixel dot to aim with and no way to find the mouse
     const rules = Array.from(doc.styleSheets)

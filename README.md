@@ -26,6 +26,9 @@ because the page on screen *is* the page that comes out.
   appended after it, so the grievance and its evidence go in as one file.
 - **Mark them up** — draw, highlight, arrows, boxes and ovals, and blur. Each
   tool keeps its own colour and thickness; the highlighter has its own palette.
+  **Mark up** on a form opens the form *and* its supporting documents as one
+  scrolling document, so an arrow on page 1 can point at a photo on page 4.
+  A single attachment can still be marked on its own from the list.
 - **Re-open a finished PDF.** Drop one anywhere on the page, or use the link
   under the form list. A PDF this app made fills the form back in — it
   recognises its own files from data embedded invisibly in them. Anything else
