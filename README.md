@@ -196,6 +196,11 @@ come out in the order shown, and each one can be moved or removed.
 editor a PDF from the Forms page gets: all the pages, scrolling, marked up as
 one thing rather than picture by picture.
 
+Done brings you back here with the mark-up kept, so remembering a missing
+screenshot doesn't cost the work — add it and mark up again. The marked pages
+become a single document in the list at that point, so put them in the order
+you want before marking up. Back leaves without keeping anything.
+
 Dropping images on the Forms page opens this directly — they have nowhere to go
 on a form, and this is what they're for.
 

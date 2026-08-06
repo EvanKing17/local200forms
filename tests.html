@@ -1488,15 +1488,15 @@ function run(win, doc) {
     canvas.dispatchEvent(ev('pointerup', 0.7, 0.7));
 
     doc.getElementById('editorDone').click();
-    await new Promise(r2 => win.setTimeout(r2, 1500));   // saved, then shown in the viewer
+    await new Promise(r2 => win.setTimeout(r2, 500));    // back on the builder, mark-up kept
 
     /*
-     * Read it back out of the file that was actually produced. A rectangle is an outline, not a
-     * fill, so scan a line across the page and count what isn't white — the picture's own blue
-     * edging sits in the outer few pixels, so anything in the strip between is the mark.
+     * Read it back out of the file that would actually be produced. A rectangle is an outline,
+     * not a fill, so scan a line across the page and count what isn't white — the picture's own
+     * blue edging sits in the outer few pixels, so anything in the strip between is the mark.
      */
     const saved = await win.Annotator.renderToCanvases(
-      new Uint8Array(await win.__viewerBlob().arrayBuffer()), 1);
+      await win.Annotator.compile(win.builderItems, win.builderFit), 1);
     const c = saved[1];
     const row = c.getContext('2d').getImageData(0, Math.round(c.height * 0.45), c.width, 1).data;
     let marked = 0;
@@ -1505,7 +1505,6 @@ function run(win, doc) {
       if (!(row[i] > 245 && row[i + 1] > 245 && row[i + 2] > 245)) marked++;
     }
 
-    doc.getElementById('pdfViewerClose').click();
     win.builderItems.length = 0;
     win.renderBuilder();
     win.showHome();
@@ -1570,6 +1569,83 @@ function run(win, doc) {
     return (always && always.indexOf('pan-y') !== -1 &&
             whileDrawing && whileDrawing.indexOf('none') !== -1) ||
       { detail: rules.join(' | ') || 'no touch-action rule found' };
+  });
+
+  // Adds a picture and draws one box on it in the editor, leaving the editor open
+  const markUpBuilder = async (pictures) => {
+    win.showBuilder();
+    win.builderItems.length = 0;
+    for (let i = 0; i < pictures; i++) {
+      win.builderItems.push(await win.Annotator.readFile(await madeImage(600, 400)));
+    }
+    win.renderBuilder();
+    useLayout('image');
+    doc.getElementById('builderMarkup').click();
+    await new Promise(r => win.setTimeout(r, 1800));
+  };
+
+  const drawBox = () => {
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
+    const r = canvas.getBoundingClientRect();
+    doc.querySelector('#editorTools .tool[data-tool="rect"]').click();
+    const ev = (t, x, y) => new win.PointerEvent(t, { clientX: r.left + x * r.width,
+      clientY: r.top + y * r.height, pointerId: 1, bubbles: true, cancelable: true });
+    canvas.dispatchEvent(ev('pointerdown', 0.2, 0.2));
+    canvas.dispatchEvent(ev('pointermove', 0.7, 0.7));
+    canvas.dispatchEvent(ev('pointerup', 0.7, 0.7));
+  };
+
+  checkAsync(g14, 'Mark-up survives going back to add another picture', async () => {
+    await markUpBuilder(2);
+    drawBox();
+    doc.getElementById('editorDone').click();
+    await new Promise(r => win.setTimeout(r, 400));
+
+    const backOnBuilder = !doc.getElementById('builderView').hidden;
+    const kept = win.builderItems.reduce(
+      (n, item) => n + item.pages.reduce((m, p) => m + p.annotations.length, 0), 0);
+
+    // the forgotten screenshot, added afterwards
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(400, 300)));
+    win.renderBuilder();
+    const sizes = await sizesOf(await win.Annotator.compile(win.builderItems, win.builderFit));
+
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    // two marked pages plus the new one, and the mark still on board
+    return (backOnBuilder && kept === 1 && sizes.length === 3) ||
+      { detail: 'onBuilder=' + backOnBuilder + ' marksKept=' + kept + ' pages=' + sizes.length };
+  });
+
+  checkAsync(g14, 'Opening the editor and backing out changes nothing', async () => {
+    await markUpBuilder(3);
+    doc.getElementById('editorBack').click();          // no marks, so no confirm
+    await new Promise(r => win.setTimeout(r, 300));
+    const files = win.builderItems.length;
+    const stillPictures = win.builderItems.every(i => i.kind !== 'pdf');
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    // the three pictures stay three pictures, not one collapsed document
+    return (files === 3 && stillPictures) ||
+      { detail: files + ' items, all pictures=' + stillPictures };
+  });
+
+  checkAsync(g14, 'Backing out of the editor leaves, rather than going on to the preview', async () => {
+    // Back used to run the same callback as Done, so it went forward to the preview, whose own
+    // Back reopened the editor — the two bounced off each other with no way out
+    const src = win.buildPolicyDoc(win.fd(doc.getElementById('policyForm')));
+    const item = await win.Annotator.readFile(asFile(src, 'Bounce.pdf'));
+    let handedBack = 'nothing';
+    win.openEditor(item, (finished) => { handedBack = finished ? 'the document' : 'nothing'; });
+    doc.getElementById('editorBack').click();
+    const editorClosed = doc.getElementById('editor').hidden;
+    const previewClosed = doc.getElementById('pdfViewer').hidden;
+    if (!previewClosed) doc.getElementById('pdfViewerClose').click();
+    return (editorClosed && previewClosed && handedBack === 'nothing') ||
+      { detail: 'editorClosed=' + editorClosed + ' previewClosed=' + previewClosed +
+                ' handed back ' + handedBack };
   });
 
   checkAsync(g14, 'Page labels follow the layout, so two-up says one page', async () => {

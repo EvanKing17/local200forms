@@ -1750,7 +1750,20 @@ document.getElementById('builderMarkup').addEventListener('click', async () => {
     const bytes = await Annotator.compile(builderItems, builderFit);
     const name = builderFilename();
     const item = await Annotator.readFile(new File([bytes], name, { type: 'application/pdf' }));
-    markUp(item);
+
+    openEditor(item, (finished) => {
+      showBuilder();
+      if (!finished) return;                       // backed out; the pictures are as they were
+      /*
+       * The marked-up document becomes the thing being built, so remembering a missing
+       * screenshot doesn't cost the mark-up. Adding another picture appends to it and it can
+       * be marked up again. Only when there is something to keep — otherwise opening the
+       * editor and closing it would collapse the pictures into one file for no reason.
+       */
+      const marks = finished.pages.reduce((n, page) => n + page.annotations.length, 0);
+      if (marks) builderItems = [finished];
+      renderBuilder();
+    });
   } catch (err) {
     showBuilderError('Couldn’t open that for mark-up: ' + err.message + '.');
   } finally {
@@ -3389,7 +3402,12 @@ function closeEditor(discarding) {
   editorDoc = null;
   editorOnDone = null;
   pageCanvases = [];
-  if (done) done(finished);
+  /*
+   * Backing out hands back nothing. It used to hand back the document either way, so Back ran
+   * the same callback as Done and went forward to the preview — whose own Back reopened the
+   * editor. Two buttons bouncing off each other with no way out of either.
+   */
+  if (done) done(discarding ? null : finished);
 }
 
 document.getElementById('editorBack').addEventListener('click', () => closeEditor(true));
@@ -3714,7 +3732,6 @@ function markUp(item) {
 // reference would go on pointing at the old array
 Object.defineProperty(window, 'builderItems', { get: () => builderItems });
 window.attachmentFit = attachmentFit;
-window.__viewerBlob = () => viewerBlob;      // so a test can read what the viewer is showing
 Object.defineProperty(window, 'builderFit', { get: () => builderFit });
 
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX,
