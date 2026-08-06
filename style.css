@@ -2194,6 +2194,12 @@ input[type="radio"] { width: 15px; height: 15px; }
   background: var(--c-surface);
   border-right: 1px solid var(--c-border);
   overflow-y: auto;
+  /*
+   * Room for the scrollbar whether or not there is one. Ticking Solid fill adds a note, which
+   * made the panel overflow, which took width away for the scrollbar and reflowed everything
+   * beside it — the last colour dropped to a second row as you clicked.
+   */
+  scrollbar-gutter: stable;
 }
 
 .tool-group {
@@ -2239,11 +2245,22 @@ input[type="radio"] { width: 15px; height: 15px; }
 }
 .tool-label b { color: var(--c-text); }
 
-.swatches { display: flex; flex-wrap: wrap; gap: 9px; }
+/*
+ * A fixed five across, sized to whatever room there is, rather than five fixed widths that fit
+ * until something takes a few pixels away. Both palettes are five colours, so this is one row
+ * at any panel width and can't be knocked onto a second.
+ */
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  justify-items: center;
+}
 
 .swatch {
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  max-width: 28px;
+  aspect-ratio: 1;
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.15);
   cursor: pointer;

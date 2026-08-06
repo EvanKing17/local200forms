@@ -1682,6 +1682,42 @@ function run(win, doc) {
                 ' fixed=' + fixed + ' agreeOn=' + allOn + ' agreeOff=' + allOff };
   });
 
+  checkAsync(g14, 'Ticking Solid fill does not move the colours', async () => {
+    win.showBuilder();
+    win.builderItems.length = 0;
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(600, 400)));
+    win.renderBuilder();
+    doc.getElementById('builderMarkup').click();
+    await new Promise(r => win.setTimeout(r, 1500));
+
+    doc.querySelector('#editorTools .tool[data-tool="rect"]').click();
+    const tools = doc.querySelector('.editor-tools');
+    const swatches = () => Array.from(doc.querySelectorAll('.swatches .swatch'));
+    const rows = () => new Set(swatches().map(s => Math.round(s.getBoundingClientRect().top))).size;
+    const lastLeft = () => Math.round(swatches().slice(-1)[0].getBoundingClientRect().left);
+
+    const before = { rows: rows(), last: lastLeft(), width: tools.getBoundingClientRect().width };
+    const fill = doc.getElementById('editorFill');
+    fill.checked = true;
+    fill.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const noteShown = !doc.getElementById('fillNote').hidden;
+    const after = { rows: rows(), last: lastLeft(), width: tools.getBoundingClientRect().width };
+
+    fill.checked = false;
+    fill.dispatchEvent(new win.Event('change', { bubbles: true }));
+    doc.getElementById('editorBack').click();
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+
+    // one row before and after, the last colour in the same place, panel the same width
+    return (noteShown && before.rows === 1 && after.rows === 1 &&
+            before.last === after.last && before.width === after.width) ||
+      { detail: 'note=' + noteShown + ' rows ' + before.rows + '->' + after.rows +
+                ', last colour at ' + before.last + '->' + after.last +
+                ', panel ' + before.width + '->' + after.width };
+  });
+
   check(g14, 'The real pointer is never hidden while drawing', () => {
     // It used to be, leaving a four-pixel dot to aim with and no way to find the mouse
     const rules = Array.from(doc.styleSheets)
