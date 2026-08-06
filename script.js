@@ -1505,6 +1505,62 @@ document.addEventListener('paste', (e) => {
   }
 });
 
+/* ============ How pictures are laid out on a page ============
+ *
+ * One control, the same three choices and the same words wherever pictures turn into pages —
+ * the builder and a form's supporting documents both. Learning it once is enough.
+ *
+ * Each choice carries a sentence saying what it does, shown for whichever one is picked. These
+ * forms are used by reps who work with computers all day and by reps who don't, and "Fit to
+ * Letter" means nothing to the second kind. Nobody should have to try all three to find out.
+ */
+const PAGE_LAYOUTS = [
+  { value: 'image', label: 'Page fits the picture',
+    help: 'Every picture gets a page its own size and shape. Nothing is shrunk, turned or cut off. Best for screenshots.' },
+  { value: 'letter', label: 'One picture per page',
+    help: 'Each picture is centred on a letter page, and the page turns sideways when the picture is wider than it is tall.' },
+  { value: 'pair', label: 'Two pictures per page',
+    help: 'Pictures are stacked two to a letter page, in the order shown. A PDF still contributes its own pages.' },
+];
+
+function layoutPicker(current, onChange) {
+  const wrap = document.createElement('div');
+  wrap.className = 'layout-picker';
+
+  const row = document.createElement('label');
+  row.className = 'layout-row';
+  const caption = document.createElement('span');
+  caption.className = 'layout-caption';
+  caption.textContent = 'Page layout';
+
+  const select = document.createElement('select');
+  select.className = 'layout-select';
+  PAGE_LAYOUTS.forEach(option => {
+    const el = document.createElement('option');
+    el.value = option.value;
+    el.textContent = option.label;
+    select.appendChild(el);
+  });
+  select.value = current;
+
+  const help = document.createElement('p');
+  help.className = 'layout-help';
+  const describe = () => {
+    const picked = PAGE_LAYOUTS.find(o => o.value === select.value) || PAGE_LAYOUTS[0];
+    help.textContent = picked.help;
+  };
+  describe();
+
+  select.addEventListener('change', () => {
+    describe();
+    onChange(select.value);
+  });
+
+  row.append(caption, select);
+  wrap.append(row, help);
+  return wrap;
+}
+
 /* ============ Building a PDF out of images ============
  *
  * A dozen screenshots from the accounting software, sent as one document instead of a dozen
@@ -1518,6 +1574,7 @@ const builderView = document.getElementById('builderView');
 const builderPages = document.getElementById('builderPages');
 const builderError = document.getElementById('builderError');
 let builderItems = [];
+let builderFit = 'image';        // screenshots are what this is for, so pages match them
 
 function showBuilder() {
   currentFormType = null;
@@ -1546,6 +1603,15 @@ function renderBuilder() {
   document.getElementById('builderPreview').disabled = builderItems.length === 0;
   document.getElementById('builderClear').disabled = builderItems.length === 0;
 
+  // Only worth asking about once there's a picture for it to affect
+  const layoutHost = document.getElementById('builderLayout');
+  layoutHost.innerHTML = '';
+  const hasPicture = builderItems.some(item => item.kind !== 'pdf');
+  layoutHost.hidden = !hasPicture;
+  if (hasPicture) {
+    layoutHost.appendChild(layoutPicker(builderFit, value => { builderFit = value; }));
+  }
+
   builderPages.innerHTML = '';
   let pageNumber = 1;
   builderItems.forEach((item, index) => {
@@ -1569,6 +1635,14 @@ function renderBuilder() {
 
     const actions = document.createElement('div');
     actions.className = 'builder-card-actions';
+
+    // The same editor the supporting documents use — one set of tools to learn, not two
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'builder-markup';
+    edit.textContent = 'Mark up';
+    edit.addEventListener('click', () => openEditor(item, () => renderBuilder()));
+
     const move = (label, to, enabled) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -1593,7 +1667,7 @@ function renderBuilder() {
     });
     actions.append(move('↑', index - 1, index > 0),
                    move('↓', index + 1, index < builderItems.length - 1),
-                   remove);
+                   edit, remove);
 
     card.append(thumb, name, where, actions);
     builderPages.appendChild(card);
@@ -1643,8 +1717,7 @@ document.getElementById('builderPreview').addEventListener('click', async () => 
   button.textContent = 'Building…';
   button.disabled = true;
   try {
-    const fit = document.getElementById('builderFit').value;
-    const bytes = await Annotator.compile(builderItems, fit);
+    const bytes = await Annotator.compile(builderItems, builderFit);
     const blob = new Blob([bytes], { type: 'application/pdf' });
     await showPdf(blob, builderFilename(), null, showBuilder);
   } catch (err) {
@@ -3091,6 +3164,13 @@ const DRAG_TOOLS = ['rect', 'ellipse', 'pixelate', 'arrow'];
 
 const attachments = { ford: [], policy: [], unifor: [], investigation: [] };
 
+/*
+ * How each form lays its pictures out. One page per picture by default: a grievance is a paper
+ * document that gets printed and handed over, so its pages should be paper-sized. The page turns
+ * sideways for a wide picture rather than shrinking it into a strip across an empty sheet.
+ */
+const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter' };
+
 const editor = document.getElementById('editor');
 const editorStage = document.getElementById('editorStage');
 const editorPages = document.getElementById('editorPages');
@@ -3409,6 +3489,12 @@ function renderAttachmentList(type) {
     : 'Supporting documents';
   host.appendChild(heading);
 
+  // Same control, same words as the builder — but only once a picture has been added, since a
+  // stack of PDFs keeps its own pages whatever is chosen here
+  if (docs.some(d => d.kind !== 'pdf')) {
+    host.appendChild(layoutPicker(attachmentFit[type], value => { attachmentFit[type] = value; }));
+  }
+
   docs.forEach((doc, i) => {
     const row = document.createElement('div');
     row.className = 'dc-attach-row';
@@ -3490,7 +3576,7 @@ async function openWithAttachments(doc, type, filename) {
   const wording = button ? button.textContent : null;
   if (button) { button.disabled = true; button.textContent = 'Building…'; }
   try {
-    const bytes = await window.Annotator.appendTo(doc.output('arraybuffer'), docs);
+    const bytes = await window.Annotator.appendTo(doc.output('arraybuffer'), docs, attachmentFit[type]);
     showPdf(new Blob([bytes], { type: 'application/pdf' }), filename, null);
   } catch (err) {
     showPdf(doc.output('blob'), filename, doc);
@@ -3535,6 +3621,7 @@ function markUp(item) {
 // A getter, not a copy: the list is replaced outright when the builder is cleared, and a plain
 // reference would go on pointing at the old array
 Object.defineProperty(window, 'builderItems', { get: () => builderItems });
+window.attachmentFit = attachmentFit;
 
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX,
                  get attachments() { return attachments; },

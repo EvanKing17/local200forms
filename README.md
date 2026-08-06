@@ -192,19 +192,32 @@ anywhere on the page, or pick them. Images and PDFs both go in; a PDF
 contributes its own pages unchanged, still vector and still searchable. Pages
 come out in the order shown, and each one can be moved or removed.
 
-Three ways to size the pages:
-
-- **Match each image** — every picture gets a page exactly its own size. No
-  margins, no shrinking. This is the one for screenshots.
-- **One per page, turned to fit** — a Letter sheet, centred with a margin, and
-  the paper turns landscape when the picture is wider than it is tall. A wide
-  screenshot on portrait paper is a strip across the middle of an empty sheet.
-- **Two per page** — two pictures stacked on a Letter sheet, for the ones that
-  go together. A PDF between two images breaks the pair rather than reaching
-  past it, and an odd one out takes the top half instead of being stretched.
+**Mark up** on any page opens the same editor the supporting documents use —
+same tools, same colours, nothing extra to learn.
 
 Dropping images on the Forms page opens this directly — they have nowhere to go
 on a form, and this is what they're for.
+
+### Page layout
+
+The same control appears in the builder and under a form's supporting
+documents, with the same three choices and the same words. It only shows up
+once a picture has been added, since a stack of PDFs keeps its own pages
+whatever is chosen.
+
+- **Page fits the picture** — every picture gets a page its own size and shape.
+  Nothing shrunk, turned or cut off. Best for screenshots, and the builder's
+  default.
+- **One picture per page** — centred on a letter page, and the page turns
+  sideways when the picture is wider than it is tall. A form's default: a
+  grievance gets printed and handed over, so its pages should be paper-sized.
+- **Two pictures per page** — stacked two to a letter page, for the ones that go
+  together. A PDF between two pictures breaks the pair rather than reaching past
+  it, and an odd one out takes the top half instead of being stretched.
+
+Each choice carries a sentence saying what it does, shown for whichever one is
+picked. These forms get used by reps who work with computers all day and by reps
+who don't; nobody should have to try all three to find out what they mean.
 
 ## Editing
 

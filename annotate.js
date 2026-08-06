@@ -333,10 +333,10 @@
     };
   }
 
-  async function appendTo(formBytes, docs) {
+  async function appendTo(formBytes, docs, fit) {
     const PDFLib = await loadPdfLib();
     const out = await PDFLib.PDFDocument.load(formBytes);
-    await appendInto(PDFLib, out, docs, 'letter');
+    await appendInto(PDFLib, out, docs, fit || 'letter');
     return out.save();
   }
 

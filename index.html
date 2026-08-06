@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=50">
+<link rel="stylesheet" href="style.css?v=51">
 </head>
 <body>
 
@@ -79,14 +79,6 @@
       Forms
     </button>
     <span class="builder-count" id="builderCount">Nothing added yet</span>
-    <label class="builder-fit">
-      <span>Page size</span>
-      <select id="builderFit">
-        <option value="image">Match each image</option>
-        <option value="letter">One per page, turned to fit</option>
-        <option value="pair">Two per page</option>
-      </select>
-    </label>
     <button type="button" class="btn-secondary" id="builderClear">Start over</button>
     <button type="button" class="btn-primary" id="builderPreview">Preview PDF</button>
   </div>
@@ -101,6 +93,7 @@
   </div>
 
   <p class="upload-error" id="builderError" hidden></p>
+  <div id="builderLayout" hidden></div>
   <div class="builder-pages" id="builderPages"></div>
 </div>
 
@@ -1044,7 +1037,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=50"></script>
-<script src="script.js?v=50"></script>
+<script src="annotate.js?v=51"></script>
+<script src="script.js?v=51"></script>
 </body>
 </html>

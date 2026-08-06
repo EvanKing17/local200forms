@@ -1372,10 +1372,116 @@ function run(win, doc) {
       { detail: 'added=' + added + ' said=' + (said || '(nothing)') };
   });
 
-  check(g14, 'Attaching to a form still uses a letter sheet', () => {
-    // The builder's page sizing must not have leaked into the pile that rides on a grievance
-    const box = win.Annotator.imageBox({ width: 400, height: 200 }, 'letter');
-    return (box.page[0] === 792 && box.page[1] === 612) || { detail: box.page.join('x') };
+  check(g14, 'A form lays its pictures out one per page until told otherwise', () => {
+    const defaults = ['ford', 'policy', 'unifor', 'investigation']
+      .filter(t => win.attachmentFit[t] !== 'letter');
+    return defaults.length === 0 || { detail: 'not one-per-page: ' + defaults.join(', ') };
+  });
+
+  checkAsync(g14, 'The same three choices are offered wherever pictures become pages', async () => {
+    // One control to learn, not two — the builder and a form's documents must agree
+    win.showBuilder();
+    win.builderItems.length = 0;
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(400, 200)));
+    win.renderBuilder();
+    const inBuilder = Array.from(doc.querySelectorAll('#builderLayout .layout-select option'))
+      .map(o => o.value + ':' + o.textContent);
+
+    win.showForm('ford');
+    win.__app.attachments.ford.length = 0;
+    win.__app.attachments.ford.push(await win.Annotator.readFile(await madeImage(400, 200)));
+    win.renderAttachmentList('ford');
+    const onForm = Array.from(doc.querySelectorAll('#form-ford .layout-select option'))
+      .map(o => o.value + ':' + o.textContent);
+
+    win.__app.attachments.ford.length = 0;
+    win.renderAttachmentList('ford');
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    return (inBuilder.length === 3 && inBuilder.join(' | ') === onForm.join(' | ')) ||
+      { detail: 'builder ' + inBuilder.join(', ') + ' vs form ' + onForm.join(', ') };
+  });
+
+  checkAsync(g14, 'Every choice explains itself in plain words', async () => {
+    win.showBuilder();
+    win.builderItems.length = 0;
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(400, 200)));
+    win.renderBuilder();
+    const select = doc.querySelector('#builderLayout .layout-select');
+    const help = doc.querySelector('#builderLayout .layout-help');
+    const seen = [];
+    ['image', 'letter', 'pair'].forEach(value => {
+      select.value = value;
+      select.dispatchEvent(new win.Event('change', { bubbles: true }));
+      seen.push(help.textContent);
+    });
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    const distinct = new Set(seen).size === 3;
+    const wordy = seen.every(s => s.length > 40 && !/letter$/i.test(s.trim()));
+    return (distinct && wordy) || { detail: seen.join(' // ') };
+  });
+
+  checkAsync(g14, 'The choice on a form is the one its PDF is built with', async () => {
+    win.showForm('policy');
+    win.__app.attachments.policy.length = 0;
+    win.__app.attachments.policy.push(await win.Annotator.readFile(await madeImage(1600, 900)));
+    win.attachmentFit.policy = 'image';
+    const form = win.buildPolicyDoc(win.fd(doc.getElementById('policyForm')));
+    const bytes = await win.Annotator.appendTo(form.output('arraybuffer'),
+                                               win.__app.attachments.policy, win.attachmentFit.policy);
+    const sizes = await sizesOf(bytes);
+    win.attachmentFit.policy = 'letter';
+    win.__app.attachments.policy.length = 0;
+    win.renderAttachmentList('policy');
+    win.showHome();
+    // form page first, then the picture on a page its own size
+    return (sizes.length === 2 && sizes[1] === '1200x675') || { detail: sizes.join(' ') };
+  });
+
+  checkAsync(g14, 'A mark drawn in the builder is there in the finished PDF', async () => {
+    win.showBuilder();
+    win.builderItems.length = 0;
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(600, 400)));
+    win.renderBuilder();
+
+    doc.querySelector('#builderPages .builder-markup').click();
+    const opened = !doc.getElementById('editor').hidden;
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
+    const r = canvas.getBoundingClientRect();
+    doc.querySelector('#editorTools .tool[data-tool="rect"]').click();
+    const ev = (t, x, y) => new win.PointerEvent(t, { clientX: r.left + x * r.width,
+      clientY: r.top + y * r.height, pointerId: 1, bubbles: true, cancelable: true });
+    canvas.dispatchEvent(ev('pointerdown', 0.2, 0.2));
+    canvas.dispatchEvent(ev('pointermove', 0.7, 0.7));
+    canvas.dispatchEvent(ev('pointerup', 0.7, 0.7));
+    const marks = win.builderItems[0].pages[0].annotations.length;
+    doc.getElementById('editorDone').click();
+
+    const bytes = await win.Annotator.compile(win.builderItems, 'image');
+    const canvases = await win.Annotator.renderToCanvases(bytes, 1);
+    /*
+     * A rectangle is an outline, not a fill, so the middle of it is still the white picture.
+     * Scan a line across the page instead and count what isn't white — the picture's own blue
+     * edging is in the outer few pixels, so the strip between is the mark or nothing.
+     */
+    const c = canvases[0];
+    const row = c.getContext('2d')
+      .getImageData(0, Math.round(c.height * 0.45), c.width, 1).data;
+    let marked = 0;
+    for (let x = Math.round(c.width * 0.1); x < Math.round(c.width * 0.9); x++) {
+      const i = x * 4;
+      if (!(row[i] > 245 && row[i + 1] > 245 && row[i + 2] > 245)) marked++;
+    }
+    const drew = marked > 0;
+
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    return (opened && marks === 1 && drew) ||
+      { detail: 'editor=' + opened + ' marks=' + marks + ' non-white pixels across the line: ' + marked };
   });
 
   const g7 = group('Drafts');
