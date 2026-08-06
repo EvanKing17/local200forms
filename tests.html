@@ -1718,6 +1718,27 @@ function run(win, doc) {
                 ', panel ' + before.width + '->' + after.width };
   });
 
+  check(g14, 'The build number is shown on the Forms page and matches what is served', () => {
+    win.showHome();
+    const tag = doc.getElementById('appVersion');
+    const shown = !tag.hidden && /^v\d+$/.test(tag.textContent);
+    // it must agree with the ?v= the page actually loaded, not a number typed in beside it
+    const src = doc.querySelector('script[src*="script.js"]').getAttribute('src');
+    const served = (src.match(/[?&]v=([\w.]+)/) || [])[1];
+    const agrees = tag.textContent === 'v' + served;
+
+    win.showForm('ford');
+    const hiddenOnForm = tag.hidden;
+    win.showBuilder();
+    const hiddenInBuilder = tag.hidden;
+    win.showHome();
+    const backOnHome = !tag.hidden;
+
+    return (shown && agrees && hiddenOnForm && hiddenInBuilder && backOnHome) ||
+      { detail: 'reads "' + tag.textContent + '" for v' + served + '; onForm hidden=' +
+                hiddenOnForm + ' inBuilder hidden=' + hiddenInBuilder + ' backHome=' + backOnHome };
+  });
+
   check(g14, 'The real pointer is never hidden while drawing', () => {
     // It used to be, leaving a four-pixel dot to aim with and no way to find the mouse
     const rules = Array.from(doc.styleSheets)

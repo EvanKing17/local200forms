@@ -166,6 +166,10 @@ Fact Sheet's radio answers.
 
 It carries values only. Attached documents are not part of it.
 
+The build number sits in the bottom right of the form list — handy when someone
+says a fix isn't there yet. It's read off the `?v=` on `script.js`, so it can't
+disagree with what's actually being served.
+
 ## Install it
 
 On a phone: open the link, then **Add to Home screen** (Chrome: ⋮ menu,

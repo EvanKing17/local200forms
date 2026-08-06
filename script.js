@@ -1265,14 +1265,37 @@ const FORM_BUILDERS = {
 
 let currentFormType = null;
 
+/* ============ Which build this is ============
+ *
+ * Taken off the ?v= that already sits on script.js, so it can't drift from what is actually
+ * being served — there is no separate number to remember to bump. Shown on the Forms page only:
+ * it answers "have you got the new one yet", which is not a question you ask mid-grievance.
+ */
+const APP_VERSION = (() => {
+  const tag = document.querySelector('script[src*="script.js"]');
+  const found = tag && (tag.getAttribute('src') || '').match(/[?&]v=([\w.]+)/);
+  return found ? 'v' + found[1] : '';
+})();
+
+const versionTag = document.getElementById('appVersion');
+if (versionTag) versionTag.textContent = APP_VERSION;
+
+function showVersion(show) {
+  if (versionTag) versionTag.hidden = !show || !APP_VERSION;
+}
+
 /* ============ Home / fill-form view routing ============ */
 const homeView = document.getElementById('homeView');
+
+// The page opens on the form list without going through showHome(), so say so once here too
+showVersion(!homeView.hidden);
 
 function showHome() {
   currentFormType = null;
   homeView.hidden = false;
   workspace.hidden = true;
   builderView.hidden = true;
+  showVersion(true);
   refreshClearAllButton();
   refreshDraftFlags();
 }
@@ -1317,6 +1340,7 @@ function showForm(type, data) {
   homeView.hidden = true;
   builderView.hidden = true;
   workspace.hidden = false;
+  showVersion(false);
   panels.forEach(p => p.classList.remove('active'));
   document.getElementById('form-' + type).classList.add('active');
   const entry = FORM_BUILDERS[type];
@@ -1564,6 +1588,7 @@ function showBuilder() {
   homeView.hidden = true;
   workspace.hidden = true;
   builderView.hidden = false;
+  showVersion(false);
   builderError.hidden = true;
   renderBuilder();
 }
