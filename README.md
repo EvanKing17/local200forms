@@ -192,8 +192,9 @@ anywhere on the page, or pick them. Images and PDFs both go in; a PDF
 contributes its own pages unchanged, still vector and still searchable. Pages
 come out in the order shown, and each one can be moved or removed.
 
-**Mark up** on any page opens the same editor the supporting documents use —
-same tools, same colours, nothing extra to learn.
+**Mark up** assembles everything into one document and opens it in the same
+editor a PDF from the Forms page gets: all the pages, scrolling, marked up as
+one thing rather than picture by picture.
 
 Dropping images on the Forms page opens this directly — they have nowhere to go
 on a form, and this is what they're for.
@@ -205,19 +206,19 @@ documents, with the same three choices and the same words. It only shows up
 once a picture has been added, since a stack of PDFs keeps its own pages
 whatever is chosen.
 
-- **Page fits the picture** — every picture gets a page its own size and shape.
-  Nothing shrunk, turned or cut off. Best for screenshots, and the builder's
-  default.
-- **One picture per page** — centred on a letter page, and the page turns
-  sideways when the picture is wider than it is tall. A form's default: a
-  grievance gets printed and handed over, so its pages should be paper-sized.
-- **Two pictures per page** — stacked two to a letter page, for the ones that go
-  together. A PDF between two pictures breaks the pair rather than reaching past
-  it, and an odd one out takes the top half instead of being stretched.
+- **Match each picture (any size)** — no paper size at all: each page comes out
+  exactly as big as the picture on it. A full-screen grab makes a page the size
+  of your screen. Best for reading on a screen, and the builder's default.
+- **Letter paper, one per page** — normal paper, one picture centred on it,
+  turned sideways when the picture is wider than it is tall. A form's default,
+  since a grievance gets printed and handed over.
+- **Letter paper, two per page** — two pictures stacked on one sheet, for the
+  ones that go together. A PDF between two pictures breaks the pair rather than
+  reaching past it, and an odd one out takes the top half rather than being
+  stretched.
 
-Each choice carries a sentence saying what it does, shown for whichever one is
-picked. These forms get used by reps who work with computers all day and by reps
-who don't; nobody should have to try all three to find out what they mean.
+The page numbers on each card follow the choice, so on two-per-page the first
+two both read Page 1, top and bottom.
 
 ## Editing
 

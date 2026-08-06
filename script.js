@@ -1512,9 +1512,9 @@ document.addEventListener('paste', (e) => {
  * them, because a line of prose explaining "Two pictures per page" would be worse than nothing.
  */
 const PAGE_LAYOUTS = [
-  { value: 'image', label: 'Page fits the picture' },
-  { value: 'letter', label: 'One picture per page' },
-  { value: 'pair', label: 'Two pictures per page' },
+  { value: 'image', label: 'Match each picture (any size)' },
+  { value: 'letter', label: 'Letter paper, one per page' },
+  { value: 'pair', label: 'Letter paper, two per page' },
 ];
 
 function layoutPicker(current, onChange) {
@@ -1567,8 +1567,41 @@ function showBuilder() {
   renderBuilder();
 }
 
-function builderPageCount() {
-  return builderItems.reduce((n, item) => n + item.pages.length, 0);
+/*
+ * Which sheet each item lands on, following the same rules the writer uses. Worked out here
+ * rather than counted, because "two per page" means two items share a sheet and a running total
+ * would label the second one page 2 when it's the bottom half of page 1.
+ */
+function builderPagePlan() {
+  const plan = [];
+  let page = 1;
+  for (let i = 0; i < builderItems.length; i++) {
+    const item = builderItems[i];
+
+    if (item.kind === 'pdf') {
+      plan.push(item.pages.length === 1
+        ? 'Page ' + page
+        : 'Pages ' + page + '–' + (page + item.pages.length - 1));
+      page += item.pages.length;
+      continue;
+    }
+
+    if (builderFit === 'pair') {
+      const next = builderItems[i + 1];
+      const partner = next && next.kind !== 'pdf' ? next : null;
+      plan.push('Page ' + page + (partner ? ', top' : ''));
+      if (partner) {
+        plan.push('Page ' + page + ', bottom');
+        i++;
+      }
+      page += 1;
+      continue;
+    }
+
+    plan.push('Page ' + page);
+    page += 1;
+  }
+  return { labels: plan, pages: page - 1 };
 }
 
 function showBuilderError(message) {
@@ -1577,13 +1610,15 @@ function showBuilderError(message) {
 }
 
 function renderBuilder() {
-  const pages = builderPageCount();
+  const plan = builderPagePlan();
+  const pages = plan.pages;
   document.getElementById('builderCount').textContent =
     builderItems.length === 0 ? 'Nothing added yet'
       : pages + (pages === 1 ? ' page' : ' pages') +
         ' from ' + builderItems.length + (builderItems.length === 1 ? ' file' : ' files');
-  document.getElementById('builderPreview').disabled = builderItems.length === 0;
-  document.getElementById('builderClear').disabled = builderItems.length === 0;
+  ['builderPreview', 'builderClear', 'builderMarkup'].forEach(id => {
+    document.getElementById(id).disabled = builderItems.length === 0;
+  });
 
   // Only worth asking about once there's a picture for it to affect
   const layoutHost = document.getElementById('builderLayout');
@@ -1591,11 +1626,11 @@ function renderBuilder() {
   const hasPicture = builderItems.some(item => item.kind !== 'pdf');
   layoutHost.hidden = !hasPicture;
   if (hasPicture) {
-    layoutHost.appendChild(layoutPicker(builderFit, value => { builderFit = value; }));
+    // Re-render: the layout decides which sheet each picture lands on, so the labels change too
+    layoutHost.appendChild(layoutPicker(builderFit, value => { builderFit = value; renderBuilder(); }));
   }
 
   builderPages.innerHTML = '';
-  let pageNumber = 1;
   builderItems.forEach((item, index) => {
     const card = document.createElement('div');
     card.className = 'builder-card';
@@ -1610,20 +1645,10 @@ function renderBuilder() {
 
     const where = document.createElement('span');
     where.className = 'builder-where';
-    where.textContent = item.pages.length === 1
-      ? 'Page ' + pageNumber
-      : 'Pages ' + pageNumber + '–' + (pageNumber + item.pages.length - 1);
-    pageNumber += item.pages.length;
+    where.textContent = plan.labels[index] || '';
 
     const actions = document.createElement('div');
     actions.className = 'builder-card-actions';
-
-    // The same editor the supporting documents use — one set of tools to learn, not two
-    const edit = document.createElement('button');
-    edit.type = 'button';
-    edit.className = 'builder-markup';
-    edit.textContent = 'Mark up';
-    edit.addEventListener('click', () => openEditor(item, () => renderBuilder()));
 
     const move = (label, to, enabled) => {
       const b = document.createElement('button');
@@ -1649,7 +1674,7 @@ function renderBuilder() {
     });
     actions.append(move('↑', index - 1, index > 0),
                    move('↓', index + 1, index < builderItems.length - 1),
-                   edit, remove);
+                   remove);
 
     card.append(thumb, name, where, actions);
     builderPages.appendChild(card);
@@ -1707,6 +1732,30 @@ document.getElementById('builderPreview').addEventListener('click', async () => 
   } finally {
     button.textContent = said;
     button.disabled = false;
+  }
+});
+
+/*
+ * Marks go on the assembled document, not on the pictures going into it — the same thing that
+ * happens when a PDF is opened from the Forms page. One scrolling document, one set of pages,
+ * and an arrow can point at whichever page it needs to.
+ */
+document.getElementById('builderMarkup').addEventListener('click', async () => {
+  if (!builderItems.length) return;
+  const button = document.getElementById('builderMarkup');
+  const said = button.textContent;
+  button.textContent = 'Building…';
+  button.disabled = true;
+  try {
+    const bytes = await Annotator.compile(builderItems, builderFit);
+    const name = builderFilename();
+    const item = await Annotator.readFile(new File([bytes], name, { type: 'application/pdf' }));
+    markUp(item);
+  } catch (err) {
+    showBuilderError('Couldn’t open that for mark-up: ' + err.message + '.');
+  } finally {
+    button.textContent = said;
+    button.disabled = builderItems.length === 0;
   }
 });
 
@@ -3395,6 +3444,39 @@ function attachDrawing(canvas, page, index) {
   canvas.addEventListener('pointerleave', () => { if (!stroke) { cursorOver = null; brushCursor.hidden = true; } });
   canvas.addEventListener('pointermove', moveBrushCursor);
 
+  /*
+   * Drawing used to repaint the whole page on every pointermove: clear, redraw the full-size
+   * base image, then redraw every mark already on it. Pointer events arrive faster than the
+   * screen refreshes, so that was several full repaints per frame, getting slower with every
+   * mark added — which is what made a page of screenshots crawl.
+   *
+   * Instead the settled page is photographed once when a stroke starts. Each frame is then that
+   * photograph plus the one stroke being drawn, which costs the same whether the page has one
+   * mark on it or fifty.
+   */
+  let settled = null;
+  let frame = 0;
+
+  function paintStroke() {
+    frame = 0;
+    if (!stroke || !settled) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(settled, 0, 0);
+    window.Annotator.drawAnnotation(ctx, canvas, page, stroke);
+  }
+
+  function paintSoon() {
+    // One paint per frame, however many moves arrive in between
+    if (!frame) frame = requestAnimationFrame(paintStroke);
+  }
+
+  function stopPainting() {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    settled = null;
+  }
+
   canvas.addEventListener('pointerdown', (e) => {
     if (!editorDoc) return;
     e.preventDefault();
@@ -3402,6 +3484,12 @@ function attachDrawing(canvas, page, index) {
     cursorOver = { canvas, page };
     const [x, y] = pointOn(e);
     const set = settings();
+
+    // The page as it stands, before this stroke joins it
+    settled = document.createElement('canvas');
+    settled.width = canvas.width;
+    settled.height = canvas.height;
+    window.Annotator.renderPage(settled, page);
 
     if (editorTool === 'arrow') {
       stroke = { type: 'arrow', color: set.color, width: set.width, x1: x, y1: y, x2: x, y2: y };
@@ -3430,7 +3518,7 @@ function attachDrawing(canvas, page, index) {
       stroke.w = Math.abs(x - stroke.ox);
       stroke.h = Math.abs(y - stroke.oy);
     }
-    window.Annotator.renderPage(canvas, page);
+    paintSoon();
   });
 
   function end() {
@@ -3442,6 +3530,8 @@ function attachDrawing(canvas, page, index) {
     else empty = stroke.w < 0.005 || stroke.h < 0.005;
     if (empty) { page.annotations.pop(); forgetStroke(stroke); }
     stroke = null;
+    // Painted in full here, once, so the finished mark is composited like all the others
+    stopPainting();
     window.Annotator.renderPage(canvas, page);
   }
   canvas.addEventListener('pointerup', end);
@@ -3604,6 +3694,7 @@ function markUp(item) {
 // reference would go on pointing at the old array
 Object.defineProperty(window, 'builderItems', { get: () => builderItems });
 window.attachmentFit = attachmentFit;
+window.__viewerBlob = () => viewerBlob;      // so a test can read what the viewer is showing
 Object.defineProperty(window, 'builderFit', { get: () => builderFit });
 
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX,

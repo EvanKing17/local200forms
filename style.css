@@ -393,20 +393,6 @@ input[type="radio"] { width: 15px; height: 15px; }
   padding: 7px 9px;
 }
 
-.builder-markup {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  padding: 5px 9px;
-  border-radius: 6px;
-  border: 1px solid var(--c-border-strong);
-  background: var(--c-surface);
-  color: var(--c-text-muted);
-  cursor: pointer;
-  margin-left: auto;
-}
-
-.builder-markup:hover { border-color: var(--c-accent); color: var(--c-text); }
-
 .builder-count {
   font-size: 13px;
   color: var(--c-text-muted);

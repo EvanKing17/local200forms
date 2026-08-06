@@ -1246,6 +1246,15 @@ function run(win, doc) {
     c.toBlob(b => resolve(new win.File([b], w + 'x' + h + '.png', { type: 'image/png' })), 'image/png');
   });
 
+  // The chosen layout sticks between visits to the builder, so tests say which one they want
+  const useLayout = (value) => {
+    const select = doc.querySelector('#builderLayout .layout-select');
+    if (!select) return false;
+    select.value = value;
+    select.dispatchEvent(new win.Event('change', { bubbles: true }));
+    return true;
+  };
+
   const sizesOf = async (bytes) => {
     const PDFLib = await win.Annotator.loadPdfLib();
     const pdf = await PDFLib.PDFDocument.load(bytes);
@@ -1453,15 +1462,23 @@ function run(win, doc) {
     return (sizes.length === 2 && sizes[1] === '1200x675') || { detail: sizes.join(' ') };
   });
 
-  checkAsync(g14, 'A mark drawn in the builder is there in the finished PDF', async () => {
+  checkAsync(g14, 'Mark-up applies to the whole document, and reaches the saved file', async () => {
     win.showBuilder();
     win.builderItems.length = 0;
     win.builderItems.push(await win.Annotator.readFile(await madeImage(600, 400)));
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(600, 400)));
     win.renderBuilder();
+    useLayout('image');                                 // one page each, so there are two
 
-    doc.querySelector('#builderPages .builder-markup').click();
+    doc.getElementById('builderMarkup').click();
+    await new Promise(r => win.setTimeout(r, 1500));     // the document is assembled first
     const opened = !doc.getElementById('editor').hidden;
-    const canvas = doc.querySelector('#editorPages .editor-canvas');
+    const canvases = doc.querySelectorAll('#editorPages .editor-canvas');
+    // Both pictures in one scrolling document, not one picture at a time
+    const bothPages = canvases.length === 2;
+
+    // Draw on the second page, which per-picture mark-up could never have reached from here
+    const canvas = canvases[1];
     const r = canvas.getBoundingClientRect();
     doc.querySelector('#editorTools .tool[data-tool="rect"]').click();
     const ev = (t, x, y) => new win.PointerEvent(t, { clientX: r.left + x * r.width,
@@ -1469,31 +1486,93 @@ function run(win, doc) {
     canvas.dispatchEvent(ev('pointerdown', 0.2, 0.2));
     canvas.dispatchEvent(ev('pointermove', 0.7, 0.7));
     canvas.dispatchEvent(ev('pointerup', 0.7, 0.7));
-    const marks = win.builderItems[0].pages[0].annotations.length;
-    doc.getElementById('editorDone').click();
 
-    const bytes = await win.Annotator.compile(win.builderItems, 'image');
-    const canvases = await win.Annotator.renderToCanvases(bytes, 1);
+    doc.getElementById('editorDone').click();
+    await new Promise(r2 => win.setTimeout(r2, 1500));   // saved, then shown in the viewer
+
     /*
-     * A rectangle is an outline, not a fill, so the middle of it is still the white picture.
-     * Scan a line across the page instead and count what isn't white — the picture's own blue
-     * edging is in the outer few pixels, so the strip between is the mark or nothing.
+     * Read it back out of the file that was actually produced. A rectangle is an outline, not a
+     * fill, so scan a line across the page and count what isn't white — the picture's own blue
+     * edging sits in the outer few pixels, so anything in the strip between is the mark.
      */
-    const c = canvases[0];
-    const row = c.getContext('2d')
-      .getImageData(0, Math.round(c.height * 0.45), c.width, 1).data;
+    const saved = await win.Annotator.renderToCanvases(
+      new Uint8Array(await win.__viewerBlob().arrayBuffer()), 1);
+    const c = saved[1];
+    const row = c.getContext('2d').getImageData(0, Math.round(c.height * 0.45), c.width, 1).data;
     let marked = 0;
     for (let x = Math.round(c.width * 0.1); x < Math.round(c.width * 0.9); x++) {
       const i = x * 4;
       if (!(row[i] > 245 && row[i + 1] > 245 && row[i + 2] > 245)) marked++;
     }
-    const drew = marked > 0;
+
+    doc.getElementById('pdfViewerClose').click();
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    return (opened && bothPages && saved.length === 2 && marked > 0) ||
+      { detail: 'editor=' + opened + ' pagesInEditor=' + canvases.length +
+                ' pagesOut=' + saved.length + ' markedPixels=' + marked };
+  });
+
+  checkAsync(g14, 'Page labels follow the layout, so two-up says one page', async () => {
+    win.showBuilder();
+    win.builderItems.length = 0;
+    for (let i = 0; i < 3; i++) {
+      win.builderItems.push(await win.Annotator.readFile(await madeImage(400, 200)));
+    }
+    const read = () => Array.from(doc.querySelectorAll('.builder-where')).map(e => e.textContent);
+
+    win.renderBuilder();
+    useLayout('image');
+    const single = read();
+    const singleCount = doc.getElementById('builderCount').textContent;
+
+    useLayout('pair');
+    const paired = read();
+    const pairedCount = doc.getElementById('builderCount').textContent;
 
     win.builderItems.length = 0;
     win.renderBuilder();
     win.showHome();
-    return (opened && marks === 1 && drew) ||
-      { detail: 'editor=' + opened + ' marks=' + marks + ' non-white pixels across the line: ' + marked };
+    return (single.join(' | ') === 'Page 1 | Page 2 | Page 3' &&
+            paired.join(' | ') === 'Page 1, top | Page 1, bottom | Page 2' &&
+            /3 pages/.test(singleCount) && /2 pages/.test(pairedCount)) ||
+      { detail: single.join(', ') + '  ->  ' + paired.join(', ') +
+                ' | counts: ' + singleCount + ' / ' + pairedCount };
+  });
+
+  checkAsync(g14, 'Drawing repaints once a frame, not once an event', async () => {
+    // Every pointermove used to repaint the base image and every mark already on the page
+    const src = win.showBuilder.toString();          // keep the builder open for the editor
+    win.builderItems.length = 0;
+    win.builderItems.push(await win.Annotator.readFile(await madeImage(600, 400)));
+    win.renderBuilder();
+    useLayout('image');
+    doc.getElementById('builderMarkup').click();
+    await new Promise(r => win.setTimeout(r, 1500));
+
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
+    const r2 = canvas.getBoundingClientRect();
+    let fullRepaints = 0;
+    const realRender = win.Annotator.renderPage;
+    win.Annotator.renderPage = (t, p) => { fullRepaints++; return realRender(t, p); };
+
+    doc.querySelector('#editorTools .tool[data-tool="pen"]').click();
+    const ev = (t, x, y) => new win.PointerEvent(t, { clientX: r2.left + x * r2.width,
+      clientY: r2.top + y * r2.height, pointerId: 1, bubbles: true, cancelable: true });
+    canvas.dispatchEvent(ev('pointerdown', 0.1, 0.1));
+    for (let i = 0; i < 40; i++) canvas.dispatchEvent(ev('pointermove', 0.1 + i * 0.02, 0.3));
+    canvas.dispatchEvent(ev('pointerup', 0.9, 0.3));
+    win.Annotator.renderPage = realRender;
+
+    doc.getElementById('editorDone').click();
+    await new Promise(r3 => win.setTimeout(r3, 1200));
+    doc.getElementById('pdfViewerClose').click();
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    // One to photograph the settled page, one to composite at the end. Forty moves add none.
+    return fullRepaints <= 4 || { detail: fullRepaints + ' full repaints for 40 moves' };
   });
 
   const g7 = group('Drafts');
