@@ -3204,6 +3204,9 @@ const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', inve
 
 const editor = document.getElementById('editor');
 const editorStage = document.getElementById('editorStage');
+
+// Scrolling moves the page out from under a stationary pointer, so the marker has to follow
+editorStage.addEventListener('scroll', () => refreshBrushCursorPosition(), { passive: true });
 const editorPages = document.getElementById('editorPages');
 const editorNameInput = document.getElementById('editorName');
 const editorPageLabel = document.getElementById('editorPageLabel');
@@ -3295,12 +3298,26 @@ function updateBrushCursor() {
   brushCursor.style.opacity = editorTool === 'highlight' ? '0.45' : '0.85';
 }
 
+let lastPointer = null;
+
+function refreshBrushCursorPosition() {
+  if (lastPointer) moveBrushCursor(lastPointer);
+}
+
 function moveBrushCursor(e) {
+  lastPointer = { clientX: e.clientX, clientY: e.clientY };
   if (!FREEHAND_TOOLS.includes(editorTool)) { brushCursor.hidden = true; return; }
   const stage = editorStage.getBoundingClientRect();
   brushCursor.hidden = false;
-  brushCursor.style.left = (e.clientX - stage.left) + 'px';
-  brushCursor.style.top = (e.clientY - stage.top) + 'px';
+  /*
+   * The marker is positioned inside the stage, which scrolls, so its coordinates are measured
+   * from the top of the whole document rather than the top of the visible part. Without the
+   * scroll offset it sits further and further above the pointer the further down you go — and
+   * because the real cursor is hidden while a freehand tool is up, that reads as the mouse
+   * lagging behind or disappearing.
+   */
+  brushCursor.style.left = (e.clientX - stage.left + editorStage.scrollLeft) + 'px';
+  brushCursor.style.top = (e.clientY - stage.top + editorStage.scrollTop) + 'px';
 }
 
 /* ---------- Laying the pages out ----------
@@ -3485,6 +3502,8 @@ function attachDrawing(canvas, page, index) {
     const [x, y] = pointOn(e);
     const set = settings();
 
+    editor.classList.add('is-drawing');     // pan is blocked only for the length of the stroke
+
     // The page as it stands, before this stroke joins it
     settled = document.createElement('canvas');
     settled.width = canvas.width;
@@ -3530,6 +3549,7 @@ function attachDrawing(canvas, page, index) {
     else empty = stroke.w < 0.005 || stroke.h < 0.005;
     if (empty) { page.annotations.pop(); forgetStroke(stroke); }
     stroke = null;
+    editor.classList.remove('is-drawing');
     // Painted in full here, once, so the finished mark is composited like all the others
     stopPainting();
     window.Annotator.renderPage(canvas, page);

@@ -1514,6 +1514,64 @@ function run(win, doc) {
                 ' pagesOut=' + saved.length + ' markedPixels=' + marked };
   });
 
+  checkAsync(g14, 'The brush marker stays under the pointer once the document is scrolled', async () => {
+    // It's positioned inside the scrolling stage, so its coordinates include the scroll offset.
+    // Without that it drifts further from the pointer the further down you go — and the real
+    // cursor is hidden while a freehand tool is up, so there's nothing left to aim with.
+    win.showBuilder();
+    win.builderItems.length = 0;
+    for (let i = 0; i < 4; i++) {
+      win.builderItems.push(await win.Annotator.readFile(await madeImage(600, 800)));
+    }
+    win.renderBuilder();
+    useLayout('image');
+    doc.getElementById('builderMarkup').click();
+    await new Promise(r => win.setTimeout(r, 1800));
+
+    const stage = doc.getElementById('editorStage');
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
+    doc.querySelector('#editorTools .tool[data-tool="pen"]').click();
+
+    const aim = (clientX, clientY) => {
+      canvas.dispatchEvent(new win.PointerEvent('pointerenter', { clientX, clientY,
+        pointerId: 1, bubbles: true }));
+      canvas.dispatchEvent(new win.PointerEvent('pointermove', { clientX, clientY,
+        pointerId: 1, bubbles: true }));
+      const box = doc.getElementById('brushCursor').getBoundingClientRect();
+      return Math.hypot(box.left + box.width / 2 - clientX, box.top + box.height / 2 - clientY);
+    };
+
+    const r = stage.getBoundingClientRect();
+    const at = [r.left + r.width / 2, r.top + r.height / 2];
+    const before = aim(at[0], at[1]);
+    stage.scrollTop = 400;
+    const after = aim(at[0], at[1]);
+    const scrolled = stage.scrollTop;
+
+    doc.getElementById('editorBack').click();
+    if (!doc.getElementById('editor').hidden) doc.getElementById('editorBack').click();
+    win.builderItems.length = 0;
+    win.renderBuilder();
+    win.showHome();
+    return (scrolled > 0 && before < 3 && after < 3) ||
+      { detail: 'scrolled ' + scrolled + 'px; marker was ' + before.toFixed(1) +
+                'px off before, ' + after.toFixed(1) + 'px off after' };
+  });
+
+  check(g14, 'Scrolling is not blocked over the page', () => {
+    // touch-action: none on the canvas stopped two fingers on a trackpad moving the document
+    const rules = Array.from(doc.styleSheets)
+      .flatMap(sheet => { try { return Array.from(sheet.cssRules); } catch (e) { return []; } })
+      .filter(rule => rule.selectorText && rule.selectorText.indexOf('.editor-canvas') !== -1)
+      .map(rule => rule.selectorText + ' { touch-action: ' + rule.style.touchAction + ' }')
+      .filter(text => text.indexOf('touch-action:  }') === -1);
+    const always = rules.find(t => t.indexOf('is-drawing') === -1 && t.indexOf('touch-action') !== -1);
+    const whileDrawing = rules.find(t => t.indexOf('is-drawing') !== -1);
+    return (always && always.indexOf('pan-y') !== -1 &&
+            whileDrawing && whileDrawing.indexOf('none') !== -1) ||
+      { detail: rules.join(' | ') || 'no touch-action rule found' };
+  });
+
   checkAsync(g14, 'Page labels follow the layout, so two-up says one page', async () => {
     win.showBuilder();
     win.builderItems.length = 0;

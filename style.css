@@ -2264,8 +2264,15 @@ input[type="radio"] { width: 15px; height: 15px; }
   background: #fff;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   cursor: crosshair;
-  touch-action: none;        /* the page must not pan while a mark is being drawn */
+  /*
+   * Scrolling has to keep working over the page — a canvas covers most of the stage, and
+   * touch-action: none here stopped two fingers on a trackpad from moving the document at all.
+   * Panning is only blocked while a mark is actually being drawn, below.
+   */
+  touch-action: pan-y;
 }
+
+.editor.is-drawing .editor-canvas { touch-action: none; }
 
 .editor-page-number {
   position: absolute;
