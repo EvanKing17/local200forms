@@ -1464,11 +1464,12 @@ input[type="radio"] { width: 15px; height: 15px; }
  * rather than being dragged down to meet a taller thing beside it.
  */
 .dc-head-boxed {
-  align-items: flex-start;
+  align-items: flex-end;      /* both sit on the rule, rather than hanging from a common top */
   gap: 24px;
 }
 
-.dc-head-boxed .dc-doc-title { padding-top: 6.667px; }   /* 5pt, so it optically centres */
+/* The rule is drawn along the bottom of the box, so nothing separates the two */
+.dc-head-boxed + .dc-doc-rule { margin-top: 0; }
 
 .dc-submitted-cell {
   width: 177.333px;        /* 133pt — a quarter of the sheet, so it lines up with the grid below */

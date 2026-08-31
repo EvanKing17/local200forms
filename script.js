@@ -462,12 +462,16 @@ function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
    * sheet, and it never has to shrink or shorten to fit beside the heading.
    */
   if (rightField && rightField.boxed) {
+    /*
+     * The box stands on the rule — its bottom edge and the rule are the same line, so the two
+     * read as one header rather than a box floating above a stripe. The heading then drops to
+     * sit on that line too, instead of staying up where a short title used to start.
+     */
     const cellW = SUBMITTED_CELL_W;
-    const cellX = x + w - cellW;
-    const cellTop = y - 12;
-    boxedBottom = boxedGrid(doc, cellX, cellTop, cellW,
+    boxedBottom = boxedGrid(doc, x + w - cellW, HEADER_TOP, cellW,
       [{ label: rightField.label, value: rightField.value || '', width: cellW }]);
     titleWidth = w - cellW - 20;
+    y = boxedBottom - 10;          // the heading sits on the rule, like the box does
 
   } else if (rightField) {
     doc.setFontSize(11);
@@ -500,8 +504,8 @@ function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
   }
 
   cy += 10;
-  // The rule sits under whichever is lower, the heading or the box beside it
-  if (boxedBottom) cy = Math.max(cy, boxedBottom + 8);
+  // Drawn along the bottom of the box, so the box sits on it rather than above it
+  if (boxedBottom) cy = Math.max(cy, boxedBottom);
   doc.setDrawColor(...DC.primary);
   doc.setLineWidth(1.5);
   doc.line(x, cy, x + w, cy);
@@ -542,6 +546,7 @@ const CELL_BOTTOM = 6;     // last value line to the cell's bottom edge
 const CELL_LINE = 11;      // value line height
 const CELL_MIN_H = 35;
 const SUBMITTED_CELL_W = 133;   // a quarter of the 532pt sheet, so it lines up with the grid
+const HEADER_TOP = 40;          // same top margin every other page starts at
 
 function prepareGridCells(doc, cells) {
   const labelFontSize = 6.5, valueFontSize = 9.5;
