@@ -171,8 +171,8 @@ document.getElementById('host').addEventListener('load', () => {
 
 function run(win, doc) {
   const FORMS = [
-    { type: 'ford', build: 'buildFordDoc', form: 'fordForm', pages: 2, fields: 14 },
-    { type: 'policy', build: 'buildPolicyDoc', form: 'policyForm', pages: 1, fields: 8 },
+    { type: 'ford', build: 'buildFordDoc', form: 'fordForm', pages: 2, fields: 15 },
+    { type: 'policy', build: 'buildPolicyDoc', form: 'policyForm', pages: 1, fields: 9 },
     { type: 'unifor', build: 'buildUniforDoc', form: 'uniforForm', pages: 5, fields: 37 },
     { type: 'investigation', build: 'buildInvestigationDoc', form: 'investigationForm', pages: 1, fields: 13 },
   ];
@@ -206,13 +206,29 @@ function run(win, doc) {
       return n === f.fields || { detail: 'got ' + n + ' (unanswered radio groups are omitted by FormData)' };
     });
   });
-  check(g3, 'Clearing a form empties every field', () => {
+  check(g3, 'Clearing a form empties every field but who is filing it', () => {
     const form = doc.getElementById('uniforForm');
     form.elements.grievorName.value = 'Someone';
     win.clearForm(form);
     const data = win.fd(form);
-    const left = Object.keys(data).filter(k => data[k] !== '');
+    // Clearing starts the next grievance, and it's still the same rep filing it
+    const left = Object.keys(data).filter(k => data[k] !== '' && k !== 'submittedBy');
     return left.length === 0 || { detail: 'still set: ' + left.join(', ') };
+  });
+
+  check(g3, 'A form holding only the remembered name counts as empty', () => {
+    // It arrives pre-filled, so it must not flag the form as having work waiting in it
+    const form = doc.getElementById('policyForm');
+    win.showForm('policy');
+    win.clearForm(form);
+    form.elements.submittedBy.value = 'Evan King';
+    const looksEmpty = !win.formHasContent('policy');
+    form.elements.employeeName.value = 'Now it has something';
+    const looksFull = win.formHasContent('policy');
+    win.clearForm(form);
+    return (looksEmpty && looksFull) ||
+      { detail: 'nameOnly=' + (looksEmpty ? 'empty' : 'not empty') +
+                ', withData=' + (looksFull ? 'not empty' : 'empty') };
   });
 
   const g4 = group('PDF round-trip');
@@ -358,9 +374,9 @@ function run(win, doc) {
    * is what fails loudly if anyone reorders a form.
    */
   const EXPECTED_ORDER = {
-    ford: ['employeeName','globalId','department','processCoach','article','dateIncident','dateFiled',
+    ford: ['submittedBy','employeeName','globalId','department','processCoach','article','dateIncident','dateFiled',
            'details','hoursStraight','hoursShift1','hoursTimeHalf','hoursShift3','hoursDouble','hoursTriple'],
-    policy: ['employeeName','globalId','department','processCoach','article','dateIncident','dateFiled','details'],
+    policy: ['submittedBy','employeeName','globalId','department','processCoach','article','dateIncident','dateFiled','details'],
     unifor: ['spNumber','grievorName','gid','dept','classification','seniorityDate','timeInClass','rate','cola',
              'discipline','supervisor','generalSupervisor','superintendent','uniforDateIncident','uniforDateFiled',
              'whoInvolved','whenHappened','whereHappened','whyGrievance','whatWeWant','supervisorStatement',
@@ -1905,6 +1921,108 @@ function run(win, doc) {
     win.showHome();
     // One to photograph the settled page, one to composite at the end. Forty moves add none.
     return fullRepaints <= 4 || { detail: fullRepaints + ' full repaints for 40 moves' };
+  });
+
+  const g15 = group('Who submitted it');
+
+  checkAsync(g15, 'The name is remembered and put back into every form that asks', async () => {
+    const ford = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(ford);
+    ford.elements.submittedBy.value = 'Evan King';
+    ford.elements.submittedBy.dispatchEvent(new win.Event('input', { bubbles: true }));
+
+    // a different form, later — same person, same machine
+    win.showForm('policy');
+    const onPolicy = doc.getElementById('policyForm').elements.submittedBy.value;
+    win.showForm('unifor');
+    const onFactSheet = doc.getElementById('uniforForm').elements.submittedBy.value;
+
+    // and still there after clearing, because clearing starts the next grievance
+    win.showForm('ford');
+    win.clearForm(ford);
+    const afterClear = ford.elements.submittedBy.value;
+
+    return (onPolicy === 'Evan King' && onFactSheet === 'Evan King' && afterClear === 'Evan King') ||
+      { detail: 'policy=' + onPolicy + ' factSheet=' + onFactSheet + ' afterClear=' + afterClear };
+  });
+
+  checkAsync(g15, 'A name already in the form is never overwritten', async () => {
+    const ford = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(ford);
+    // filing on someone's behalf, which is rare but must not be undone
+    ford.elements.submittedBy.value = 'Someone Else';
+    ford.elements.employeeName.value = 'The Grievor';   // a name on its own is still an empty form
+    win.saveDraft('ford');
+    win.showForm('policy');
+    win.showForm('ford');
+    const kept = ford.elements.submittedBy.value;
+    win.discardDraft('ford');
+    win.clearForm(ford);
+    return kept === 'Someone Else' || { detail: 'became ' + kept };
+  });
+
+  checkAsync(g15, 'It prints top right, and reads back out of the PDF', async () => {
+    const ford = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(ford);
+    ford.elements.submittedBy.value = 'Wes Macauley';
+    const built = win.buildFordDoc(win.fd(ford));
+    const text = built.output('datauristring');
+    const back = win.readEmbeddedFormData(
+      new Uint8Array(atob(text.split(',')[1]).split('').map(c => c.charCodeAt(0))));
+    win.clearForm(ford);
+    return (back && back.data.submittedBy === 'Wes Macauley') ||
+      { detail: back ? JSON.stringify(back.data.submittedBy) : 'nothing embedded' };
+  });
+
+  checkAsync(g15, 'A long name is never shortened, whatever it costs the layout', async () => {
+    // Somebody's name on the grievance they filed is not a thing to abbreviate for a layout
+    const ford = doc.getElementById('fordForm');
+    const pdfjs = await win.Annotator.loadPdfJs();
+    const names = ['Evan King', 'Evan Robert King Thompson MacGregor',
+                   'Bartholomew Fitzwilliam Montgomery-Ashcroft the Third'];
+    const missing = [];
+    for (const name of names) {
+      win.showForm('ford');
+      win.clearForm(ford);
+      ford.elements.submittedBy.value = name;
+      const bytes = new Uint8Array(win.buildFordDoc(win.fd(ford)).output('arraybuffer'));
+      const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+      const content = await (await pdf.getPage(1)).getTextContent();
+      const printed = content.items.map(i => i.str).join('');
+      if (printed.replace(/\s+/g, ' ').indexOf(name) === -1) missing.push(name);
+    }
+    win.clearForm(ford);
+    win.showHome();
+    return missing.length === 0 || { detail: 'not printed in full: ' + missing.join(' / ') };
+  });
+
+  checkAsync(g15, 'A name too long to sit beside the title moves below it, never across it', async () => {
+    const ford = doc.getElementById('fordForm');
+    const monster = 'Maria de los Angeles Fitzwilliam-Montgomery Ashcroft Vandenberg Okonkwo-Lindqvist III';
+    win.showForm('ford');
+    win.clearForm(ford);
+    ford.elements.submittedBy.value = monster;
+    const bytes = new Uint8Array(win.buildFordDoc(win.fd(ford)).output('arraybuffer'));
+    const pdfjs = await win.Annotator.loadPdfJs();
+    const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+    const items = (await (await pdf.getPage(1)).getTextContent()).items;
+
+    const title = items.find(i => i.str.indexOf('Grievance Investigation') !== -1);
+    const label = items.find(i => i.str.indexOf('Submitted') !== -1);
+    const value = items.find(i => i.str.indexOf('Maria de los') !== -1);
+    const sameLine = title && label && Math.abs(title.transform[5] - label.transform[5]) < 4;
+    const overlaps = sameLine && (title.transform[4] + title.width) > label.transform[4];
+    const printedWhole = !!value && value.str.indexOf(monster) !== -1;
+    const insideMargin = !!value && (value.transform[4] + value.width) <= 574;
+
+    win.clearForm(ford);
+    win.showHome();
+    return (!sameLine && !overlaps && printedWhole && insideMargin) ||
+      { detail: 'sameLine=' + sameLine + ' overlaps=' + overlaps +
+                ' whole=' + printedWhole + ' insideMargin=' + insideMargin };
   });
 
   const g7 = group('Drafts');

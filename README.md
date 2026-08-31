@@ -20,6 +20,10 @@ because the page on screen *is* the page that comes out.
 - **Nothing is sent anywhere.** No server, no database, no account. PDFs are
   built in the browser and drafts are saved on your own device.
 - **Works offline.** Install it (below) and it runs with no signal at all.
+- **Submitted By** sits top right on the monetary and policy grievances, and is
+  remembered on your device — you fill it in once and it's there on the next
+  one. Type over it when you're filing for somebody else. A form holding
+  nothing but that name still counts as empty.
 - **Drafts save as you type**, so a closed tab or a dead battery costs nothing.
   "Clear form" is how you throw one away.
 - **Attach supporting documents.** Add PDFs or photos to a form and they're

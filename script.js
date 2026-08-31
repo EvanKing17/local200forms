@@ -453,20 +453,42 @@ function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
    * form control on paper, when it's really just part of the heading.
    */
   let titleWidth = w;
+  let ownLine = null;
   if (rightField) {
-    doc.setFontSize(11);
     doc.setTextColor(...DC.ink);
+    doc.setFont('helvetica', 'bold');
+
+    /*
+     * A name is longer than "1", so the right-hand block has to earn its room. It gives up
+     * point size first, down to 8pt. If a name is long enough that even that would run into
+     * the title, it drops onto its own line underneath instead.
+     *
+     * A name is never shortened. Somebody's name on the grievance they filed is not a thing to
+     * abbreviate to make a layout work, and "Evan Robert King Th…" on a filed document would be
+     * worse than an extra line.
+     */
+    doc.setFontSize(15);
+    const titleW = doc.getTextWidth(title);
     const value = String(rightField.value || '');
 
-    doc.setFont('helvetica', 'bold');
-    const valueW = doc.getTextWidth(value);
-    doc.text(value, x + w, y + 1, { align: 'right' });
+    const blockWidth = (size) => {
+      doc.setFontSize(size);
+      return doc.getTextWidth(rightField.label) + doc.getTextWidth(value) + 33;
+    };
 
-    doc.setFont('helvetica', 'bold');
-    const labelW = doc.getTextWidth(rightField.label);
-    doc.text(rightField.label, x + w - valueW - 5, y + 1, { align: 'right' });
+    let size = 11;
+    while (size > 8 && titleW + blockWidth(size) > w) size -= 1;
 
-    titleWidth = w - labelW - valueW - 28;
+    if (titleW + blockWidth(size) > w) {
+      ownLine = { size, value, label: rightField.label };   // drawn under the title, below
+    } else {
+      doc.setFontSize(size);
+      const valueW = doc.getTextWidth(value);
+      doc.text(value, x + w, y + 1, { align: 'right' });
+      const labelW = doc.getTextWidth(rightField.label);
+      doc.text(rightField.label, x + w - valueW - 5, y + 1, { align: 'right' });
+      titleWidth = w - labelW - valueW - 28;
+    }
   }
 
   doc.setFont('helvetica', 'bold');
@@ -475,6 +497,17 @@ function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
   const titleLines = doc.splitTextToSize(title, titleWidth);
   titleLines.forEach((line, i) => doc.text(line, x, y + i * 18));
   let cy = y + (titleLines.length - 1) * 18;
+
+  // No room beside the title, so it goes underneath — full name, still right-aligned
+  if (ownLine) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(ownLine.size);
+    doc.setTextColor(...DC.ink);
+    cy += 14;
+    const valueW = doc.getTextWidth(ownLine.value);
+    doc.text(ownLine.value, x + w, cy, { align: 'right' });
+    doc.text(ownLine.label, x + w - valueW - 5, cy, { align: 'right' });
+  }
 
   if (subtitle) {
     doc.setFont('helvetica', 'normal');
@@ -763,7 +796,8 @@ function buildFordDoc(data) {
 
   const marginX = 40;
   const W = 532;
-  let y = drawDocHeader(doc, marginX, 54, W, FORMS_CONFIG.ford.title);
+  let y = drawDocHeader(doc, marginX, 54, W, FORMS_CONFIG.ford.title, '',
+                       data.submittedBy ? { label: 'Submitted By:', value: data.submittedBy } : null);
 
   // The band sits flush on the grid below it (no gap), so the two read as one component.
   y = sectionBar(doc, marginX, y, W, 'Section A:', ' Employee Details & Grievance Summary');
@@ -869,7 +903,8 @@ function buildPolicyDoc(data) {
 
   const marginX = 40;
   const W = 532;
-  let y = drawDocHeader(doc, marginX, 54, W, FORMS_CONFIG.policy.title);
+  let y = drawDocHeader(doc, marginX, 54, W, FORMS_CONFIG.policy.title, '',
+                       data.submittedBy ? { label: 'Submitted By:', value: data.submittedBy } : null);
 
   y = sectionBar(doc, marginX, y, W, 'Section A:', ' Employee Details & Grievance Summary');
 
@@ -1233,9 +1268,16 @@ document.getElementById('investigationClear').addEventListener('click', () => {
 
 
 /* ============ Unsaved-changes guard ============ */
+/*
+ * "submittedBy" doesn't count. It arrives pre-filled from the last grievance, so a form holding
+ * nothing but your own name is an empty form — it shouldn't be flagged as having work waiting,
+ * shouldn't be counted by Clear all forms, and shouldn't be saved as a draft or a .grv.
+ */
+const NOT_CONTENT = ['submittedBy'];
+
 function formHasData(form) {
   return Array.from(form.elements).some(el => {
-    if (!el.name) return false;
+    if (!el.name || NOT_CONTENT.includes(el.name)) return false;
     if (el.type === 'radio' || el.type === 'checkbox') return false;
     return (el.value || '').toString().trim() !== '';
   });
@@ -1284,6 +1326,40 @@ function showVersion(show) {
   if (versionTag) versionTag.hidden = !show || !APP_VERSION;
 }
 
+/* ============ Who is filling this in ============
+ *
+ * Remembered on this device and put back into every form that asks for it. A rep files their
+ * own grievances from their own machine; typing the same name in every time is a small tax on
+ * the one thing that never changes. Typed over freely when it isn't you.
+ *
+ * Same storage as the drafts: on this device, sent nowhere.
+ */
+const SUBMITTER_KEY = 'local200forms:submittedBy';
+
+function rememberedSubmitter() {
+  try { return localStorage.getItem(SUBMITTER_KEY) || ''; } catch { return ''; }
+}
+
+function rememberSubmitter(value) {
+  try {
+    const name = value.trim();
+    if (name) localStorage.setItem(SUBMITTER_KEY, name);
+    else localStorage.removeItem(SUBMITTER_KEY);
+  } catch { /* private browsing; the field still works, it just won't be remembered */ }
+}
+
+/* Only fills a blank one — anything already there was either typed or restored from a draft */
+function applyRememberedSubmitter(form) {
+  const field = form && form.elements.submittedBy;
+  if (!field || field.value.trim()) return;
+  const name = rememberedSubmitter();
+  if (name) field.value = name;
+}
+
+document.querySelectorAll('[name="submittedBy"]').forEach(field => {
+  field.addEventListener('input', () => rememberSubmitter(field.value));
+});
+
 /* ============ Home / fill-form view routing ============ */
 const homeView = document.getElementById('homeView');
 
@@ -1312,6 +1388,8 @@ function clearForm(form) {
     else if (el.tagName === 'TEXTAREA' || el.type === 'text' || el.type === 'date') el.value = '';
   });
   form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
+  // Clearing starts the next grievance, and it's still you filing it
+  applyRememberedSubmitter(form);
   form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
   if (currentFormType) {
     discardDraft(currentFormType);
@@ -1355,6 +1433,7 @@ function showForm(type, data) {
   document.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   // scrollHeight reads 0 while the panel is hidden, so size the textareas now that it's visible
   entry.form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
+  applyRememberedSubmitter(entry.form);
   updatePageBreaks(type);
   if (entry.syncSheet) entry.syncSheet();
   renderAttachmentList(type);
@@ -2961,7 +3040,8 @@ function saveDraft(type) {
   const entry = FORM_BUILDERS[type];
   if (!entry) return;
   const data = fd(entry.form);
-  const hasContent = Object.values(data).some(v => v !== '');
+  const hasContent = Object.entries(data)
+    .some(([key, value]) => !NOT_CONTENT.includes(key) && value !== '');
   try {
     if (hasContent) localStorage.setItem(draftKey(type), JSON.stringify({ savedAt: Date.now(), data }));
     else localStorage.removeItem(draftKey(type));
@@ -3870,10 +3950,10 @@ window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX, defaultBuilderFit: DEFA
  * already have a draft in it.
  */
 const IMPORT_FORM_FIELDS = {
-  ford: ['employeeName', 'globalId', 'department', 'processCoach', 'article',
+  ford: ['submittedBy', 'employeeName', 'globalId', 'department', 'processCoach', 'article',
          'dateIncident', 'dateFiled', 'details',
          'hoursStraight', 'hoursShift1', 'hoursTimeHalf', 'hoursShift3', 'hoursDouble', 'hoursTriple'],
-  policy: ['employeeName', 'globalId', 'department', 'processCoach', 'article',
+  policy: ['submittedBy', 'employeeName', 'globalId', 'department', 'processCoach', 'article',
            'dateIncident', 'dateFiled', 'details'],
 };
 
@@ -3915,6 +3995,7 @@ function importLabel(type, field) {
 
 /* The sending app won't know our field names, so a spread of plausible ones is accepted */
 const IMPORT_ALIASES = {
+  submittedBy: ['submittedby', 'submitter', 'filedby', 'rep', 'representative', 'committeeperson'],
   employeeName: ['employeename', 'name', 'employee', 'grievor', 'grievorname', 'member', 'membername'],
   globalId: ['globalid', 'gid', 'employeeid', 'employeenumber', 'badge', 'badgenumber', 'id'],
   department: ['department', 'dept', 'deptname', 'departmentname'],
@@ -3933,7 +4014,7 @@ const IMPORT_ALIASES = {
 };
 
 const IMPORT_LABELS = {
-  employeeName: 'Employee Name', globalId: 'Global ID', department: 'Department',
+  submittedBy: 'Submitted By', employeeName: 'Employee Name', globalId: 'Global ID', department: 'Department',
   processCoach: 'Process Coach', article: 'Article Violation', dateIncident: 'Date of Incident',
   dateFiled: 'Date Filed', details: 'Details of Incident',
   hoursStraight: 'Hours at straight time', hoursShift1: 'Hours of #1 Shift Prem',
