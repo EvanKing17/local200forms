@@ -446,6 +446,27 @@ function clearLabelStyle(doc) {
  * Document header lockup: title over a subtitle, on a rule in the primary colour.
  * Left-aligned per the style guide.
  */
+/*
+ * A field in the header: label above, value below, laid out on exactly the same metrics as a
+ * cell in any grid — but with no outline drawn around it. Up here the blue rule underneath is
+ * the only edge it needs; a box as well was one line too many.
+ *
+ * It measures itself through the same two helpers the grids use, so its height stays in step
+ * with every other cell on the sheet without boxedGrid having to grow an option for it.
+ */
+function headerFieldCell(doc, x, y, w, label, value) {
+  const prepared = prepareGridCells(doc, [{ label, value, width: w }]);
+  const { h, labelBlockH } = gridHeightFromPrepared(prepared, CELL_MIN_H);
+  const cell = prepared[0];
+
+  setLabelStyle(doc);
+  doc.text(cell.labelLines, x + CELL_X, y + 10.5);
+  clearLabelStyle(doc);
+  setValueStyle(doc, 9.5);
+  doc.text(cell.valueLines, x + CELL_X, y + labelBlockH + CELL_LABEL_GAP + 8);
+  return y + h;
+}
+
 function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
   /*
    * A short value sitting on the title's baseline, e.g. the Investigation form's "Step: 1".
@@ -468,8 +489,8 @@ function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
      * sit on that line too, instead of staying up where a short title used to start.
      */
     const cellW = SUBMITTED_CELL_W;
-    boxedBottom = boxedGrid(doc, x + w - cellW, HEADER_TOP, cellW,
-      [{ label: rightField.label, value: rightField.value || '', width: cellW }]);
+    boxedBottom = headerFieldCell(doc, x + w - cellW, HEADER_TOP, cellW,
+                                  rightField.label, rightField.value || '');
     titleWidth = w - cellW - 20;
     y = boxedBottom - 10;          // the heading sits on the rule, like the box does
 
