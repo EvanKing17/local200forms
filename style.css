@@ -1456,8 +1456,23 @@ input[type="radio"] { width: 15px; height: 15px; }
   align-items: baseline;      /* Step sits on the title's baseline, not below it */
   justify-content: space-between;
   gap: 20px;
-  /* A name too long to sit beside the title drops under it, which is what the PDF does too */
-  flex-wrap: wrap;
+}
+
+/*
+ * Submitted By is an ordinary field box, not a label and a line on the title's baseline: a name
+ * belongs under its heading like every other value on the sheet. The title keeps its own top
+ * rather than being dragged down to meet a taller thing beside it.
+ */
+.dc-head-boxed {
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.dc-head-boxed .dc-doc-title { padding-top: 6.667px; }   /* 5pt, so it optically centres */
+
+.dc-submitted-cell {
+  width: 177.333px;        /* 133pt — a quarter of the sheet, so it lines up with the grid below */
+  flex-shrink: 0;
 }
 
 .dc-step {
@@ -1488,13 +1503,6 @@ input[type="radio"] { width: 15px; height: 15px; }
 .dc-step input:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
 
 .dc-step .dc-inline-label { font-size: 14.667px; }
-
-/* Same idea as Step, but a name needs room and reads left-aligned */
-.dc-submitted-by input {
-  width: 200px;
-  max-width: 34vw;
-  text-align: left;
-}
 
 .dc-value-input {
   margin: var(--dc-label-gap) -2px 0;

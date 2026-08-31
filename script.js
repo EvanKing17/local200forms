@@ -453,42 +453,35 @@ function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
    * form control on paper, when it's really just part of the heading.
    */
   let titleWidth = w;
-  let ownLine = null;
-  if (rightField) {
-    doc.setTextColor(...DC.ink);
-    doc.setFont('helvetica', 'bold');
+  let boxedBottom = 0;
 
-    /*
-     * A name is longer than "1", so the right-hand block has to earn its room. It gives up
-     * point size first, down to 8pt. If a name is long enough that even that would run into
-     * the title, it drops onto its own line underneath instead.
-     *
-     * A name is never shortened. Somebody's name on the grievance they filed is not a thing to
-     * abbreviate to make a layout work, and "Evan Robert King Th…" on a filed document would be
-     * worse than an extra line.
-     */
-    doc.setFontSize(15);
-    const titleW = doc.getTextWidth(title);
+  /*
+   * Two shapes of right-hand field. The 4.01's "Step: 1" is plain text on the title's baseline —
+   * a lone digit in a drawn box reads as an empty form control on paper. A name is different:
+   * it gets an ordinary field box, label above and value below, like every other value on the
+   * sheet, and it never has to shrink or shorten to fit beside the heading.
+   */
+  if (rightField && rightField.boxed) {
+    const cellW = SUBMITTED_CELL_W;
+    const cellX = x + w - cellW;
+    const cellTop = y - 12;
+    boxedBottom = boxedGrid(doc, cellX, cellTop, cellW,
+      [{ label: rightField.label, value: rightField.value || '', width: cellW }]);
+    titleWidth = w - cellW - 20;
+
+  } else if (rightField) {
+    doc.setFontSize(11);
+    doc.setTextColor(...DC.ink);
     const value = String(rightField.value || '');
 
-    const blockWidth = (size) => {
-      doc.setFontSize(size);
-      return doc.getTextWidth(rightField.label) + doc.getTextWidth(value) + 33;
-    };
+    doc.setFont('helvetica', 'bold');
+    const valueW = doc.getTextWidth(value);
+    doc.text(value, x + w, y + 1, { align: 'right' });
 
-    let size = 11;
-    while (size > 8 && titleW + blockWidth(size) > w) size -= 1;
+    const labelW = doc.getTextWidth(rightField.label);
+    doc.text(rightField.label, x + w - valueW - 5, y + 1, { align: 'right' });
 
-    if (titleW + blockWidth(size) > w) {
-      ownLine = { size, value, label: rightField.label };   // drawn under the title, below
-    } else {
-      doc.setFontSize(size);
-      const valueW = doc.getTextWidth(value);
-      doc.text(value, x + w, y + 1, { align: 'right' });
-      const labelW = doc.getTextWidth(rightField.label);
-      doc.text(rightField.label, x + w - valueW - 5, y + 1, { align: 'right' });
-      titleWidth = w - labelW - valueW - 28;
-    }
+    titleWidth = w - labelW - valueW - 28;
   }
 
   doc.setFont('helvetica', 'bold');
@@ -497,17 +490,6 @@ function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
   const titleLines = doc.splitTextToSize(title, titleWidth);
   titleLines.forEach((line, i) => doc.text(line, x, y + i * 18));
   let cy = y + (titleLines.length - 1) * 18;
-
-  // No room beside the title, so it goes underneath — full name, still right-aligned
-  if (ownLine) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(ownLine.size);
-    doc.setTextColor(...DC.ink);
-    cy += 14;
-    const valueW = doc.getTextWidth(ownLine.value);
-    doc.text(ownLine.value, x + w, cy, { align: 'right' });
-    doc.text(ownLine.label, x + w - valueW - 5, cy, { align: 'right' });
-  }
 
   if (subtitle) {
     doc.setFont('helvetica', 'normal');
@@ -518,6 +500,8 @@ function drawDocHeader(doc, x, y, w, title, subtitle, rightField) {
   }
 
   cy += 10;
+  // The rule sits under whichever is lower, the heading or the box beside it
+  if (boxedBottom) cy = Math.max(cy, boxedBottom + 8);
   doc.setDrawColor(...DC.primary);
   doc.setLineWidth(1.5);
   doc.line(x, cy, x + w, cy);
@@ -557,6 +541,7 @@ const CELL_LABEL_GAP = 6;  // label block to the first value line
 const CELL_BOTTOM = 6;     // last value line to the cell's bottom edge
 const CELL_LINE = 11;      // value line height
 const CELL_MIN_H = 35;
+const SUBMITTED_CELL_W = 133;   // a quarter of the 532pt sheet, so it lines up with the grid
 
 function prepareGridCells(doc, cells) {
   const labelFontSize = 6.5, valueFontSize = 9.5;
@@ -797,7 +782,7 @@ function buildFordDoc(data) {
   const marginX = 40;
   const W = 532;
   let y = drawDocHeader(doc, marginX, 54, W, FORMS_CONFIG.ford.title, '',
-                       data.submittedBy ? { label: 'Submitted By:', value: data.submittedBy } : null);
+                       data.submittedBy ? { label: 'Submitted By', value: data.submittedBy, boxed: true } : null);
 
   // The band sits flush on the grid below it (no gap), so the two read as one component.
   y = sectionBar(doc, marginX, y, W, 'Section A:', ' Employee Details & Grievance Summary');
@@ -904,7 +889,7 @@ function buildPolicyDoc(data) {
   const marginX = 40;
   const W = 532;
   let y = drawDocHeader(doc, marginX, 54, W, FORMS_CONFIG.policy.title, '',
-                       data.submittedBy ? { label: 'Submitted By:', value: data.submittedBy } : null);
+                       data.submittedBy ? { label: 'Submitted By', value: data.submittedBy, boxed: true } : null);
 
   y = sectionBar(doc, marginX, y, W, 'Section A:', ' Employee Details & Grievance Summary');
 

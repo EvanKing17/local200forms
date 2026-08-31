@@ -839,9 +839,13 @@ function run(win, doc) {
     const noIframe = !doc.getElementById('pdfViewerFrame');
     let drew = false;
     if (pages.length) {
+      // Scan a strip rather than sampling one spot: the point of this check is that the page
+      // was drawn at all, and a fixed coordinate breaks every time the layout moves
       const c = pages[0];
-      const px = c.getContext('2d').getImageData(Math.round(c.width * 0.5), Math.round(c.height * 0.115), 1, 1).data;
-      drew = !(px[0] === 255 && px[1] === 255 && px[2] === 255);   // the section band
+      const strip = c.getContext('2d').getImageData(Math.round(c.width * 0.5), 0, 1, c.height).data;
+      for (let i = 0; i < strip.length && !drew; i += 4) {
+        if (!(strip[i] === 255 && strip[i+1] === 255 && strip[i+2] === 255)) drew = true;
+      }
     }
     doc.getElementById('pdfViewerClose').click();
     return (pages.length === built.getNumberOfPages() && noIframe && drew) ||
@@ -1991,38 +1995,45 @@ function run(win, doc) {
       const bytes = new Uint8Array(win.buildFordDoc(win.fd(ford)).output('arraybuffer'));
       const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
       const content = await (await pdf.getPage(1)).getTextContent();
-      const printed = content.items.map(i => i.str).join('');
-      if (printed.replace(/\s+/g, ' ').indexOf(name) === -1) missing.push(name);
+      // A long name wraps inside its box, arriving as separate items — joined with a space
+      const printed = content.items.map(i => i.str).join(' ').replace(/\s+/g, ' ').trim();
+      if (printed.indexOf(name) === -1) missing.push(name);
     }
     win.clearForm(ford);
     win.showHome();
     return missing.length === 0 || { detail: 'not printed in full: ' + missing.join(' / ') };
   });
 
-  checkAsync(g15, 'A name too long to sit beside the title moves below it, never across it', async () => {
+  checkAsync(g15, 'A long name wraps inside its box rather than running into the heading', async () => {
     const ford = doc.getElementById('fordForm');
     const monster = 'Maria de los Angeles Fitzwilliam-Montgomery Ashcroft Vandenberg Okonkwo-Lindqvist III';
-    win.showForm('ford');
-    win.clearForm(ford);
-    ford.elements.submittedBy.value = monster;
-    const bytes = new Uint8Array(win.buildFordDoc(win.fd(ford)).output('arraybuffer'));
     const pdfjs = await win.Annotator.loadPdfJs();
-    const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
-    const items = (await (await pdf.getPage(1)).getTextContent()).items;
 
-    const title = items.find(i => i.str.indexOf('Grievance Investigation') !== -1);
-    const label = items.find(i => i.str.indexOf('Submitted') !== -1);
-    const value = items.find(i => i.str.indexOf('Maria de los') !== -1);
-    const sameLine = title && label && Math.abs(title.transform[5] - label.transform[5]) < 4;
-    const overlaps = sameLine && (title.transform[4] + title.width) > label.transform[4];
-    const printedWhole = !!value && value.str.indexOf(monster) !== -1;
-    const insideMargin = !!value && (value.transform[4] + value.width) <= 574;
+    const headerOf = async (name) => {
+      win.showForm('ford');
+      win.clearForm(ford);
+      ford.elements.submittedBy.value = name;
+      const bytes = new Uint8Array(win.buildFordDoc(win.fd(ford)).output('arraybuffer'));
+      const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+      const items = (await (await pdf.getPage(1)).getTextContent()).items;
+      const title = items.find(i => i.str.indexOf('Grievance Investigation') !== -1);
+      const parts = items.filter(i => monster.indexOf(i.str.trim()) !== -1 && i.str.trim().length > 3);
+      const joined = items.map(i => i.str).join(' ').replace(/\s+/g, ' ');
+      return { title, parts, whole: joined.indexOf(name) !== -1,
+               rightmost: Math.max(...items.map(i => i.transform[4] + i.width)) };
+    };
 
+    const long = await headerOf(monster);
+    const short = await headerOf('Evan King');
     win.clearForm(ford);
     win.showHome();
-    return (!sameLine && !overlaps && printedWhole && insideMargin) ||
-      { detail: 'sameLine=' + sameLine + ' overlaps=' + overlaps +
-                ' whole=' + printedWhole + ' insideMargin=' + insideMargin };
+
+    // the box wraps it onto more lines, the whole name is there, and nothing leaves the margin
+    const wrapped = long.parts.length > short.parts.length;
+    const clearOfTitle = long.title && long.parts.every(p => p.transform[4] > long.title.transform[4] + long.title.width);
+    return (long.whole && wrapped && clearOfTitle && long.rightmost <= 574) ||
+      { detail: 'whole=' + long.whole + ' lines=' + long.parts.length + ' vs ' + short.parts.length +
+                ' clearOfTitle=' + clearOfTitle + ' rightmost=' + Math.round(long.rightmost) };
   });
 
   const g7 = group('Drafts');
