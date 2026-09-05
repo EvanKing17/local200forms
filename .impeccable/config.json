@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "helvetica",
+        "createdAt": "2026-09-05T23:54:07.511Z",
+        "reason": "PDF mirror, not an aesthetic pick: jsPDF draws these forms with the base-14 helvetica face (17 setFont('helvetica') calls in script.js) and the .dc-* document view must match it character for character, since the on-screen page-break markers are computed from that match"
+      }
+    ]
+  }
+}

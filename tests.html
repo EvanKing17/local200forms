@@ -31,8 +31,10 @@
     background: #fff; border: 1px solid var(--border);
     font-weight: 600;
   }
-  .summary.is-pass { border-left: 5px solid var(--pass); }
-  .summary.is-fail { border-left: 5px solid var(--fail); }
+  .summary.is-pass { background: #f2f9f4; border-color: #b7dcc0; }
+  .summary.is-fail { background: #fdf3f3; border-color: #f0bcbc; }
+  .summary.is-pass .count { color: var(--pass); }
+  .summary.is-fail .count { color: var(--fail); }
   .count { font-size: 20px; }
   .group { margin-bottom: 22px; }
   .group h2 {
