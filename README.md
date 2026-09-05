@@ -174,6 +174,27 @@ The build number sits in the bottom right of the form list — handy when someon
 says a fix isn't there yet. It's read off the `?v=` on `script.js`, so it can't
 disagree with what's actually being served.
 
+## Tools
+
+**Tools** in the bottom-right corner of the form list. Odd jobs that aren't
+filling in a form.
+
+### DROT Audit
+
+Steps through all 25 departments across Essex and the Annex, one at a time,
+with the DROT big enough to read across a desk. Copy, Next, and a shift
+selector — the same walk down the same list for days, afternoons or midnights.
+
+A DROT is the department number without its leading 8, then `0`, then the
+shift, then a letter belonging to the department. Blocks is 8360, so on days
+it's `36002B`. The shift is the digit before the letter: **1** midnights,
+**2** days, **3** afternoons.
+
+The codes are worked out from the number rather than listed three times over.
+The letter can't be worked out and is recorded per department — Essex Building
+Services and Essex Stationary are both 8340, and the letter is the only thing
+separating `34002I` from `34002O`.
+
 ## Install it
 
 On a phone: open the link, then **Add to Home screen** (Chrome: ⋮ menu,

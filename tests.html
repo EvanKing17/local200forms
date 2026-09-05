@@ -2036,6 +2036,143 @@ function run(win, doc) {
                 ' clearOfTitle=' + clearOfTitle + ' rightmost=' + Math.round(long.rightmost) };
   });
 
+  const g16 = group('DROT audit');
+
+  // Straight off the sheet on the wall, day shift, both plants
+  const SHEET = {
+    'Essex|Blocks': '36002B', 'Essex|Building Services': '34002I', 'Essex|Cranks': '38402M',
+    'Essex|Dynamic': '34302P', 'Essex|Dyno': '31202A', 'Essex|Engine Line MVL': '38302M',
+    'Essex|Garage': '31602A', 'Essex|Godzilla Blocks/Heads': '36502M',
+    'Essex|Godzilla Cranks/Rods': '35002M', 'Essex|Godzilla Engine Line': '38002M',
+    'Essex|HR': '31402A', 'Essex|Rods': '36202M', 'Essex|Stationary': '34002O',
+    'Annex|Blocks 6.8 MB2': '66002B', 'Annex|Blocks 7.3 MB1': '68802B',
+    'Annex|Building Services': '61802A', 'Annex|Cranks': '66802B', 'Annex|Dynamic': '60402M',
+    'Annex|Engine Line': '67802M', 'Annex|Garage': '64502A', 'Annex|Heads 4-Valve': '65302A',
+    'Annex|Heads Godzilla': '69802B', 'Annex|HR': '61402A', 'Annex|Rods 5.0': '65802B',
+    'Annex|Rods 7.3': '60802B',
+  };
+
+  check(g16, 'Every day-shift code matches the sheet', () => {
+    const wrong = [];
+    win.__app.DROT_DEPARTMENTS.forEach(d => {
+      const want = SHEET[d.plant + '|' + d.name];
+      const got = win.drotFor(d, 'days');
+      if (!want) wrong.push(d.plant + ' ' + d.name + ' is not on the sheet');
+      else if (want !== got) wrong.push(d.plant + ' ' + d.name + ': sheet ' + want + ', app ' + got);
+    });
+    const missing = Object.keys(SHEET).filter(k =>
+      !win.__app.DROT_DEPARTMENTS.some(d => d.plant + '|' + d.name === k));
+    return (wrong.length === 0 && missing.length === 0) ||
+      { detail: wrong.concat(missing.map(m => m + ' is missing')).join(' | ') };
+  });
+
+  check(g16, 'The shift is the digit before the letter, and nothing else moves', () => {
+    const wrong = [];
+    win.__app.DROT_DEPARTMENTS.forEach(d => {
+      const days = win.drotFor(d, 'days');
+      const afts = win.drotFor(d, 'afternoons');
+      const mids = win.drotFor(d, 'midnights');
+      if (days.charAt(4) !== '2' || afts.charAt(4) !== '3' || mids.charAt(4) !== '1') {
+        wrong.push(d.name + ' shift digits ' + days + '/' + afts + '/' + mids);
+      }
+      // every other character is identical across the three
+      const stripped = [days, afts, mids].map(c => c.slice(0, 4) + c.slice(5));
+      if (stripped[0] !== stripped[1] || stripped[1] !== stripped[2]) {
+        wrong.push(d.name + ' changes more than the shift');
+      }
+    });
+    return wrong.length === 0 || { detail: wrong.join(' | ') };
+  });
+
+  check(g16, 'Two departments sharing a number stay apart', () => {
+    // Essex Building Services and Essex Stationary are both 8340; only the letter separates them
+    const eight340 = win.__app.DROT_DEPARTMENTS.filter(d => d.number === '8340' && d.plant === 'Essex');
+    const codes = eight340.map(d => win.drotFor(d, 'days'));
+    return (eight340.length === 2 && codes[0] !== codes[1]) ||
+      { detail: eight340.length + ' departments on 8340, codes ' + codes.join(' and ') };
+  });
+
+  check(g16, 'Annex HR is there, following the Essex pattern', () => {
+    const essex = win.__app.DROT_DEPARTMENTS.find(d => d.plant === 'Essex' && d.name === 'HR');
+    const annex = win.__app.DROT_DEPARTMENTS.find(d => d.plant === 'Annex' && d.name === 'HR');
+    return (annex && annex.number === '8614' && win.drotFor(annex, 'days') === '61402A' &&
+            annex.letter === essex.letter) ||
+      { detail: annex ? annex.number + ' -> ' + win.drotFor(annex, 'days') : 'no Annex HR' };
+  });
+
+  check(g16, 'A code is the department number with the 8 taken off', () => {
+    const wrong = win.__app.DROT_DEPARTMENTS.filter(d =>
+      win.drotFor(d, 'days').slice(0, 3) !== d.number.slice(1));
+    return wrong.length === 0 || { detail: wrong.map(d => d.name).join(', ') };
+  });
+
+  checkAsync(g16, 'The audit walks every department and shows what it should', async () => {
+    win.showHome();
+    doc.getElementById('toolsButton').click();
+    const menuOpen = !doc.getElementById('toolsMenu').hidden;
+    doc.querySelector('[data-tool="drot"]').click();
+    const opened = !doc.getElementById('drotView').hidden && doc.getElementById('homeView').hidden;
+
+    const first = {
+      dept: doc.getElementById('drotDept').textContent,
+      plant: doc.getElementById('drotPlant').textContent,
+      code: doc.getElementById('drotCode').textContent,
+      progress: doc.getElementById('drotProgress').textContent,
+      backOff: doc.getElementById('drotPrev').disabled,
+    };
+
+    // walk to the end, collecting every code
+    const seen = [first.code];
+    while (!doc.getElementById('drotNext').disabled) {
+      doc.getElementById('drotNext').click();
+      seen.push(doc.getElementById('drotCode').textContent);
+    }
+    const last = doc.getElementById('drotProgress').textContent;
+    win.showHome();
+
+    const total = win.__app.DROT_DEPARTMENTS.length;
+    return (menuOpen && opened && first.dept === 'Blocks' && first.plant === 'Essex' &&
+            first.code === '36002B' && first.progress === '1 of ' + total && first.backOff &&
+            seen.length === total && new Set(seen).size === total &&
+            last === total + ' of ' + total) ||
+      { detail: JSON.stringify(first) + ' walked ' + seen.length + '/' + total +
+                ', distinct ' + new Set(seen).size + ', ended "' + last + '"' };
+  });
+
+  checkAsync(g16, 'Changing shift keeps your place and changes only the shift', async () => {
+    win.showHome();
+    doc.querySelector('[data-tool="drot"]').click();
+    doc.getElementById('drotNext').click();
+    doc.getElementById('drotNext').click();
+    const where = doc.getElementById('drotProgress').textContent;
+    const onDays = doc.getElementById('drotCode').textContent;
+
+    const select = doc.getElementById('drotShift');
+    select.value = 'midnights';
+    select.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const onMids = doc.getElementById('drotCode').textContent;
+    const stillThere = doc.getElementById('drotProgress').textContent;
+
+    select.value = 'days';
+    select.dispatchEvent(new win.Event('change', { bubbles: true }));
+    win.showHome();
+    return (where === stillThere && onDays.charAt(4) === '2' && onMids.charAt(4) === '1' &&
+            onDays.slice(0, 4) === onMids.slice(0, 4) && onDays.slice(5) === onMids.slice(5)) ||
+      { detail: where + ' -> ' + stillThere + ', ' + onDays + ' -> ' + onMids };
+  });
+
+  check(g16, 'Tools is on the form list only', () => {
+    win.showHome();
+    const onHome = !doc.getElementById('tools').hidden;
+    win.showForm('ford');
+    const onForm = !doc.getElementById('tools').hidden;
+    win.showBuilder();
+    const inBuilder = !doc.getElementById('tools').hidden;
+    win.showHome();
+    return (onHome && !onForm && !inBuilder) ||
+      { detail: 'home=' + onHome + ' form=' + onForm + ' builder=' + inBuilder };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {

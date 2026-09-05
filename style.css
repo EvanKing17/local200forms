@@ -1923,6 +1923,125 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 @media print { .app-version { display: none !important; } }
 
+/* ---------- Tools, and the DROT audit ---------- */
+.tools {
+  position: fixed;
+  right: 12px;
+  bottom: 26px;
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.tools[hidden] { display: none; }
+
+.tools-button {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.08);
+}
+.tools-button:hover { border-color: var(--c-accent); color: var(--c-text); }
+
+.tools-menu {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.16);
+  padding: 5px;
+  min-width: 168px;
+}
+.tools-menu[hidden] { display: none; }
+
+.tools-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--c-text);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+.tools-menu button:hover { background: var(--c-surface-alt); color: var(--c-accent); }
+
+.drot-view {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: clamp(12px, 2vw, 24px) clamp(16px, 4vw, 40px) 60px;
+}
+
+.drot-progress { font-size: 13px; color: var(--c-text-muted); margin-right: auto; }
+
+.drot-shift {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+}
+.drot-shift select {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--c-text);
+  background: var(--c-input-bg);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 8px;
+}
+
+.drot-card {
+  margin-top: 18px;
+  padding: clamp(24px, 5vw, 44px) clamp(20px, 4vw, 36px);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.drot-dept { margin: 0; font-size: clamp(19px, 3vw, 25px); font-weight: 700; color: var(--c-text); }
+.drot-plant { margin: 4px 0 0; font-size: 13px; color: var(--c-text-faint); }
+
+/* The thing you came here for — big, monospaced, and spaced so a 0 and an O can't blur together */
+.drot-code {
+  margin: 22px 0 0;
+  font-family: var(--font-mono);
+  font-size: clamp(38px, 9vw, 60px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--dc-primary, #002855);
+  line-height: 1.1;
+  word-break: break-all;
+}
+
+.drot-number { margin: 6px 0 0; font-size: 12.5px; color: var(--c-text-faint); }
+
+.drot-actions {
+  margin-top: 26px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.drot-actions .btn-secondary, .drot-actions .btn-primary { min-width: 116px; }
+.drot-actions button:disabled { opacity: 0.4; cursor: default; }
+
+.drot-status { margin: 12px 0 0; min-height: 18px; font-size: 12.5px; color: var(--c-text-muted); }
+
+.is-large-text .drot-view { zoom: 1.25; }
+@media print { .tools { display: none !important; } }
+
 .bar-text-size {
   display: inline-flex;
   align-items: baseline;

@@ -1371,18 +1371,188 @@ document.querySelectorAll('[name="submittedBy"]').forEach(field => {
   field.addEventListener('input', () => rememberSubmitter(field.value));
 });
 
+/* ============ Tools: DROT audit ============
+ *
+ * A DROT is the department number without its leading 8, then "0", then the shift, then a
+ * letter belonging to the department: 8360 Blocks on days is 36002B.
+ *
+ * The shift is the last digit before the letter — 1 midnights, 2 days, 3 afternoons — so one
+ * department is the same code three times with that digit swapped. Codes are worked out from
+ * the number rather than listed three times over: seventy-two hand-typed codes is a list with
+ * a typo in it.
+ *
+ * The letter can't be worked out and has to be recorded. Essex Building Services and Essex
+ * Stationary are both 8340, and the letter is the only thing separating 34002I from 34002O.
+ */
+const DROT_SHIFTS = [
+  { key: 'days', label: 'Day shift', digit: '2' },
+  { key: 'afternoons', label: 'Afternoons', digit: '3' },
+  { key: 'midnights', label: 'Midnights', digit: '1' },
+];
+
+const DROT_DEPARTMENTS = [
+  { plant: 'Essex', name: 'Blocks', number: '8360', letter: 'B' },
+  { plant: 'Essex', name: 'Building Services', number: '8340', letter: 'I' },
+  { plant: 'Essex', name: 'Cranks', number: '8384', letter: 'M' },
+  { plant: 'Essex', name: 'Dynamic', number: '8343', letter: 'P' },
+  { plant: 'Essex', name: 'Dyno', number: '8312', letter: 'A' },
+  { plant: 'Essex', name: 'Engine Line MVL', number: '8383', letter: 'M' },
+  { plant: 'Essex', name: 'Garage', number: '8316', letter: 'A' },
+  { plant: 'Essex', name: 'Godzilla Blocks/Heads', number: '8365', letter: 'M' },
+  { plant: 'Essex', name: 'Godzilla Cranks/Rods', number: '8350', letter: 'M' },
+  { plant: 'Essex', name: 'Godzilla Engine Line', number: '8380', letter: 'M' },
+  { plant: 'Essex', name: 'HR', number: '8314', letter: 'A' },
+  { plant: 'Essex', name: 'Rods', number: '8362', letter: 'M' },
+  { plant: 'Essex', name: 'Stationary', number: '8340', letter: 'O' },
+
+  { plant: 'Annex', name: 'Blocks 6.8 MB2', number: '8660', letter: 'B' },
+  { plant: 'Annex', name: 'Blocks 7.3 MB1', number: '8688', letter: 'B' },
+  { plant: 'Annex', name: 'Building Services', number: '8618', letter: 'A' },
+  { plant: 'Annex', name: 'Cranks', number: '8668', letter: 'B' },
+  { plant: 'Annex', name: 'Dynamic', number: '8604', letter: 'M' },
+  { plant: 'Annex', name: 'Engine Line', number: '8678', letter: 'M' },
+  { plant: 'Annex', name: 'Garage', number: '8645', letter: 'A' },
+  { plant: 'Annex', name: 'Heads 4-Valve', number: '8653', letter: 'A' },
+  { plant: 'Annex', name: 'Heads Godzilla', number: '8698', letter: 'B' },
+  { plant: 'Annex', name: 'HR', number: '8614', letter: 'A' },   // same shape as Essex HR
+  { plant: 'Annex', name: 'Rods 5.0', number: '8658', letter: 'B' },
+  { plant: 'Annex', name: 'Rods 7.3', number: '8608', letter: 'B' },
+];
+
+function drotFor(dept, shiftKey) {
+  const shift = DROT_SHIFTS.find(s => s.key === shiftKey) || DROT_SHIFTS[0];
+  return dept.number.slice(1) + '0' + shift.digit + dept.letter;
+}
+
+const drotView = document.getElementById('drotView');
+const drotShiftSelect = document.getElementById('drotShift');
+let drotAt = 0;
+let drotShift = 'days';
+
+DROT_SHIFTS.forEach(shift => {
+  const option = document.createElement('option');
+  option.value = shift.key;
+  option.textContent = shift.label;
+  drotShiftSelect.appendChild(option);
+});
+
+function renderDrot() {
+  const dept = DROT_DEPARTMENTS[drotAt];
+  if (!dept) return;
+  document.getElementById('drotDept').textContent = dept.name;
+  document.getElementById('drotPlant').textContent = dept.plant;
+  document.getElementById('drotCode').textContent = drotFor(dept, drotShift);
+  document.getElementById('drotNumber').textContent = 'Dept ' + dept.number;
+  document.getElementById('drotProgress').textContent =
+    (drotAt + 1) + ' of ' + DROT_DEPARTMENTS.length;
+  document.getElementById('drotPrev').disabled = drotAt === 0;
+  document.getElementById('drotNext').disabled = drotAt >= DROT_DEPARTMENTS.length - 1;
+  setDrotStatus('');
+}
+
+let drotStatusTimer = null;
+
+function setDrotStatus(message) {
+  clearTimeout(drotStatusTimer);
+  const el = document.getElementById('drotStatus');
+  el.textContent = message || '';
+  if (message) drotStatusTimer = setTimeout(() => { el.textContent = ''; }, 2500);
+}
+
+function showDrot() {
+  currentFormType = null;
+  homeView.hidden = true;
+  workspace.hidden = true;
+  builderView.hidden = true;
+  drotView.hidden = false;
+  showVersion(false);
+  showTools(false);
+  drotShiftSelect.value = drotShift;
+  renderDrot();
+}
+
+/* Clipboard first; a locked-down machine can refuse it, and the old way still works there */
+async function copyDrot() {
+  const text = document.getElementById('drotCode').textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    setDrotStatus('Copied ' + text);
+    return true;
+  } catch (err) {
+    /* fall through to the old way */
+  }
+  const scratch = document.createElement('textarea');
+  scratch.value = text;
+  scratch.setAttribute('readonly', '');
+  scratch.style.cssText = 'position:fixed;top:-1000px';
+  document.body.appendChild(scratch);
+  scratch.select();
+  let copied = false;
+  try { copied = document.execCommand('copy'); } catch (err) { copied = false; }
+  scratch.remove();
+  setDrotStatus(copied ? 'Copied ' + text : 'Couldn’t reach the clipboard — copy it by hand.');
+  return copied;
+}
+
+document.getElementById('drotCopy').addEventListener('click', copyDrot);
+document.getElementById('drotNext').addEventListener('click', () => {
+  if (drotAt < DROT_DEPARTMENTS.length - 1) { drotAt += 1; renderDrot(); }
+});
+document.getElementById('drotPrev').addEventListener('click', () => {
+  if (drotAt > 0) { drotAt -= 1; renderDrot(); }
+});
+drotShiftSelect.addEventListener('change', () => {
+  // Changing shift keeps your place: it's the same walk down the same list
+  drotShift = drotShiftSelect.value;
+  renderDrot();
+});
+
+/* ---------- The Tools menu ---------- */
+const toolsBox = document.getElementById('tools');
+const toolsMenu = document.getElementById('toolsMenu');
+const toolsButton = document.getElementById('toolsButton');
+
+function showTools(show) {
+  toolsBox.hidden = !show;
+  if (!show) closeToolsMenu();
+}
+
+function closeToolsMenu() {
+  toolsMenu.hidden = true;
+  toolsButton.setAttribute('aria-expanded', 'false');
+}
+
+toolsButton.addEventListener('click', () => {
+  const opening = toolsMenu.hidden;
+  toolsMenu.hidden = !opening;
+  toolsButton.setAttribute('aria-expanded', String(opening));
+});
+
+document.addEventListener('click', (e) => {
+  if (!toolsBox.hidden && !toolsBox.contains(e.target)) closeToolsMenu();
+});
+
+document.querySelector('[data-tool="drot"]').addEventListener('click', () => {
+  closeToolsMenu();
+  drotAt = 0;
+  showDrot();
+});
+
 /* ============ Home / fill-form view routing ============ */
 const homeView = document.getElementById('homeView');
 
 // The page opens on the form list without going through showHome(), so say so once here too
 showVersion(!homeView.hidden);
+showTools(!homeView.hidden);
 
 function showHome() {
   currentFormType = null;
   homeView.hidden = false;
   workspace.hidden = true;
   builderView.hidden = true;
+  drotView.hidden = true;
   showVersion(true);
+  showTools(true);
   refreshClearAllButton();
   refreshDraftFlags();
 }
@@ -1428,8 +1598,10 @@ function showForm(type, data) {
   currentFormType = type;
   homeView.hidden = true;
   builderView.hidden = true;
+  drotView.hidden = true;
   workspace.hidden = false;
   showVersion(false);
+  showTools(false);
   panels.forEach(p => p.classList.remove('active'));
   document.getElementById('form-' + type).classList.add('active');
   const entry = FORM_BUILDERS[type];
@@ -1678,7 +1850,9 @@ function showBuilder() {
   homeView.hidden = true;
   workspace.hidden = true;
   builderView.hidden = false;
+  drotView.hidden = true;
   showVersion(false);
+  showTools(false);
   builderError.hidden = true;
   renderBuilder();
 }
@@ -3947,6 +4121,7 @@ window.attachmentFit = attachmentFit;
 Object.defineProperty(window, 'builderFit', { get: () => builderFit });
 
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX, defaultBuilderFit: DEFAULT_BUILDER_FIT,
+                 DROT_DEPARTMENTS, DROT_SHIFTS,
                  get attachments() { return attachments; },
                  TOOL_SETTINGS, INK_COLOURS, HIGHLIGHT_COLOURS };
 

@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=64">
+<link rel="stylesheet" href="style.css?v=65">
 </head>
 <body>
 
@@ -68,6 +68,49 @@
 <!-- Which build this is, for when someone says a fix isn't there yet. Read off the ?v= on
      script.js so there is nothing extra to remember to bump. -->
 <span class="app-version" id="appVersion" hidden></span>
+
+<!-- Odd jobs that aren't filling in a form. Tucked in the corner because most reps never
+     need any of them. -->
+<div class="tools" id="tools" hidden>
+  <div class="tools-menu" id="toolsMenu" hidden role="menu">
+    <button type="button" role="menuitem" data-tool="drot">DROT Audit</button>
+  </div>
+  <button type="button" class="tools-button" id="toolsButton" aria-expanded="false"
+          aria-haspopup="true" aria-controls="toolsMenu">Tools</button>
+</div>
+
+<!-- ================= DROT AUDIT =================
+     Steps through every department, one at a time, showing the DROT to copy out. -->
+<div class="drot-view" id="drotView" hidden>
+  <div class="dc-toolbar">
+    <button type="button" class="dc-back" data-back-to-forms>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+      </svg>
+      Forms
+    </button>
+    <span class="drot-progress" id="drotProgress"></span>
+    <label class="drot-shift">
+      <span>Shift</span>
+      <select id="drotShift"></select>
+    </label>
+  </div>
+
+  <div class="drot-card">
+    <p class="drot-dept" id="drotDept"></p>
+    <p class="drot-plant" id="drotPlant"></p>
+    <p class="drot-code" id="drotCode"></p>
+    <p class="drot-number" id="drotNumber"></p>
+
+    <div class="drot-actions">
+      <button type="button" class="btn-quiet" id="drotPrev">Back</button>
+      <button type="button" class="btn-secondary" id="drotCopy">Copy</button>
+      <button type="button" class="btn-primary" id="drotNext">Next</button>
+    </div>
+    <p class="drot-status" id="drotStatus" role="status"></p>
+  </div>
+</div>
 
 <!-- ================= BUILD A PDF FROM IMAGES =================
      For sending a pile of screenshots as one document. Each image becomes a page; a PDF
@@ -1067,7 +1110,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=64"></script>
-<script src="script.js?v=64"></script>
+<script src="annotate.js?v=65"></script>
+<script src="script.js?v=65"></script>
 </body>
 </html>
