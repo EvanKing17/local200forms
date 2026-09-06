@@ -422,14 +422,29 @@
     return out.save();
   }
 
-  /* Renders finished PDF bytes to canvases, for showing a document we've just produced */
+  /*
+   * Renders finished PDF bytes to canvases, for showing a document we've just produced.
+   *
+   * Drawn at the screen's own pixel density, not in CSS pixels: on a display running at 150% or
+   * 200% a canvas built at 1:1 gets stretched by the browser to fill the same space, and the
+   * page looks soft when the file it came from is perfectly sharp. Capped by the longest edge,
+   * because a screenshot-sized page at 2x is tens of megabytes of canvas and that has already
+   * cost this app its frame rate once.
+   */
+  const MAX_RENDER_EDGE = 2600;
+
   async function renderToCanvases(bytes, scale) {
     const pdfjs = await loadPdfJs();
     const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+    const density = Math.min(window.devicePixelRatio || 1, 2);
     const canvases = [];
     for (let n = 1; n <= pdf.numPages; n++) {
       const page = await pdf.getPage(n);
-      const viewport = page.getViewport({ scale: scale || 1.5 });
+      const base = page.getViewport({ scale: (scale || 1.5) * density });
+      const room = MAX_RENDER_EDGE / Math.max(base.width, base.height);
+      const viewport = room < 1
+        ? page.getViewport({ scale: (scale || 1.5) * density * room })
+        : base;
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(viewport.width);
       canvas.height = Math.round(viewport.height);

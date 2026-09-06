@@ -261,6 +261,15 @@ whatever is chosen.
 The page numbers on each card follow the choice, so on two-per-page the first
 two both read Page 1, top and bottom.
 
+**On sharpness.** The picture goes into the PDF exactly as it came in — nothing
+is resized or re-encoded. How sharp it looks on paper is how much of the page
+it's spread across: a 1920-pixel-wide screenshot works out at about 186 dpi on
+a letter sheet, 245 dpi two-up, and 96 dpi at "match each picture", where the
+page is deliberately the size of your screen. None of that is detail being
+thrown away; it's the detail the screenshot had in the first place. For a
+crisper result, capture at a higher resolution, or print the source to PDF
+instead of screenshotting it.
+
 ## Editing
 
 No build step — edit and push, GitHub Pages redeploys.

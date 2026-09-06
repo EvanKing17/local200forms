@@ -2175,6 +2175,48 @@ function run(win, doc) {
       { detail: 'home=' + onHome + ' form=' + onForm + ' builder=' + inBuilder };
   });
 
+  checkAsync(g16, 'Pictures go into the PDF at their own resolution', async () => {
+    // The file has to carry every pixel that went in — anything softer is the page it's drawn
+    // on, not the app throwing detail away
+    const shot = await madeImage(1920, 1080);
+    const item = await win.Annotator.readFile(shot);
+    const untouched = item.bytes.length === shot.size;
+
+    const PDFLib = await win.Annotator.loadPdfLib();
+    const PDFName = PDFLib.PDFName;
+    const wrong = [];
+    for (const fit of ['image', 'letter', 'pair']) {
+      const pdf = await PDFLib.PDFDocument.load(await win.Annotator.compile([item], fit));
+      const xobjects = pdf.getPages()[0].node.Resources().lookup(PDFName.of('XObject'));
+      let pixels = 'none';
+      if (xobjects) {
+        xobjects.entries().forEach(([, ref]) => {
+          const image = pdf.context.lookup(ref);
+          const wide = image.dict.get(PDFName.of('Width'));
+          if (wide) pixels = wide.asNumber() + 'x' + image.dict.get(PDFName.of('Height')).asNumber();
+        });
+      }
+      if (pixels !== '1920x1080') wrong.push(fit + ' embedded ' + pixels);
+    }
+    return (untouched && wrong.length === 0) ||
+      { detail: 'originalBytes=' + untouched + ' ' + wrong.join(', ') };
+  });
+
+  checkAsync(g16, 'The preview is drawn for the screen it is on, within reason', async () => {
+    // A canvas built in CSS pixels is stretched by the browser on a 150% display, so a sharp
+    // file looks soft. Bigger than the screen needs is wasted canvas, which has cost us before.
+    const src = win.buildPolicyDoc(win.fd(doc.getElementById('policyForm')));
+    const canvases = await win.Annotator.renderToCanvases(
+      new Uint8Array(src.output('arraybuffer')), 1.5);
+    const dpr = Math.min(win.devicePixelRatio || 1, 2);
+    const page = canvases[0];
+    const expected = Math.round(612 * 1.5 * dpr);
+    const withinCap = Math.max(page.width, page.height) <= 2600;
+    return (Math.abs(page.width - expected) <= 2 && withinCap) ||
+      { detail: 'dpr ' + dpr + ' gave ' + page.width + 'px, expected about ' + expected +
+                ', capped=' + withinCap };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {
