@@ -896,9 +896,11 @@ const fordForm = document.getElementById('fordForm');
 
 fordForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  const data = fd(e.target);
-  const doc = buildFordDoc(data);
-  openWithAttachments(doc, 'ford', buildFilename(data.employeeName, 'Grievance Claim', data.dateIncident));
+  confirmFlags('ford', () => {
+    const data = fd(e.target);
+    const doc = buildFordDoc(data);
+    openWithAttachments(doc, 'ford', buildFilename(data.employeeName, 'Grievance Claim', data.dateIncident));
+  });
 });
 
 document.getElementById('fordClear').addEventListener('click', () => {
@@ -975,9 +977,11 @@ const policyForm = document.getElementById('policyForm');
 
 policyForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  const data = fd(e.target);
-  const doc = buildPolicyDoc(data);
-  openWithAttachments(doc, 'policy', buildFilename(data.employeeName, 'Policy Grievance', data.dateIncident));
+  confirmFlags('policy', () => {
+    const data = fd(e.target);
+    const doc = buildPolicyDoc(data);
+    openWithAttachments(doc, 'policy', buildFilename(data.employeeName, 'Policy Grievance', data.dateIncident));
+  });
 });
 
 document.getElementById('policyClear').addEventListener('click', () => {
@@ -1205,9 +1209,11 @@ const uniforForm = document.getElementById('uniforForm');
 
 uniforForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  const data = fd(e.target);
-  const doc = buildUniforDoc(data);
-  openWithAttachments(doc, 'unifor', buildFilename(data.grievorName, 'Fact Sheet', data.uniforDateIncident));
+  confirmFlags('unifor', () => {
+    const data = fd(e.target);
+    const doc = buildUniforDoc(data);
+    openWithAttachments(doc, 'unifor', buildFilename(data.grievorName, 'Fact Sheet', data.uniforDateIncident));
+  });
 });
 
 document.getElementById('uniforClear').addEventListener('click', () => {
@@ -1268,9 +1274,11 @@ const investigationForm = document.getElementById('investigationForm');
 
 investigationForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  const data = fd(e.target);
-  const doc = buildInvestigationDoc(data);
-  openWithAttachments(doc, 'investigation', buildFilename(data.supervisorName, 'Investigation Form', data.dateInfraction));
+  confirmFlags('investigation', () => {
+    const data = fd(e.target);
+    const doc = buildInvestigationDoc(data);
+    openWithAttachments(doc, 'investigation', buildFilename(data.supervisorName, 'Investigation Form', data.dateInfraction));
+  });
 });
 
 document.getElementById('investigationClear').addEventListener('click', () => {
@@ -1369,6 +1377,321 @@ function applyRememberedSubmitter(form) {
 
 document.querySelectorAll('[name="submittedBy"]').forEach(field => {
   field.addEventListener('input', () => rememberSubmitter(field.value));
+});
+
+/* ============ Word, out and back ============
+ *
+ * A form goes out as plain text with a heading over every field, gets dictated into in Word,
+ * and comes back by pasting the whole document in. Nothing reads the file: whatever he saves it
+ * as — .docx, .doc, .rtf — the clipboard carries the same text, so the format can't break us.
+ *
+ * Coming back, a line that exactly matches a field's heading starts that field and everything
+ * until the next heading is its value. Dictation produces sentence case, so it can't invent a
+ * heading by accident. Every label in all four forms is unique, which is what makes this work
+ * at all — there is a check that fails if that ever stops being true.
+ */
+const WORD_LABEL_OVERRIDES = { spNumber: 'SP Number', resolution: 'Resolution' };
+
+function wordLabelFor(el) {
+  if (WORD_LABEL_OVERRIDES[el.name]) return WORD_LABEL_OVERRIDES[el.name];
+  const own = el.closest('label');
+  let cap = own && own.querySelector('.dc-field-label, .dc-inline-label');
+  if (cap) return cap.textContent.trim().replace(/[:*]\s*$/, '');
+  const block = el.closest('.dc-block, .dc-question, .dc-checkbox-field, .dc-inline-field, .dc-page-head');
+  cap = block && block.querySelector('.dc-field-label, .dc-box-label, .dc-inline-label, .dc-question-text');
+  return cap ? cap.textContent.trim().replace(/[:*]\s*$/, '') : el.name;
+}
+
+function wordFields(type) {
+  const form = FORM_BUILDERS[type].form;
+  const fields = [];
+  const seen = [];
+  form.querySelectorAll('[name]').forEach(el => {
+    if (seen.indexOf(el.name) !== -1) return;
+    seen.push(el.name);
+    const group = form.elements[el.name];
+    const choices = (typeof RadioNodeList !== 'undefined' && group instanceof RadioNodeList)
+      ? Array.from(group).map(r => r.value) : null;
+    fields.push({ name: el.name, label: wordLabelFor(el), choices, date: isDateField(type, el.name) });
+  });
+  return fields;
+}
+
+function wordHeading(field) {
+  return field.label.toUpperCase() + (field.choices ? '  (' + field.choices.join(' / ') + ')' : '');
+}
+
+function wordTextFor(type) {
+  const heading = document.getElementById('form-' + type + '-heading');
+  const title = heading ? heading.textContent.trim() : FORM_BUILDERS[type].label;
+  const data = fd(FORM_BUILDERS[type].form);
+  const lines = ['UNION FORMS — ' + title.toUpperCase(), '',
+                 'Dictate under each heading. Leave the headings alone, then paste the whole',
+                 'page back into the app.', ''];
+  wordFields(type).forEach(field => {
+    lines.push(wordHeading(field));
+    lines.push(data[field.name] || '');
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+/* Headings are matched loosely enough to survive Word: case, spacing and punctuation all go */
+function wordKey(line) {
+  return String(line).toUpperCase().replace(/\(.*?\)/g, '').replace(/[^A-Z0-9]/g, '');
+}
+
+/*
+ * Which form this text is, decided by how many of its headings appear rather than by a marker
+ * line — a marker is one stray keystroke away from being deleted, and the headings have to be
+ * there anyway for the rest to work.
+ */
+function readWordText(text) {
+  const lines = String(text).replace(/\r/g, '').split('\n');
+  const keys = lines.map(wordKey);
+
+  let best = null;
+  Object.keys(FORM_BUILDERS).forEach(type => {
+    const fields = wordFields(type);
+    const found = fields.filter(f => keys.indexOf(wordKey(f.label)) !== -1).length;
+    if (!best || found > best.found) best = { type, fields, found };
+  });
+  if (!best || best.found < 3) throw new Error('that doesn’t look like a form from this app');
+
+  const headingAt = {};
+  best.fields.forEach(field => {
+    const at = keys.indexOf(wordKey(field.label));
+    if (at !== -1) headingAt[at] = field;
+  });
+  const marks = Object.keys(headingAt).map(Number).sort((a, b) => a - b);
+
+  const values = {};
+  const missing = [];
+  best.fields.forEach(field => {
+    const at = marks.find(i => headingAt[i] === field);
+    if (at === undefined) { missing.push(field); return; }
+    const next = marks.find(i => i > at);
+    const body = lines.slice(at + 1, next === undefined ? lines.length : next)
+      .join('\n').trim();
+    if (!body) { missing.push(field); return; }
+
+    if (field.date) {
+      const iso = importDate(body);
+      if (!iso) { missing.push(field); return; }
+      values[field.name] = iso;
+    } else if (field.choices) {
+      const picked = field.choices.find(c => wordKey(c) === wordKey(body));
+      if (!picked) { missing.push(field); return; }
+      values[field.name] = picked;
+    } else {
+      values[field.name] = body;
+    }
+  });
+
+  return { type: best.type, values, missing, total: best.fields.length };
+}
+
+/* ---------- Flags ----------
+ * Bright markers pinned to whatever the paste couldn't fill, so it's obvious what's left. They
+ * live in the document view only: the PDF is drawn by jsPDF from the field values and never
+ * reads the page, and a print rule keeps them off paper. There is a check for both.
+ */
+function flagContainerFor(form, name) {
+  const el = form.querySelector('[name="' + name + '"]');
+  if (!el) return null;
+  return el.closest('label, .dc-block, .dc-question, .dc-checkbox-field, .dc-inline-field, .dc-page-head');
+}
+
+function flagFields(type, fields) {
+  const form = FORM_BUILDERS[type].form;
+  clearFlags(type);
+  fields.forEach(field => {
+    const box = flagContainerFor(form, field.name);
+    if (box) {
+      box.classList.add('is-flagged');
+      box.setAttribute('data-flag-note', field.label);
+    }
+  });
+}
+
+function flaggedCount(type) {
+  const form = FORM_BUILDERS[type] && FORM_BUILDERS[type].form;
+  return form ? form.querySelectorAll('.is-flagged').length : 0;
+}
+
+function clearFlags(type) {
+  const form = FORM_BUILDERS[type] && FORM_BUILDERS[type].form;
+  if (!form) return;
+  form.querySelectorAll('.is-flagged').forEach(box => {
+    box.classList.remove('is-flagged');
+    box.removeAttribute('data-flag-note');
+  });
+}
+
+// Filling one in answers its flag, so it goes as soon as there's something in the field
+document.addEventListener('input', (e) => {
+  const box = e.target.closest && e.target.closest('.is-flagged');
+  if (box && String(e.target.value || '').trim()) {
+    box.classList.remove('is-flagged');
+    box.removeAttribute('data-flag-note');
+  }
+});
+document.addEventListener('change', (e) => {
+  const box = e.target.closest && e.target.closest('.is-flagged');
+  if (box && e.target.type === 'radio') {
+    box.classList.remove('is-flagged');
+    box.removeAttribute('data-flag-note');
+  }
+});
+
+/* ---------- The three dialogs ---------- */
+let wordFormType = null;
+
+function openWordDialog(id) {
+  document.getElementById(id).hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeWordDialogs() {
+  ['wordOutOverlay', 'wordInOverlay', 'wordResultOverlay'].forEach(id => {
+    document.getElementById(id).hidden = true;
+  });
+  document.body.style.overflow = '';
+}
+
+document.querySelectorAll('[data-word-close]').forEach(b => b.addEventListener('click', closeWordDialogs));
+
+document.querySelectorAll('[data-word-out]').forEach(button => {
+  button.addEventListener('click', () => {
+    wordFormType = button.dataset.wordOut;
+    const box = document.getElementById('wordOutText');
+    box.value = wordTextFor(wordFormType);
+    resetCopyButton();
+    openWordDialog('wordOutOverlay');
+    box.focus();
+    box.setSelectionRange(0, 0);
+  });
+});
+
+document.querySelectorAll('[data-word-in]').forEach(button => {
+  button.addEventListener('click', () => {
+    wordFormType = button.dataset.wordIn;
+    document.getElementById('wordInText').value = '';
+    document.getElementById('wordInStatus').textContent = '';
+    openWordDialog('wordInOverlay');
+    document.getElementById('wordInText').focus();
+  });
+});
+
+const wordCopyButton = document.getElementById('wordOutCopy');
+let wordCopyTimer = null;
+
+function resetCopyButton() {
+  clearTimeout(wordCopyTimer);
+  wordCopyButton.textContent = 'Copy the text';
+  wordCopyButton.classList.remove('is-done');
+}
+
+wordCopyButton.addEventListener('click', async () => {
+  const box = document.getElementById('wordOutText');
+  box.select();
+  let done = false;
+  try {
+    await navigator.clipboard.writeText(box.value);
+    done = true;
+  } catch (err) {
+    try { done = document.execCommand('copy'); } catch (err2) { done = false; }
+  }
+  wordCopyButton.textContent = done ? 'Text copied!' : 'Press Ctrl+C';
+  wordCopyButton.classList.add('is-done');
+  wordCopyTimer = setTimeout(resetCopyButton, 2600);
+});
+
+document.getElementById('wordInPaste').addEventListener('click', async () => {
+  const box = document.getElementById('wordInText');
+  const status = document.getElementById('wordInStatus');
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) { status.textContent = 'The clipboard is empty.'; return; }
+    box.value = text;
+    status.textContent = 'Pasted. Now press “Fill the form”.';
+  } catch (err) {
+    box.focus();
+    status.textContent = 'This browser won’t hand over the clipboard — press Ctrl+V in the box.';
+  }
+});
+
+document.getElementById('wordInSubmit').addEventListener('click', () => {
+  const box = document.getElementById('wordInText');
+  const status = document.getElementById('wordInStatus');
+  const text = box.value.trim();
+  if (!text) { status.textContent = 'Nothing pasted yet.'; return; }
+
+  let read;
+  try {
+    read = readWordText(text);
+  } catch (err) {
+    status.textContent = 'That didn’t work: ' + err.message + '.';
+    return;
+  }
+
+  closeWordDialogs();
+  applyWordText(read);
+});
+
+function applyWordText(read) {
+  showForm(read.type, read.values);
+  flagFields(read.type, read.missing);
+
+  const filled = read.total - read.missing.length;
+  document.getElementById('wordResultScore').textContent = filled + ' of ' + read.total + ' fields filled';
+  document.getElementById('wordResultNote').textContent = read.missing.length
+    ? 'The rest are flagged on the form. Fill one in and its flag goes.'
+    : 'Everything came across.';
+
+  const list = document.getElementById('wordResultMissing');
+  list.innerHTML = '';
+  list.hidden = read.missing.length === 0;
+  read.missing.forEach(field => {
+    const row = document.createElement('span');
+    row.className = 'word-missing-item';
+    row.textContent = field.label;
+    list.appendChild(row);
+  });
+  openWordDialog('wordResultOverlay');
+}
+
+/* ---------- Leaving with flags up ---------- */
+const flagWarn = document.getElementById('flagWarnOverlay');
+let flagWarnGo = null;
+
+/*
+ * Flags can't reach the PDF — it's built from the field values, not from the page — but this
+ * asks anyway, because a flag means a field somebody meant to come back to.
+ */
+function confirmFlags(type, proceed) {
+  const count = flaggedCount(type);
+  if (!count) { proceed(); return; }
+  flagWarnGo = () => { clearFlags(type); proceed(); };
+  document.getElementById('flagWarnCount').textContent =
+    count === 1 ? 'One field is still flagged as empty.'
+                : count + ' fields are still flagged as empty.';
+  flagWarn.hidden = false;
+  document.body.style.overflow = 'hidden';
+  document.getElementById('flagWarnBack').focus();
+}
+
+function closeFlagWarn() {
+  flagWarn.hidden = true;
+  document.body.style.overflow = '';
+  flagWarnGo = null;
+}
+
+document.getElementById('flagWarnBack').addEventListener('click', closeFlagWarn);
+document.getElementById('flagWarnGo').addEventListener('click', () => {
+  const go = flagWarnGo;
+  closeFlagWarn();
+  if (go) go();
 });
 
 /* ============ Tools: DROT audit ============
@@ -1567,6 +1890,10 @@ function clearForm(form) {
     if (el.type === 'radio' || el.type === 'checkbox') el.checked = false;
     else if (el.type === 'hidden' && el.closest('.datepicker')) el.closest('.datepicker').setValue('');
     else if (el.tagName === 'TEXTAREA' || el.type === 'text' || el.type === 'date') el.value = '';
+  });
+  form.querySelectorAll('.is-flagged').forEach(box => {
+    box.classList.remove('is-flagged');
+    box.removeAttribute('data-flag-note');
   });
   form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   // Clearing starts the next grievance, and it's still you filing it

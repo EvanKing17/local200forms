@@ -1923,6 +1923,121 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 @media print { .app-version { display: none !important; } }
 
+/* ---------- Word, out and back ---------- */
+.admin-modal.is-wide { max-width: 720px; }
+
+.word-text {
+  width: 100%;
+  height: clamp(220px, 42vh, 420px);
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-input-bg);
+  color: var(--c-text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  resize: vertical;
+}
+.word-text:focus { outline: 2px solid var(--c-accent); outline-offset: 1px; }
+
+/* The copy button confirms in place rather than leaving you wondering whether it took */
+.word-copy { transition: background 0.18s ease, transform 0.18s ease; }
+.word-copy.is-done {
+  background: #1a7f37;
+  animation: word-copied 0.45s ease;
+}
+@keyframes word-copied {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(26, 127, 55, 0.5); }
+  40% { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(26, 127, 55, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(26, 127, 55, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .word-copy.is-done { animation: none; }
+}
+
+.word-score {
+  margin: 4px 0 0;
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+.word-missing {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.word-missing[hidden] { display: none; }
+
+.word-missing-item {
+  font-size: 11.5px;
+  color: #8a4b00;
+  background: #fff4e0;
+  border: 1px solid #ffd79a;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+/* ---------- Flags ----------
+ * A bright tab pinned to a field the paste couldn't fill, pointing at it the way a sign-here
+ * arrow sticks out of a paper contract. On screen only — see the print rule below, and note
+ * that the PDF is drawn from the field values and never reads this page at all.
+ */
+.is-flagged {
+  position: relative;
+  outline: 2px solid rgba(255, 122, 0, 0.55);
+  outline-offset: -1px;
+  border-radius: 2px;
+  background: rgba(255, 176, 32, 0.10);
+}
+
+.is-flagged::after {
+  content: attr(data-flag-note);
+  position: absolute;
+  top: -9px;
+  right: -6px;
+  z-index: 6;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 9px 2px 15px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(233, 96, 0, 0.9);
+  border-radius: 2px;
+  clip-path: polygon(0 50%, 8px 0, 100% 0, 100% 100%, 8px 100%);
+  pointer-events: none;
+  animation: flag-in 0.28s ease both;
+}
+
+@keyframes flag-in {
+  from { opacity: 0; transform: translateX(6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-flagged::after { animation: none; }
+}
+
+/*
+ * Never on paper. The PDF can't carry them — it is built by jsPDF from the field values and
+ * never looks at this page — but Ctrl+P prints the page itself, and this is what stops them
+ * there. There is a check that fails if this rule goes missing.
+ */
+@media print {
+  .is-flagged { outline: none !important; background: none !important; }
+  .is-flagged::after { display: none !important; }
+}
+
 /* ---------- The form toolbar ----------
  * A strip of flat icon buttons in the middle, the way a word processor puts its everyday
  * commands, with the one thing you came to do kept as a full button on the right. Saving a

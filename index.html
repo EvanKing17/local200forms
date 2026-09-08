@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=67">
+<link rel="stylesheet" href="style.css?v=68">
 </head>
 <body>
 
@@ -1086,6 +1086,71 @@
 
 <!-- Shown when a .json handover file is dropped or chosen. Nothing is written into a form
      until this is confirmed, since the form may already have a draft in it. -->
+<!-- ================= WORD: OUT =================
+     The form as plain text, to paste into Word and dictate into. -->
+<div class="admin-overlay" id="wordOutOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="wordOutTitle">
+  <div class="admin-modal is-wide">
+    <h2 class="admin-title" id="wordOutTitle">Send to Word</h2>
+    <p class="admin-lede">
+      Copy this, paste it into a blank Word document, and dictate under each heading. Leave the
+      headings as they are — they're how it finds its way back.
+    </p>
+    <textarea id="wordOutText" class="word-text" readonly spellcheck="false"></textarea>
+    <div class="admin-actions">
+      <button type="button" class="btn-secondary" data-word-close>Close</button>
+      <button type="button" class="btn-primary word-copy" id="wordOutCopy">Copy the text</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= WORD: BACK IN ================= -->
+<div class="admin-overlay" id="wordInOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="wordInTitle">
+  <div class="admin-modal is-wide">
+    <h2 class="admin-title" id="wordInTitle">Bring back from Word</h2>
+    <p class="admin-lede">
+      In Word press Ctrl+A then Ctrl+C, then paste it here. Anything it can't find is flagged on
+      the form for you to finish by hand.
+    </p>
+    <textarea id="wordInText" class="word-text" spellcheck="false"
+              placeholder="Paste the whole Word document here"></textarea>
+    <p class="admin-status" id="wordInStatus" role="status"></p>
+    <div class="admin-actions">
+      <button type="button" class="btn-secondary" data-word-close>Cancel</button>
+      <button type="button" class="btn-secondary" id="wordInPaste">Paste</button>
+      <button type="button" class="btn-primary" id="wordInSubmit">Fill the form</button>
+    </div>
+  </div>
+</div>
+
+<!-- What the paste actually managed, and what is left flagged -->
+<div class="admin-overlay" id="wordResultOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="wordResultTitle">
+  <div class="admin-modal">
+    <h2 class="admin-title" id="wordResultTitle">Filled in from Word</h2>
+    <p class="word-score" id="wordResultScore"></p>
+    <p class="admin-lede" id="wordResultNote"></p>
+    <div class="word-missing" id="wordResultMissing" hidden></div>
+    <div class="admin-actions">
+      <button type="button" class="btn-primary" data-word-close>Got it</button>
+    </div>
+  </div>
+</div>
+
+<!-- Flags must never reach paper, so leaving with them still up asks first -->
+<div class="admin-overlay" id="flagWarnOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="flagWarnTitle">
+  <div class="admin-modal">
+    <h2 class="admin-title" id="flagWarnTitle">Some fields are still flagged</h2>
+    <p class="admin-lede" id="flagWarnCount"></p>
+    <p class="admin-hint">
+      Flags are only ever on screen — they are not drawn into the PDF and they don't print. This
+      is just a check that you meant to leave those fields empty.
+    </p>
+    <div class="admin-actions">
+      <button type="button" class="btn-secondary" id="flagWarnBack">Go back and fill them</button>
+      <button type="button" class="btn-primary" id="flagWarnGo">Clear flags and continue</button>
+    </div>
+  </div>
+</div>
+
 <div class="admin-overlay" id="importOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="importTitle">
   <div class="admin-modal">
     <h2 class="admin-title" id="importTitle">Fill a form from this file</h2>
@@ -1174,7 +1239,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=67"></script>
-<script src="script.js?v=67"></script>
+<script src="annotate.js?v=68"></script>
+<script src="script.js?v=68"></script>
 </body>
 </html>

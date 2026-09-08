@@ -2298,6 +2298,174 @@ function run(win, doc) {
       { detail: 'shut=' + wasShut + ' opened=' + opened + ' reshut=' + shutAgain + ' holds ' + holds.join(', ') };
   });
 
+  const g18 = group('Word, out and back');
+
+  check(g18, 'Every field heading in a form is unique', () => {
+    // The whole round trip rests on this: a repeated heading would swallow the wrong text
+    const clashes = [];
+    FORMS.forEach(f => {
+      const seen = {};
+      win.wordFields(f.type).forEach(field => {
+        const key = field.label.toUpperCase();
+        if (seen[key]) clashes.push(f.type + ': "' + field.label + '" twice');
+        seen[key] = true;
+      });
+    });
+    return clashes.length === 0 || { detail: clashes.join(' | ') };
+  });
+
+  checkAsync(g18, 'A form goes out to Word and comes back whole', async () => {
+    const form = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Evan King';
+    form.elements.globalId.value = '002173535';
+    form.elements.department.value = '8383 - Heads';
+    form.elements.details.value = 'Denied overtime on the weekend shift.';
+    form.elements.hoursStraight.value = '8';
+    form.elements.dateIncident.value = '2026-07-22';
+
+    const text = win.wordTextFor('ford');
+    win.clearForm(form);
+
+    const read = win.readWordText(text);
+    return (read.type === 'ford' && read.values.employeeName === 'Evan King' &&
+            read.values.globalId === '002173535' &&
+            read.values.details === 'Denied overtime on the weekend shift.' &&
+            read.values.hoursStraight === '8' && read.values.dateIncident === '2026-07-22') ||
+      { detail: read.type + ' ' + JSON.stringify(read.values) };
+  });
+
+  check(g18, 'Dictated text under a heading is kept, paragraphs and all', () => {
+    const text = win.wordTextFor('policy')
+      .replace('DETAILS OF INCIDENT\n', 'DETAILS OF INCIDENT\nHe was sent home early.\n\nThen it happened again.\n');
+    const read = win.readWordText(text);
+    return (read.values.details === 'He was sent home early.\n\nThen it happened again.') ||
+      { detail: JSON.stringify(read.values.details) };
+  });
+
+  check(g18, 'Word text that says nothing useful is refused', () => {
+    let said = '';
+    try { win.readWordText('Dear Wes,\n\nPlease see the attached.\n\nThanks'); }
+    catch (err) { said = err.message; }
+    return said.indexOf('form from this app') !== -1 || { detail: said || '(it accepted it)' };
+  });
+
+  checkAsync(g18, 'What it could not fill is counted and flagged', async () => {
+    const form = doc.getElementById('uniforForm');
+    win.showForm('unifor');
+    win.clearForm(form);
+    // a document with one heading answered and the rest left blank, as a half-done dictation is
+    const text = win.wordTextFor('unifor')
+      .replace('WHY IS THIS A GRIEVANCE?\n', 'WHY IS THIS A GRIEVANCE?\nThe article was not followed.\n');
+    const read = win.readWordText(text);
+    win.applyWordText(read);
+
+    const score = doc.getElementById('wordResultScore').textContent;
+    const flags = win.flaggedCount('unifor');
+    const filledOne = form.elements.whyGrievance.value === 'The article was not followed.';
+    doc.querySelector('#wordResultOverlay [data-word-close]').click();
+
+    // typing into a flagged field answers its flag
+    const before = win.flaggedCount('unifor');
+    const stillFlagged = form.querySelector('.is-flagged [name]');
+    if (stillFlagged) {
+      stillFlagged.value = 'now filled';
+      stillFlagged.dispatchEvent(new win.Event('input', { bubbles: true }));
+    }
+    const after = win.flaggedCount('unifor');
+
+    win.clearForm(form);
+    win.showHome();
+    // The count and the flags have to agree — filled plus flagged is the whole form. Not a
+    // fixed number: Submitted By arrives pre-filled, so it legitimately comes back filled too.
+    const numbers = score.match(/(\d+) of (\d+)/);
+    const adds = numbers && Number(numbers[1]) + flags === Number(numbers[2]);
+    return (filledOne && adds && flags > 1 && after === before - 1) ||
+      { detail: 'score "' + score + '" flags=' + flags + ' addsUp=' + adds +
+                ' afterTyping=' + after + '/' + before };
+  });
+
+  checkAsync(g18, 'Flags never reach the PDF', async () => {
+    // The PDF is drawn from the field values and never reads the page, so this is structural —
+    // but it is worth a check, because printing a flag onto a filed grievance would be bad
+    const form = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Flagged Person';
+    form.elements.details.value = 'Something happened.';
+
+    const clean = win.buildFordDoc(win.fd(form));
+    const cleanText = clean.output('datauristring').length;
+
+    win.flagFields('ford', win.wordFields('ford').filter(f => !form.elements[f.name].value));
+    const flags = win.flaggedCount('ford');
+    const flagged = win.buildFordDoc(win.fd(form));
+
+    const pdfjs = await win.Annotator.loadPdfJs();
+    const read = async (jsdoc) => {
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(jsdoc.output('arraybuffer')) }).promise;
+      const page = await pdf.getPage(1);
+      return (await page.getTextContent()).items.map(i => i.str).join('|');
+    };
+    const before = await read(clean);
+    const after = await read(flagged);
+
+    win.clearFlags('ford');
+    win.clearForm(form);
+    win.showHome();
+    return (flags > 0 && before === after && cleanText > 0) ||
+      { detail: flags + ' flags up; PDF text ' + (before === after ? 'identical' : 'DIFFERED') };
+  });
+
+  check(g18, 'Flags are hidden when the page is printed', () => {
+    // Ctrl+P prints the document view itself, which is the one way a flag could reach paper
+    const rules = Array.from(doc.styleSheets)
+      .flatMap(sheet => { try { return Array.from(sheet.cssRules); } catch (e) { return []; } })
+      .filter(rule => rule.media && Array.from(rule.media).join(' ').indexOf('print') !== -1)
+      .flatMap(rule => Array.from(rule.cssRules || []));
+    const hidesFlag = rules.some(r => r.selectorText && r.selectorText.indexOf('.is-flagged::after') !== -1 &&
+                                      r.style.display === 'none');
+    return hidesFlag || { detail: 'no print rule hides .is-flagged::after' };
+  });
+
+  checkAsync(g18, 'Printing with flags up asks first, and clears them on the way', async () => {
+    const form = doc.getElementById('policyForm');
+    win.showForm('policy');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Someone';
+    win.flagFields('policy', win.wordFields('policy').slice(0, 3));
+
+    let went = false;
+    win.confirmFlags('policy', () => { went = true; });
+    const asked = !doc.getElementById('flagWarnOverlay').hidden;
+    const heldBack = !went;
+    doc.getElementById('flagWarnGo').click();
+    const wentAfter = went;
+    const flagsLeft = win.flaggedCount('policy');
+
+    win.clearForm(form);
+    win.showHome();
+    return (asked && heldBack && wentAfter && flagsLeft === 0) ||
+      { detail: 'asked=' + asked + ' heldBack=' + heldBack + ' continued=' + wentAfter +
+                ' flagsLeft=' + flagsLeft };
+  });
+
+  checkAsync(g18, 'Going back leaves the flags and does not build anything', async () => {
+    const form = doc.getElementById('policyForm');
+    win.showForm('policy');
+    win.clearForm(form);
+    win.flagFields('policy', win.wordFields('policy').slice(0, 2));
+    let went = false;
+    win.confirmFlags('policy', () => { went = true; });
+    doc.getElementById('flagWarnBack').click();
+    const flagsKept = win.flaggedCount('policy');
+    win.clearFlags('policy');
+    win.clearForm(form);
+    win.showHome();
+    return (!went && flagsKept === 2) || { detail: 'built=' + went + ' flagsKept=' + flagsKept };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {

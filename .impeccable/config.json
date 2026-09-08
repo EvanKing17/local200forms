@@ -8,6 +8,15 @@
         "value": "helvetica",
         "createdAt": "2026-09-05T23:54:07.511Z",
         "reason": "PDF mirror, not an aesthetic pick: jsPDF draws these forms with the base-14 helvetica face (17 setFont('helvetica') calls in script.js) and the .dc-* document view must match it character for character, since the on-screen page-break markers are computed from that match"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-09-08T20:05:30.109Z",
+        "reason": "Claude: dc-logo img tags get their src at runtime from the vendored unifor-logo.js data URI, so the Fact Sheet logo works with no network; pre-existing, verified in unifor-logo.js"
       }
     ]
   }
