@@ -1923,6 +1923,113 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 @media print { .app-version { display: none !important; } }
 
+/* ---------- The form toolbar ----------
+ * A strip of flat icon buttons in the middle, the way a word processor puts its everyday
+ * commands, with the one thing you came to do kept as a full button on the right. Saving a
+ * .grv is behind the overflow: it was sitting next to the download button dressed the same,
+ * and people were reaching for it when they wanted the PDF.
+ */
+.dc-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: auto;
+  padding: 3px;
+  background: var(--c-surface-alt);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+}
+
+.dc-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+
+.dc-tool:hover {
+  background: var(--c-surface);
+  border-color: var(--c-border-strong);
+  color: var(--c-text);
+}
+.dc-tool:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 1px; }
+.dc-tool[aria-expanded="true"] { background: var(--c-surface); border-color: var(--c-border-strong); }
+
+.dc-tool-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--c-border-strong);
+}
+
+.dc-advanced { position: relative; }
+
+.dc-advanced-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 170px;
+  padding: 5px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.16);
+}
+.dc-advanced-menu[hidden] { display: none; }
+
+.dc-advanced-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--c-text);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+.dc-advanced-menu button:hover { background: var(--c-surface-alt); color: var(--c-accent); }
+
+.dc-advanced-head {
+  margin: 2px 4px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+}
+
+/* A named card rather than the browser's own tooltip, which is slow and only holds one line */
+.tip {
+  position: fixed;
+  z-index: 200;
+  max-width: 250px;
+  padding: 9px 11px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgba(17, 24, 39, 0.18);
+  pointer-events: none;
+  font-family: var(--font-sans);
+}
+.tip[hidden] { display: none; }
+.tip-name { display: block; font-size: 12.5px; font-weight: 700; color: var(--c-text); }
+.tip-note { display: block; margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--c-text-muted); }
+
+@media (max-width: 640px) {
+  .dc-tools { order: 3; margin-right: 0; }
+}
+
 /* ---------- Tools, and the DROT audit ---------- */
 .tools {
   position: fixed;

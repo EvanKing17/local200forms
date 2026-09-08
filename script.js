@@ -1744,6 +1744,94 @@ function saveGrv(type) {
   return name;
 }
 
+/* ---------- Advanced, beside each form's tools ----------
+ * Where the things almost nobody needs live. Saving a .grv was sitting next to the download
+ * button dressed the same way, and people were reaching for it when they wanted the PDF.
+ */
+function closeAdvancedMenus() {
+  document.querySelectorAll('.dc-advanced-menu').forEach(m => { m.hidden = true; });
+  document.querySelectorAll('[data-advanced]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+
+document.querySelectorAll('[data-advanced]').forEach(button => {
+  const menu = document.querySelector('[data-advanced-menu="' + button.dataset.advanced + '"]');
+  button.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const opening = menu.hidden;
+    closeAdvancedMenus();
+    menu.hidden = !opening;
+    button.setAttribute('aria-expanded', String(opening));
+  });
+});
+
+document.addEventListener('click', closeAdvancedMenus);
+
+/* ---------- Tooltips ----------
+ * The toolbar is icons, and an icon without a name is a guess. The browser's own tooltip takes
+ * about a second to appear and can't hold a second line, so this is a small card like a word
+ * processor's: what the button is, then what it does.
+ */
+const tipCard = document.createElement('div');
+tipCard.className = 'tip';
+tipCard.hidden = true;
+document.body.appendChild(tipCard);
+
+let tipTimer = null;
+let tipFor = null;
+
+function hideTip() {
+  clearTimeout(tipTimer);
+  tipCard.hidden = true;
+  tipFor = null;
+}
+
+function showTip(target) {
+  const note = target.dataset.tipNote;
+  tipCard.innerHTML = '';
+  const name = document.createElement('span');
+  name.className = 'tip-name';
+  name.textContent = target.dataset.tip;
+  tipCard.appendChild(name);
+  if (note) {
+    const detail = document.createElement('span');
+    detail.className = 'tip-note';
+    detail.textContent = note;
+    tipCard.appendChild(detail);
+  }
+
+  tipCard.hidden = false;
+  const anchor = target.getBoundingClientRect();
+  const card = tipCard.getBoundingClientRect();
+  // Below the button, nudged back inside the window rather than hanging off the edge
+  const left = Math.min(Math.max(8, anchor.left), window.innerWidth - card.width - 8);
+  const below = anchor.bottom + 8;
+  const top = below + card.height > window.innerHeight - 8 ? anchor.top - card.height - 8 : below;
+  tipCard.style.left = Math.round(left) + 'px';
+  tipCard.style.top = Math.round(top) + 'px';
+  tipFor = target;
+}
+
+function considerTip(target) {
+  if (!target || target === tipFor) return;
+  clearTimeout(tipTimer);
+  tipCard.hidden = true;
+  tipTimer = setTimeout(() => showTip(target), 400);   // long enough not to flicker past
+}
+
+document.addEventListener('pointerover', (e) => {
+  const target = e.target.closest && e.target.closest('[data-tip]');
+  if (target) considerTip(target);
+  else if (tipFor) hideTip();
+});
+document.addEventListener('pointerdown', hideTip);
+document.addEventListener('focusin', (e) => {
+  const target = e.target.closest && e.target.closest('[data-tip]');
+  if (target) considerTip(target);
+  else hideTip();
+});
+document.addEventListener('focusout', hideTip);
+window.addEventListener('scroll', hideTip, true);
+
 document.querySelectorAll('[data-save-grv]').forEach(button => {
   button.addEventListener('click', () => {
     const type = button.dataset.saveGrv;
@@ -2272,10 +2360,20 @@ window.addEventListener('drop', (e) => {
   }
 
   /*
-   * With a form open, anything dropped becomes one of its supporting documents. Nothing dropped
-   * on a form replaces it: a photo used to jump to the builder and take the form off screen,
-   * and a recognised PDF would have filled the form over top of whatever was already typed.
-   * To open a saved grievance, drop it on the Forms page.
+   * A saved grievance is never a supporting document, wherever it lands. Dropped on a form it
+   * used to be handed to the attachment reader, which tried to open it as a picture and said
+   * the image couldn't be read — the one file the app writes itself, refused by the app.
+   */
+  if (files.length === 1 && /\.(grv|json)$/i.test(files[0].name)) {
+    handleIncomingFile(files[0]);
+    return;
+  }
+
+  /*
+   * With a form open, anything else dropped becomes one of its supporting documents. Nothing
+   * dropped on a form replaces it: a photo used to jump to the builder and take the form off
+   * screen, and a recognised PDF would have filled the form over whatever was already typed.
+   * To open a saved grievance PDF back into its form, drop it on the Forms page.
    */
   if (currentFormType && !workspace.hidden) {
     files.forEach(file => addAttachment(currentFormType, file));

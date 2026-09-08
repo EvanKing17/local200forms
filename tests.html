@@ -2217,6 +2217,87 @@ function run(win, doc) {
                 ', capped=' + withinCap };
   });
 
+  const g17 = group('The toolbar');
+
+  checkAsync(g17, 'A saved .grv loads back in from anywhere it is dropped', async () => {
+    // Dropped on a form it used to reach the attachment reader, which tried to open the app's
+    // own file as a picture and refused it
+    const form = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Dropped Back In';
+    const file = new win.File([JSON.stringify(win.buildGrv('ford'))], 'Saved.grv',
+                              { type: 'application/grievance+json' });
+    win.clearForm(form);
+
+    const drop = (f) => {
+      const ev = new win.Event('drop', { bubbles: true, cancelable: true });
+      ev.dataTransfer = { files: [f], types: ['Files'] };
+      win.dispatchEvent(ev);
+    };
+    const tryFrom = async (where) => {
+      where();
+      win.__app.attachments.ford.length = 0;
+      drop(file);
+      await new Promise(r => win.setTimeout(r, 800));
+      const offered = !doc.getElementById('importOverlay').hidden;
+      if (offered) doc.querySelector('[data-import-close]').click();
+      const attached = win.__app.attachments.ford.length;
+      win.__app.attachments.ford.length = 0;
+      win.renderAttachmentList('ford');
+      return { offered, attached };
+    };
+
+    const fromHome = await tryFrom(() => win.showHome());
+    const fromForm = await tryFrom(() => win.showForm('ford'));
+    win.clearForm(form);
+    win.showHome();
+    return (fromHome.offered && fromForm.offered && fromForm.attached === 0) ||
+      { detail: 'home offered=' + fromHome.offered + ', on a form offered=' + fromForm.offered +
+                ' attached=' + fromForm.attached };
+  });
+
+  check(g17, 'The hero button says what it does, and .grv is not beside it', () => {
+    const wrong = [];
+    FORMS.forEach(f => {
+      const bar = doc.querySelector('#form-' + f.type + ' .dc-toolbar');
+      const hero = bar.querySelector('button[type=submit]');
+      if (hero.textContent.trim() !== 'Print/Download PDF') wrong.push(f.type + ' hero: ' + hero.textContent);
+      // saving a .grv belongs in Advanced, not loose in the toolbar
+      if (bar.querySelector('.dc-tools > [data-save-grv]')) wrong.push(f.type + ' has .grv in the open');
+      if (!bar.querySelector('[data-advanced-menu="' + f.type + '"] [data-save-grv]')) {
+        wrong.push(f.type + ' has no .grv under Advanced');
+      }
+    });
+    return wrong.length === 0 || { detail: wrong.join(' | ') };
+  });
+
+  check(g17, 'Every icon button says what it is', () => {
+    // An icon with no name is a guess, so each one carries a tooltip and a label
+    const bad = [];
+    doc.querySelectorAll('.dc-tool').forEach(button => {
+      const named = button.getAttribute('aria-label');
+      const tip = button.dataset.tip;
+      if (!named || !tip) bad.push(named || tip || '(unnamed icon)');
+      if (button.hasAttribute('title')) bad.push(named + ' still has a browser tooltip too');
+    });
+    return bad.length === 0 || { detail: bad.join(', ') };
+  });
+
+  checkAsync(g17, 'Advanced opens, holds the rare things, and shuts again', async () => {
+    win.showForm('policy');
+    const menu = doc.querySelector('[data-advanced-menu="policy"]');
+    const wasShut = menu.hidden;
+    doc.querySelector('#form-policy [data-advanced]').click();
+    const opened = !menu.hidden;
+    const holds = Array.from(menu.querySelectorAll('button')).map(b => b.textContent.trim());
+    doc.body.click();
+    const shutAgain = menu.hidden;
+    win.showHome();
+    return (wasShut && opened && shutAgain && holds.indexOf('Save as .grv') !== -1) ||
+      { detail: 'shut=' + wasShut + ' opened=' + opened + ' reshut=' + shutAgain + ' holds ' + holds.join(', ') };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {
