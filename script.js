@@ -1436,6 +1436,37 @@ function wordTextFor(type) {
   return lines.join('\n');
 }
 
+/*
+ * Fields that are a set rather than a list. A grievance claims one or two kinds of hours, so
+ * the other four being blank is the normal case and not something to flag — the claim is only
+ * unanswered if every box is empty, and then it's one thing missing, not six.
+ */
+const FLAG_GROUPS = {
+  ford: [{ label: 'Hours claimed', box: '.dc-hours',
+           names: ['hoursStraight', 'hoursShift1', 'hoursTimeHalf',
+                   'hoursShift3', 'hoursDouble', 'hoursTriple'] }],
+};
+
+/*
+ * Collapses those sets in the missing list and in the count, so "4 of 15" doesn't treat five
+ * deliberately blank hour boxes as five things that failed to come across.
+ */
+function groupMissing(type, missing, values, total) {
+  (FLAG_GROUPS[type] || []).forEach(group => {
+    const filled = group.names.filter(name => (values[name] || '').trim()).length;
+    for (let i = missing.length - 1; i >= 0; i--) {
+      if (group.names.indexOf(missing[i].name) !== -1) missing.splice(i, 1);
+    }
+    if (filled) {
+      total -= group.names.length - filled;      // the blank siblings were never wanted
+    } else {
+      total -= group.names.length - 1;           // the whole set counts as one unanswered thing
+      missing.push({ name: group.names[0], label: group.label, box: group.box });
+    }
+  });
+  return total;
+}
+
 /* Headings are matched loosely enough to survive Word: case, spacing and punctuation all go */
 function wordKey(line) {
   return String(line).toUpperCase().replace(/\(.*?\)/g, '').replace(/[^A-Z0-9]/g, '');
@@ -1488,7 +1519,8 @@ function readWordText(text) {
     }
   });
 
-  return { type: best.type, values, missing, total: best.fields.length };
+  const total = groupMissing(best.type, missing, values, best.fields.length);
+  return { type: best.type, values, missing, total };
 }
 
 /* ---------- Flags ----------
@@ -1496,8 +1528,10 @@ function readWordText(text) {
  * live in the document view only: the PDF is drawn by jsPDF from the field values and never
  * reads the page, and a print rule keeps them off paper. There is a check for both.
  */
-function flagContainerFor(form, name) {
-  const el = form.querySelector('[name="' + name + '"]');
+function flagContainerFor(form, field) {
+  // A set of fields is flagged as the block it lives in, once, rather than box by box
+  if (field.box) return form.querySelector(field.box);
+  const el = form.querySelector('[name="' + field.name + '"]');
   if (!el) return null;
   return el.closest('label, .dc-block, .dc-question, .dc-checkbox-field, .dc-inline-field, .dc-page-head');
 }
@@ -1506,7 +1540,7 @@ function flagFields(type, fields) {
   const form = FORM_BUILDERS[type].form;
   clearFlags(type);
   fields.forEach(field => {
-    const box = flagContainerFor(form, field.name);
+    const box = flagContainerFor(form, field);
     if (box) {
       box.classList.add('is-flagged');
       box.setAttribute('data-flag-note', field.label);

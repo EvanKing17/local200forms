@@ -2386,6 +2386,51 @@ function run(win, doc) {
                 ' afterTyping=' + after + '/' + before };
   });
 
+  checkAsync(g18, 'Hours are only flagged when every box is empty', async () => {
+    // A grievance claims one or two kinds of hours; the rest being blank is the normal case
+    const form = doc.getElementById('fordForm');
+    const runWith = (hours) => {
+      win.showForm('ford');
+      win.clearForm(form);
+      form.elements.employeeName.value = 'Evan King';
+      Object.keys(hours).forEach(k => { form.elements[k].value = hours[k]; });
+      const text = win.wordTextFor('ford');
+      win.clearForm(form);
+      const read = win.readWordText(text);
+      win.applyWordText(read);
+      const blockFlagged = !!form.querySelector('.dc-hours.is-flagged');
+      const cellsFlagged = form.querySelectorAll('.dc-hour-cell.is-flagged').length;
+      const score = doc.getElementById('wordResultScore').textContent;
+      doc.querySelector('#wordResultOverlay [data-word-close]').click();
+      return { blockFlagged, cellsFlagged, score, flags: win.flaggedCount('ford') };
+    };
+
+    const one = runWith({ hoursStraight: '8' });
+    const two = runWith({ hoursStraight: '8', hoursDouble: '4' });
+    const none = runWith({});
+
+    // typing into any single box answers the whole set
+    win.showForm('ford');
+    win.clearForm(form);
+    win.flagFields('ford', [{ name: 'hoursStraight', label: 'Hours claimed', box: '.dc-hours' }]);
+    form.elements.hoursTimeHalf.value = '2';
+    form.elements.hoursTimeHalf.dispatchEvent(new win.Event('input', { bubbles: true }));
+    const clearedByTyping = win.flaggedCount('ford') === 0;
+
+    win.clearForm(form);
+    win.showHome();
+    // filled + flagged still equals the total in every case
+    const addsUp = [one, two, none].every(r => {
+      const n = r.score.match(/(\d+) of (\d+)/);
+      return n && Number(n[1]) + r.flags === Number(n[2]);
+    });
+    return (!one.blockFlagged && !two.blockFlagged && none.blockFlagged &&
+            one.cellsFlagged === 0 && two.cellsFlagged === 0 && none.cellsFlagged === 0 &&
+            clearedByTyping && addsUp) ||
+      { detail: 'one=' + JSON.stringify(one) + ' two=' + JSON.stringify(two) +
+                ' none=' + JSON.stringify(none) + ' typing=' + clearedByTyping + ' addsUp=' + addsUp };
+  });
+
   checkAsync(g18, 'Flags never reach the PDF', async () => {
     // The PDF is drawn from the field values and never reads the page, so this is structural —
     // but it is worth a check, because printing a flag onto a filed grievance would be bad
