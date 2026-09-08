@@ -471,6 +471,115 @@ function run(win, doc) {
     return event.defaultPrevented || { detail: 'dragover was not prevented' };
   });
 
+  const g6f = group('Clearing');
+  check(g6f, 'Clear form asks first and Cancel keeps everything', () => {
+    win.showForm('ford');
+    const form = doc.getElementById('fordForm');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Keep Me';
+    doc.getElementById('fordClear').click();
+    const overlay = doc.getElementById('clearOverlay');
+    const asked = !overlay.hidden;
+    const stillThere = form.elements.employeeName.value === 'Keep Me';
+    const cancelFocused = doc.activeElement === doc.getElementById('clearCancel');
+    const saveOffered = !doc.getElementById('clearSave').hidden;
+    doc.getElementById('clearCancel').click();
+    const closed = overlay.hidden;
+    const survived = form.elements.employeeName.value === 'Keep Me';
+    win.clearForm(form);
+    win.showHome();
+    return (asked && stillThere && cancelFocused && saveOffered && closed && survived) ||
+      { detail: 'asked=' + asked + ' stillThere=' + stillThere + ' cancelFocused=' + cancelFocused +
+                ' saveOffered=' + saveOffered + ' closed=' + closed + ' survived=' + survived };
+  });
+  check(g6f, 'Clear form clears, closes and drops the draft', () => {
+    win.showForm('ford');
+    const form = doc.getElementById('fordForm');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Gone Soon';
+    win.saveDraft('ford');
+    doc.getElementById('fordClear').click();
+    doc.getElementById('clearGo').click();
+    const closed = doc.getElementById('clearOverlay').hidden;
+    const cleared = form.elements.employeeName.value === '';
+    const draftGone = win.readDraft('ford') === null;
+    win.clearForm(form);
+    win.showHome();
+    return (closed && cleared && draftGone) ||
+      { detail: 'closed=' + closed + ' cleared=' + cleared + ' draftGone=' + draftGone };
+  });
+  check(g6f, 'An empty form clears without asking', () => {
+    win.showForm('policy');
+    const form = doc.getElementById('policyForm');
+    win.clearForm(form);
+    doc.getElementById('policyClear').click();
+    const quiet = doc.getElementById('clearOverlay').hidden;
+    win.showHome();
+    return quiet || { detail: 'the dialog opened over an empty form' };
+  });
+  checkAsync(g6f, 'Save first saves, leaves the form alone and closes', async () => {
+    win.showForm('ford');
+    const form = doc.getElementById('fordForm');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Saved Person';
+    const realSave = win.saveGrv;
+    let savedType = null;
+    win.saveGrv = (type) => { savedType = type; return 'Saved Person - Grievance Claim.grv'; };
+    try {
+      doc.getElementById('fordClear').click();
+      const save = doc.getElementById('clearSave');
+      save.click();
+      const said = save.textContent;
+      const openStill = !doc.getElementById('clearOverlay').hidden;
+      await new Promise(r => setTimeout(r, 1800));
+      const closed = doc.getElementById('clearOverlay').hidden;
+      const intact = form.elements.employeeName.value === 'Saved Person';
+      return (savedType === 'ford' && /^Saved .*\.grv$/.test(said) && openStill && closed && intact) ||
+        { detail: 'savedType=' + savedType + ' said=' + JSON.stringify(said) + ' openStill=' + openStill +
+                  ' closed=' + closed + ' intact=' + intact };
+    } finally {
+      win.saveGrv = realSave;
+      if (!doc.getElementById('clearOverlay').hidden) doc.getElementById('clearCancel').click();
+      win.clearForm(form);
+      win.showHome();
+    }
+  });
+  check(g6f, 'Clear all counts the forms and does not offer Save first', () => {
+    win.showForm('ford');
+    doc.getElementById('fordForm').elements.employeeName.value = 'A';
+    win.showForm('policy');
+    doc.getElementById('policyForm').elements.employeeName.value = 'B';
+    win.showHome();
+    doc.getElementById('clearAllForms').click();
+    const title = doc.getElementById('clearTitle').textContent;
+    const button = doc.getElementById('clearGo').textContent;
+    const saveHidden = doc.getElementById('clearSave').hidden;
+    doc.getElementById('clearGo').click();
+    const bothEmpty = doc.getElementById('fordForm').elements.employeeName.value === '' &&
+                      doc.getElementById('policyForm').elements.employeeName.value === '';
+    const buttonGone = doc.getElementById('clearAllForms').hidden;
+    FORMS.forEach(f => win.clearForm(doc.getElementById(f.form)));
+    win.showHome();
+    return (title === 'Clear all 2 forms?' && button === 'Clear 2 forms' && saveHidden && bothEmpty && buttonGone) ||
+      { detail: 'title=' + JSON.stringify(title) + ' button=' + JSON.stringify(button) +
+                ' saveHidden=' + saveHidden + ' bothEmpty=' + bothEmpty + ' buttonGone=' + buttonGone };
+  });
+  check(g6f, 'Escape closes the dialog without clearing', () => {
+    win.showForm('ford');
+    const form = doc.getElementById('fordForm');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Still Here';
+    doc.getElementById('fordClear').click();
+    const asked = !doc.getElementById('clearOverlay').hidden;
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    const closed = doc.getElementById('clearOverlay').hidden;
+    const survived = form.elements.employeeName.value === 'Still Here';
+    win.clearForm(form);
+    win.showHome();
+    return (asked && closed && survived) ||
+      { detail: 'asked=' + asked + ' closed=' + closed + ' survived=' + survived };
+  });
+
   const g6d = group('Getting around');
   check(g6d, 'Back sits in the sticky toolbar on every form', () => {
     const missing = FORMS.filter(f => !doc.querySelector('#form-' + f.type + ' .dc-toolbar .dc-back'));
@@ -479,27 +588,123 @@ function run(win, doc) {
   check(g6d, 'The preview has a back arrow as well as a close button', () =>
     (!!doc.getElementById('pdfViewerBack') && !!doc.getElementById('pdfViewerClose')) ||
     { detail: 'one of them is missing' });
-  check(g6d, 'Only the multi-sheet form gets sheet navigation', () => {
-    win.showForm('unifor');
-    const onUnifor = !!doc.querySelector('#form-unifor .dc-sheet-nav');
-    const onFord = !!doc.querySelector('#form-ford .dc-sheet-nav');
-    return (onUnifor && !onFord) || { detail: 'unifor=' + onUnifor + ' ford=' + onFord };
+  check(g6d, 'Every form gets a contents panel', () => {
+    const missing = FORMS.filter(f => !doc.querySelector('#form-' + f.type + ' nav.dc-toc[aria-label]'));
+    return missing.length === 0 || { detail: 'missing on ' + missing.map(f => f.type).join(', ') };
   });
-  check(g6d, 'Sheet menu is named from each sheet’s section', () => {
-    const items = [].map.call(doc.querySelectorAll('#form-unifor .dc-sheet-menu button'), b => b.textContent);
-    return (items.length === 5 && /Statements/.test(items[1])) || { detail: items.join(' / ') };
+  check(g6d, 'Contents list every section, the company-filled ones included', () => {
+    const counts = FORMS.map(f => f.type + '=' +
+      doc.querySelectorAll('#form-' + f.type + ' .dc-toc-band').length + '/' +
+      doc.getElementById(f.form).querySelectorAll('.dc-band').length);
+    const matched = FORMS.every(f =>
+      doc.querySelectorAll('#form-' + f.type + ' .dc-toc-band').length ===
+      doc.getElementById(f.form).querySelectorAll('.dc-band').length);
+    const ford = [].map.call(doc.querySelectorAll('#form-ford .dc-toc-band'), b => b.textContent);
+    const inv = [].map.call(doc.querySelectorAll('#form-investigation .dc-toc-band'), b => b.textContent).join(' / ');
+    return (matched && ford.length === 4 && ford[1] === 'Department Response' && /Payroll/.test(ford[3]) &&
+            inv === 'Details / Investigation / Resolution') ||
+      { detail: counts.join(' ') + '; ford: ' + ford.join(' / ') + '; investigation: ' + inv };
   });
-  check(g6d, 'The indicator follows the scroll position', () => {
+  check(g6d, 'Fact Sheet contents nest the sections under five sheets', () => {
+    const heads = [].map.call(doc.querySelectorAll('#form-unifor .dc-toc-sheet'), b => b.textContent);
+    const groups = doc.querySelectorAll('#form-unifor .dc-toc-group');
+    const perGroup = [].map.call(groups, g => g.querySelectorAll('.dc-toc-band').length).join(',');
+    const second = groups[1] ? groups[1].querySelector('.dc-toc-band').textContent : '';
+    return (heads.join(',') === 'Sheet 1,Sheet 2,Sheet 3,Sheet 4,Sheet 5' && groups.length === 5 &&
+            perGroup === '3,1,1,1,1' && second === 'Statements') ||
+      { detail: 'heads=' + heads.join(',') + ' groups=' + groups.length + ' bands=' + perGroup + ' second=' + second };
+  });
+  check(g6d, 'Entries are buttons, and exactly one is current', () => {
+    const links = doc.querySelectorAll('.dc-toc a').length;
+    const notButtons = [].filter.call(doc.querySelectorAll('.dc-toc-sheet, .dc-toc-band'),
+      b => b.tagName !== 'BUTTON' || b.type !== 'button').length;
+    win.showForm('ford');
+    win.scrollTo(0, 0);
+    win.__app.FORM_BUILDERS.ford.syncSheet();
+    const current = doc.querySelectorAll('#form-ford [aria-current="true"]');
+    const text = current[0] ? current[0].textContent : '';
+    return (links === 0 && notButtons === 0 && current.length === 1 &&
+            text === 'Employee Details & Grievance Summary') ||
+      { detail: 'links=' + links + ' notButtons=' + notButtons + ' current=' + current.length + ' read ' + text };
+  });
+  check(g6d, 'The highlight follows the scroll position', () => {
     win.showForm('unifor');
-    const label = doc.querySelector('#form-unifor .dc-sheet-current');
     const sheets = doc.querySelectorAll('#form-unifor .dc-page');
+    const bands = doc.querySelectorAll('#form-unifor .dc-band');
     const toolbar = doc.querySelector('#form-unifor .dc-toolbar');
-    win.scrollTo(0, sheets[3].getBoundingClientRect().top + win.scrollY - toolbar.offsetHeight - 24);
+    const cur = () => (doc.querySelector('#form-unifor .dc-toc-band[aria-current="true"]') || {}).textContent +
+      ' / ' + (doc.querySelector('#form-unifor .dc-toc-sheet.is-current') || {}).textContent;
+    // The sheet's page top parks under the toolbar while band F is still below the line, so
+    // this reads Sheet 4 only because the sheet is settled before the bands
+    win.scrollTo(0, sheets[3].getBoundingClientRect().top + win.scrollY - toolbar.getBoundingClientRect().height - 24);
     win.__app.FORM_BUILDERS.unifor.syncSheet();
-    const got = label.textContent;
+    const atSheet4 = cur();
+    win.scrollTo(0, bands[4].getBoundingClientRect().top + win.scrollY - toolbar.getBoundingClientRect().height - 24);
+    win.__app.FORM_BUILDERS.unifor.syncSheet();
+    const atE = cur();
     win.scrollTo(0, 0);
     win.__app.FORM_BUILDERS.unifor.syncSheet();
-    return got === 'Sheet 4 of 5' || { detail: 'read ' + got };
+    const atTop = cur();
+    return (atSheet4 === 'Assessment & Submission / Sheet 4' && atE === 'Investigation / Sheet 3' &&
+            atTop === 'Grievor / Sheet 1') ||
+      { detail: 'sheet 4: ' + atSheet4 + '; band E: ' + atE + '; top: ' + atTop };
+  });
+  check(g6d, 'The last section lights up at the foot of the page', () => {
+    win.showForm('investigation');
+    win.scrollTo(0, doc.documentElement.scrollHeight);
+    win.__app.FORM_BUILDERS.investigation.syncSheet();
+    const got = (doc.querySelector('#form-investigation [aria-current="true"]') || {}).textContent;
+    const scrolled = win.scrollY > 0;
+    win.scrollTo(0, 0);
+    win.__app.FORM_BUILDERS.investigation.syncSheet();
+    return (scrolled && got === 'Resolution') || { detail: 'scrollY=' + scrolled + ' read ' + got };
+  });
+  check(g6d, 'The contents panel never prints', () => {
+    const rules = Array.from(doc.styleSheets)
+      .flatMap(sheet => { try { return Array.from(sheet.cssRules); } catch (e) { return []; } })
+      .filter(rule => rule.media && Array.from(rule.media).join(' ').indexOf('print') !== -1)
+      .flatMap(rule => Array.from(rule.cssRules || []));
+    const hidden = rules.some(r => r.selectorText && r.selectorText.indexOf('.dc-toc') !== -1 &&
+                                   r.style.display === 'none');
+    return hidden || { detail: 'no print rule hides .dc-toc' };
+  });
+  checkAsync(g6d, 'The panel sits in the margin on a wide window and gives way when there is none', async () => {
+    const host = document.getElementById('host');
+    const toggle = doc.getElementById('textSizeToggle');
+    const tick = () => new Promise(r => setTimeout(r, 50));
+    const failures = [];
+    try {
+      if (doc.body.classList.contains('is-large-text')) toggle.click();
+      win.showForm('ford');
+      const toc = doc.querySelector('#form-ford .dc-toc');
+      const panel = doc.getElementById('form-ford');
+      const form = doc.getElementById('fordForm');
+      const shown = () => win.getComputedStyle(toc).display;
+      const indent = () => win.getComputedStyle(panel).paddingLeft;
+      if (shown() !== 'block') failures.push('at 1200 display=' + shown());
+      if (indent() !== '220px') failures.push('at 1200 padding=' + indent());
+      if (toc.getBoundingClientRect().right > form.getBoundingClientRect().left) failures.push('rail overlaps the page');
+      const width = Math.round(form.getBoundingClientRect().width);
+      if (width !== 816) failures.push('page width ' + width);
+      const sticky = win.getComputedStyle(toc.firstElementChild).position;
+      if (sticky !== 'sticky') failures.push('list is ' + sticky);
+      toggle.click(); await tick();
+      if (shown() !== 'none' || indent() !== '0px') failures.push('large text at 1200: display=' + shown() + ' padding=' + indent());
+      toggle.click(); await tick();
+      if (shown() !== 'block') failures.push('after large text off display=' + shown());
+      host.style.width = '1000px'; await tick();
+      const narrowMatches = win.matchMedia('(min-width: 1160px)').matches;
+      if (shown() !== 'none' || indent() !== '0px' || narrowMatches) {
+        failures.push('at 1000: display=' + shown() + ' padding=' + indent() + ' matches=' + narrowMatches);
+      }
+      host.style.width = '1200px'; await tick();
+      if (shown() !== 'block') failures.push('back at 1200 display=' + shown());
+    } finally {
+      host.style.width = '1200px';
+      if (doc.body.classList.contains('is-large-text')) toggle.click();
+      win.scrollTo(0, 0);
+    }
+    return failures.length === 0 || { detail: failures.join('; ') };
   });
 
   const g6e = group('Reading it');
@@ -2384,6 +2589,43 @@ function run(win, doc) {
     return (filledOne && adds && flags > 1 && after === before - 1) ||
       { detail: 'score "' + score + '" flags=' + flags + ' addsUp=' + adds +
                 ' afterTyping=' + after + '/' + before };
+  });
+
+  check(g18, 'A dictated Yes or No survives its full stop and its case', () => {
+    // Dictation leaves "Yes." and "no"; the key strips case and punctuation, so both land
+    const fields = win.wordFields('unifor');
+    const heading = (name) => win.wordHeading(fields.find(f => f.name === name)) + '\n';
+    const runWith = (discipline, prior) => {
+      const text = win.wordTextFor('unifor')
+        .replace(heading('discipline'), heading('discipline') + discipline + '\n')
+        .replace(heading('priorViolation'), heading('priorViolation') + prior + '\n');
+      return win.readWordText(text).values;
+    };
+    const a = runWith('Yes.', 'no.');
+    const b = runWith('yes', 'NO');
+    return (a.discipline === 'Yes' && a.priorViolation === 'No' &&
+            b.discipline === 'Yes' && b.priorViolation === 'No') ||
+      { detail: JSON.stringify([a.discipline, a.priorViolation, b.discipline, b.priorViolation]) };
+  });
+
+  checkAsync(g18, 'A Yes with more words after it is flagged, not guessed', async () => {
+    const form = doc.getElementById('uniforForm');
+    win.showForm('unifor');
+    win.clearForm(form);
+    const fields = win.wordFields('unifor');
+    const heading = win.wordHeading(fields.find(f => f.name === 'discipline')) + '\n';
+    const read = win.readWordText(win.wordTextFor('unifor').replace(heading, heading + 'Yes please\n'));
+    const inMissing = read.missing.some(f => f.name === 'discipline');
+    const unset = !('discipline' in read.values);
+
+    win.applyWordText(read);
+    doc.querySelector('#wordResultOverlay [data-word-close]').click();
+    const radioBlank = form.elements.discipline.value === '';
+    const flagged = !!form.querySelector('[name="discipline"]').closest('.is-flagged');
+    win.clearForm(form);
+    win.showHome();
+    return (inMissing && unset && radioBlank && flagged) ||
+      { detail: 'missing=' + inMissing + ' unset=' + unset + ' blank=' + radioBlank + ' flagged=' + flagged };
   });
 
   checkAsync(g18, 'Hours are only flagged when every box is empty', async () => {

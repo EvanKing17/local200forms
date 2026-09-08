@@ -904,7 +904,7 @@ fordForm.addEventListener('submit', (e) => {
 });
 
 document.getElementById('fordClear').addEventListener('click', () => {
-  clearForm(fordForm);
+  confirmClear('ford', () => clearForm(fordForm));
 });
 
 /* ============ POLICY GRIEVANCE FORM ============ */
@@ -985,7 +985,7 @@ policyForm.addEventListener('submit', (e) => {
 });
 
 document.getElementById('policyClear').addEventListener('click', () => {
-  clearForm(policyForm);
+  confirmClear('policy', () => clearForm(policyForm));
 });
 
 /* ============ UNIFOR FORM ============ */
@@ -1217,7 +1217,7 @@ uniforForm.addEventListener('submit', (e) => {
 });
 
 document.getElementById('uniforClear').addEventListener('click', () => {
-  clearForm(uniforForm);
+  confirmClear('unifor', () => clearForm(uniforForm));
 });
 
 /* ============ 4.01 INVESTIGATION FORM ============ */
@@ -1282,7 +1282,7 @@ investigationForm.addEventListener('submit', (e) => {
 });
 
 document.getElementById('investigationClear').addEventListener('click', () => {
-  clearForm(investigationForm);
+  confirmClear('investigation', () => clearForm(investigationForm));
 });
 
 
@@ -1511,6 +1511,9 @@ function readWordText(text) {
       if (!iso) { missing.push(field); return; }
       values[field.name] = iso;
     } else if (field.choices) {
+      // Dictation tends to leave "Yes." or "no" — the key drops case and the full stop, so
+      // those match. Anything more than the choice word ("Yes please") is left for the rep to
+      // pick, since guessing between choices is worse than a flag.
       const picked = field.choices.find(c => wordKey(c) === wordKey(body));
       if (!picked) { missing.push(field); return; }
       values[field.name] = picked;
@@ -1726,6 +1729,102 @@ document.getElementById('flagWarnGo').addEventListener('click', () => {
   const go = flagWarnGo;
   closeFlagWarn();
   if (go) go();
+});
+
+/* ---------- Clearing a form ---------- */
+const clearOverlay = document.getElementById('clearOverlay');
+let clearGo = null;
+let clearSaveType = null;
+let clearSaveTimer = null;
+let clearReturnFocus = null;
+const CLEAR_SAVED_LINGER = 1500;   // long enough to read "Saved …" before the dialog goes
+
+/*
+ * Clearing is the one thing here with no way back — the draft goes with the fields — so it
+ * asks, and offers the .grv save on the way. An empty form skips the question: there is nothing
+ * to lose, and a dialog over nothing teaches people to click through it.
+ *
+ * clearForm itself stays silent. The tests call it directly, and so does Clear all.
+ */
+function confirmClear(type, proceed) {
+  if (!formHasContent(type)) { proceed(); return; }
+  openClearDialog({
+    title: 'Clear this form?',
+    lede: 'Every field on this ' + FORM_BUILDERS[type].label + ' is erased and the draft saved on ' +
+          'this device is discarded.',
+    hint: 'There is no undo. If you might want it back, save it as a .grv first — that keeps a copy ' +
+          'you can open again later.',
+    button: 'Clear form',
+    saveType: type,
+  }, proceed);
+}
+
+/*
+ * Clear all from the Forms page. Save first is left out here: a .grv is one file per form, so
+ * one save button can't honestly cover several.
+ */
+function confirmClearAll(count, proceed) {
+  if (!count) { proceed(); return; }
+  const one = count === 1;
+  openClearDialog({
+    title: one ? 'Clear this form?' : 'Clear all ' + count + ' forms?',
+    lede: one ? 'Every field on the one form with something in it is erased and its draft on this ' +
+                'device is discarded.'
+              : 'Every field on all ' + count + ' forms is erased and their drafts on this device ' +
+                'are discarded.',
+    hint: 'There is no undo. To keep a copy of one, open it and save it as a .grv before clearing.',
+    button: one ? 'Clear 1 form' : 'Clear ' + count + ' forms',
+    saveType: null,
+  }, proceed);
+}
+
+function openClearDialog(words, proceed) {
+  clearGo = proceed;
+  clearSaveType = words.saveType;
+  clearReturnFocus = document.activeElement;
+  document.getElementById('clearTitle').textContent = words.title;
+  document.getElementById('clearLede').textContent = words.lede;
+  document.getElementById('clearHint').textContent = words.hint;
+  document.getElementById('clearGo').textContent = words.button;
+  document.getElementById('clearSave').hidden = !words.saveType;
+  clearOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+  // Cancel takes focus, so a stray Enter or Space lands on the harmless button
+  document.getElementById('clearCancel').focus();
+}
+
+function closeClearDialog() {
+  clearOverlay.hidden = true;
+  document.body.style.overflow = '';
+  clearGo = null;
+  clearSaveType = null;
+  clearTimeout(clearSaveTimer);
+  clearSaveTimer = null;
+  const save = document.getElementById('clearSave');
+  save.textContent = 'Save first';
+  save.disabled = false;
+  if (clearReturnFocus && clearReturnFocus.focus) clearReturnFocus.focus();
+  clearReturnFocus = null;
+}
+
+document.getElementById('clearCancel').addEventListener('click', closeClearDialog);
+document.getElementById('clearGo').addEventListener('click', () => {
+  const go = clearGo;
+  closeClearDialog();
+  if (go) go();
+});
+document.getElementById('clearSave').addEventListener('click', () => {
+  if (!clearSaveType) return;
+  const button = document.getElementById('clearSave');
+  const name = saveGrv(clearSaveType);
+  // Same reasoning as the .grv button: the file lands in a folder without a word otherwise
+  button.textContent = 'Saved ' + name;
+  button.disabled = true;
+  // Saved is the answer: the copy exists and the form is left as it was
+  clearSaveTimer = setTimeout(closeClearDialog, CLEAR_SAVED_LINGER);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !clearOverlay.hidden) { e.preventDefault(); closeClearDialog(); }
 });
 
 /* ============ Tools: DROT audit ============
@@ -2763,15 +2862,14 @@ function refreshClearAllButton() {
 document.getElementById('clearAllForms').addEventListener('click', () => {
   const filled = Object.keys(FORM_BUILDERS).filter(formHasContent);
   // Wiping several forms and their saved drafts at once is worth one question
-  const what = filled.length === 1 ? 'this form' : `all ${filled.length} forms`;
-  if (!confirm(`Clear ${what}? Anything typed in and not yet saved as a PDF will be lost.`)) return;
-
-  Object.keys(FORM_BUILDERS).forEach(type => {
-    clearForm(FORM_BUILDERS[type].form);
-    discardDraft(type);
+  confirmClearAll(filled.length, () => {
+    Object.keys(FORM_BUILDERS).forEach(type => {
+      clearForm(FORM_BUILDERS[type].form);
+      discardDraft(type);
+    });
+    refreshClearAllButton();
+    refreshDraftFlags();
   });
-  refreshClearAllButton();
-  refreshDraftFlags();
 });
 
 applyFormsConfig();
@@ -3860,6 +3958,8 @@ function applyTextSize(large) {
   if (currentFormType) {
     FORM_BUILDERS[currentFormType].form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
     updatePageBreaks(currentFormType);
+    // The toolbar height and every section move with the zoom
+    if (FORM_BUILDERS[currentFormType].syncSheet) FORM_BUILDERS[currentFormType].syncSheet();
   }
 }
 
@@ -3880,106 +3980,135 @@ try {
   if (localStorage.getItem(TEXT_SIZE_KEY) === 'large') applyTextSize(true);
 } catch { /* storage unavailable; stay at the default size */ }
 
-/* ============ Sheet navigation ============
+/* ============ Contents panel ============
  *
- * The Fact Sheet is five sheets and roughly seven screens. Without this you scroll a long way
- * with no idea which one you're on and no way to jump, which is the single roughest part of
- * filling it in.
+ * Every form is longer than a screen, and the Fact Sheet is five sheets and roughly seven
+ * screens. This lists every section down the left so you can see where you are and jump,
+ * the company-filled sections included: a rep reading a returned form wants those too.
  */
 function panelIsActive(type) {
   const panel = document.getElementById('form-' + type);
   return panel && panel.classList.contains('active');
 }
 
-function sheetLabels(form) {
-  return Array.from(form.querySelectorAll('.dc-page')).map((sheet, i) => {
-    const band = sheet.querySelector('.dc-band');
-    const sub = band && band.querySelector('.dc-band-sub');
-    const name = sub ? sub.textContent.trim() : (band ? band.textContent.trim() : '');
-    return { index: i, sheet, label: name ? `${i + 1} · ${name}` : `Sheet ${i + 1}` };
-  });
-}
+const TOC_JUMP_GAP = 24;   // how far below the toolbar a jumped-to section is parked
 
-function buildSheetNav(type) {
+function buildFormToc(type) {
   const form = FORM_BUILDERS[type].form;
-  const sheets = sheetLabels(form);
-  if (sheets.length < 2) return;
+  const panel = document.getElementById('form-' + type);
+  const toolbar = panel && panel.querySelector('.dc-toolbar');
+  if (!toolbar || panel.querySelector('.dc-toc')) return;
 
-  const toolbar = document.querySelector(`#form-${type} .dc-toolbar`);
-  if (!toolbar || toolbar.querySelector('.dc-sheet-nav')) return;
+  const bands = [];    // { el, button, sheet } in document order
+  const sheets = [];   // { el, button, first } — Fact Sheet only; first is the index into bands of its first band
 
-  const nav = document.createElement('div');
-  nav.className = 'dc-sheet-nav';
+  const nav = document.createElement('nav');
+  nav.className = 'dc-toc';
+  nav.setAttribute('aria-label', 'Contents');
+  const inner = document.createElement('div');
+  inner.className = 'dc-toc-inner';
+  const head = document.createElement('p');
+  head.className = 'dc-toc-head';
+  head.textContent = 'Contents';
+  inner.appendChild(head);
+  nav.appendChild(inner);
 
-  const current = document.createElement('button');
-  current.type = 'button';
-  current.className = 'dc-sheet-current';
-  current.setAttribute('aria-expanded', 'false');
-  current.textContent = `Sheet 1 of ${sheets.length}`;
+  // The title alone: the "Section A:" letter is on the band itself, a click away
+  function bandLabel(band) {
+    const sub = band.querySelector('.dc-band-sub');
+    return (sub || band).textContent.trim();
+  }
 
-  const menu = document.createElement('div');
-  menu.className = 'dc-sheet-menu';
-  menu.hidden = true;
+  function addBand(band, container, sheet) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'dc-toc-band';
+    button.textContent = bandLabel(band);
+    const index = bands.length;
+    bands.push({ el: band, button, sheet });
+    button.addEventListener('click', () => { jumpTo(band); setCurrent(index); });
+    container.appendChild(button);
+  }
 
-  sheets.forEach(({ sheet, label }) => {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.textContent = label;
-    item.addEventListener('click', () => {
-      menu.hidden = true;
-      current.setAttribute('aria-expanded', 'false');
-      // Clear the sticky toolbar, or the sheet's first rows land underneath it
-      const top = sheet.getBoundingClientRect().top + window.scrollY - toolbar.offsetHeight - SHEET_JUMP_GAP;
-      window.scrollTo({ top, behavior: 'smooth' });
-      syncCurrentSheet();
+  if (form.classList.contains('dc-sheets')) {
+    form.querySelectorAll('.dc-page').forEach((page, i) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'dc-toc-sheet';
+      button.textContent = 'Sheet ' + (i + 1);
+      const sheet = { el: page, button, first: bands.length };
+      sheets.push(sheet);
+      button.addEventListener('click', () => { jumpTo(page); setCurrent(sheet.first); });
+      const group = document.createElement('div');
+      group.className = 'dc-toc-group';
+      page.querySelectorAll('.dc-band').forEach(band => addBand(band, group, sheet));
+      inner.append(button, group);
     });
-    menu.appendChild(item);
-  });
+  } else {
+    form.querySelectorAll('.dc-band').forEach(band => addBand(band, inner, null));
+  }
+  if (!bands.length) return;
 
-  current.addEventListener('click', () => {
-    menu.hidden = !menu.hidden;
-    current.setAttribute('aria-expanded', String(!menu.hidden));
-  });
-  document.addEventListener('click', (e) => {
-    if (!nav.contains(e.target)) { menu.hidden = true; current.setAttribute('aria-expanded', 'false'); }
-  });
+  // Last in the panel: Tab from the toolbar goes straight into the fields rather than through
+  // a dozen entries first. The rail is placed by CSS, so DOM order costs nothing visually.
+  panel.appendChild(nav);
 
-  nav.append(current, menu);
-  toolbar.insertBefore(nav, toolbar.querySelector('.dc-back').nextSibling);
+  // Both sides in screen pixels: the band's rect and the toolbar's rect. offsetHeight is in the
+  // panel's own zoomed units under large text and would park the section a quarter of a
+  // toolbar too high.
+  function jumpTo(el) {
+    const top = el.getBoundingClientRect().top + window.scrollY
+              - toolbar.getBoundingClientRect().height - TOC_JUMP_GAP;
+    window.scrollTo({ top, behavior: 'smooth' });
+  }
+
+  function setCurrent(index) {
+    bands.forEach((band, i) => {
+      if (i === index) band.button.setAttribute('aria-current', 'true');
+      else band.button.removeAttribute('aria-current');
+    });
+    sheets.forEach(sheet => sheet.button.classList.toggle('is-current', sheet === bands[index].sheet));
+  }
 
   /*
-   * Whichever sheet has passed under the toolbar is the one you're on. Worked out from the
+   * Whichever section has passed under the toolbar is the one you're in. Worked out from the
    * measured positions on scroll rather than with an IntersectionObserver: the answer is the
    * same, and this can be checked directly at any scroll position instead of depending on when
    * the browser decides to deliver a callback.
    */
-  const SHEET_JUMP_GAP = 24;   // how far below the toolbar a jumped-to sheet is parked
-
-  function syncCurrentSheet() {
-    // The line has to sit below where a jump parks a sheet, or the sheet you just jumped to
+  function sync() {
+    // The line has to sit below where a jump parks a section, or the one you just jumped to
     // reads as still being the previous one
-    const line = toolbar.getBoundingClientRect().bottom + SHEET_JUMP_GAP + 8;
+    const line = toolbar.getBoundingClientRect().bottom + TOC_JUMP_GAP + 8;
     let active = 0;
-    sheets.forEach(({ sheet }, i) => {
-      if (sheet.getBoundingClientRect().top <= line) active = i;
-    });
-    current.textContent = `Sheet ${active + 1} of ${sheets.length}`;
+    // A sheet's header passes the line well before its first band does, so the sheet is settled
+    // first and a band from the sheet before it can never win
+    sheets.forEach(sheet => { if (sheet.el.getBoundingClientRect().top <= line) active = sheet.first; });
+    bands.forEach((band, i) => { if (i >= active && band.el.getBoundingClientRect().top <= line) active = i; });
+    // A short last section may never reach the line, so the foot of a page that scrolls counts as it
+    const doc = document.documentElement;
+    if (doc.scrollHeight > window.innerHeight + 2 && window.innerHeight + window.scrollY >= doc.scrollHeight - 2) {
+      active = bands.length - 1;
+    }
+    setCurrent(active);
   }
 
   // Throttled on a timer rather than requestAnimationFrame, which only runs while the page is
   // producing frames — this keeps working in a background tab, and stays testable.
   let lastSync = 0;
-  window.addEventListener('scroll', () => {
+  function onMove() {
     const now = Date.now();
     if (now - lastSync < 80) return;
     lastSync = now;
-    if (panelIsActive(type)) syncCurrentSheet();
-  }, { passive: true });
+    if (panelIsActive(type)) sync();
+  }
+  window.addEventListener('scroll', onMove, { passive: true });
+  window.addEventListener('resize', onMove, { passive: true });   // the toolbar wraps and every band moves
 
-  FORM_BUILDERS[type].syncSheet = syncCurrentSheet;
+  FORM_BUILDERS[type].syncSheet = sync;
 }
 
-Object.keys(FORM_BUILDERS).forEach(buildSheetNav);
+Object.keys(FORM_BUILDERS).forEach(buildFormToc);
 
 /* ============ Attachments and the mark-up editor ============
  *

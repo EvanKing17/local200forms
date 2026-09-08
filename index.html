@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=69">
+<link rel="stylesheet" href="style.css?v=70">
 </head>
 <body>
 
@@ -1151,6 +1151,23 @@
   </div>
 </div>
 
+<!-- Clearing is the one thing here that can't be undone, so it asks — and offers a .grv on the way -->
+<div class="admin-overlay" id="clearOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="clearTitle">
+  <div class="admin-modal">
+    <h2 class="admin-title" id="clearTitle">Clear this form?</h2>
+    <p class="admin-lede" id="clearLede"></p>
+    <p class="admin-hint" id="clearHint">
+      There is no undo. If you might want it back, save it as a .grv first — that keeps a copy you
+      can open again later.
+    </p>
+    <div class="admin-actions">
+      <button type="button" class="btn-secondary" id="clearCancel">Cancel</button>
+      <button type="button" class="btn-secondary" id="clearSave">Save first</button>
+      <button type="button" class="btn-danger" id="clearGo">Clear form</button>
+    </div>
+  </div>
+</div>
+
 <div class="admin-overlay" id="importOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="importTitle">
   <div class="admin-modal">
     <h2 class="admin-title" id="importTitle">Fill a form from this file</h2>
@@ -1239,7 +1256,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=69"></script>
-<script src="script.js?v=69"></script>
+<script src="annotate.js?v=70"></script>
+<script src="script.js?v=70"></script>
 </body>
 </html>

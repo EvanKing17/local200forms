@@ -25,7 +25,8 @@ because the page on screen *is* the page that comes out.
   one. Type over it when you're filing for somebody else. A form holding
   nothing but that name still counts as empty.
 - **Drafts save as you type**, so a closed tab or a dead battery costs nothing.
-  "Clear form" is how you throw one away.
+  "Clear form" is how you throw one away — it asks first, and offers to save a
+  .grv copy before anything is erased.
 - **Attach supporting documents.** Add PDFs or photos to a form and they're
   appended after it, so the grievance and its evidence go in as one file.
 - **Mark them up** — draw, highlight, arrows, boxes and ovals, and blur. Each
@@ -46,8 +47,10 @@ because the page on screen *is* the page that comes out.
   editor and the preview — with a control on each, since the editor and the
   preview cover the window and the fixed button sits underneath them. The PDF
   is unaffected.
-- The Fact Sheet's five sheets have a **sheet indicator and jump menu**, and a
-  form with work waiting in it is **marked on the list**.
+- Every form has a **contents panel** down the left on a wide enough window: every section,
+  the ones the company fills in included, with the one you're in marked; click to jump. The
+  Fact Sheet's five sheets are headings in it. It never prints. A form with work waiting in it
+  is **marked on the list**.
 
 ## Filling a form from another application
 
