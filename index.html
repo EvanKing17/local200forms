@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=83">
+<link rel="stylesheet" href="style.css?v=84">
 </head>
 <body>
 
@@ -1167,7 +1167,7 @@
       </div>
       <div class="dc-doc-rule"></div>
 
-      <div class="dc-band dc-block"><span>Statement</span></div>
+      <div class="dc-band"><span>Statement</span></div>
       <div class="dc-field-grid dc-cols-31 dc-attached">
         <label>
           <span class="dc-field-label">Statement RE:</span>
@@ -1178,7 +1178,7 @@
           <input type="date" name="dateTaken">
         </label>
       </div>
-      <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+      <div class="dc-field-grid dc-cols-2 dc-attached">
         <label>
           <span class="dc-field-label">Statement Given By</span>
           <textarea class="dc-value" name="givenBy" rows="1" autocomplete="name"></textarea>
@@ -1199,8 +1199,10 @@
         </div>
       </div>
 
-      <div class="dc-band dc-block"><span>Signatures</span></div>
-      <!-- Six lines are here; sigLines says how many show. See the signature-line code in script.js. -->
+      <!-- One block, so the band and its lines move to the next page together, as the PDF keeps
+           them. Six lines are here; sigLines says how many show. See the signature-line code. -->
+      <div class="dc-block dc-sig-section">
+      <div class="dc-band"><span>Signatures</span></div>
       <div class="dc-signatures">
         <div class="dc-sig-row" data-sig-row="1">
           <label class="dc-sigline">
@@ -1305,6 +1307,7 @@
           <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
         </div>
         <input type="hidden" name="sigLines" value="2">
+      </div>
       </div>
       <button type="button" class="dc-sig-add dc-ui" data-sig-add>Add a signature line</button>
     </form>
@@ -1615,9 +1618,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=83"></script>
+<script src="forms.config.js?v=84"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=83"></script>
-<script src="script.js?v=83"></script>
+<script src="annotate.js?v=84"></script>
+<script src="script.js?v=84"></script>
 </body>
 </html>

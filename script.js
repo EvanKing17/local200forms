@@ -1310,7 +1310,7 @@ function drawWitnessHeader(doc, marginX, W) {
   doc.setDrawColor(...DC.primary);
   doc.setLineWidth(1.5);
   doc.line(marginX, ruleY, marginX + W, ruleY);
-  return ruleY + 14;
+  return ruleY + 1;              // the first band sits on the rule
 }
 
 /* The lines that print: every one that is showing, plus any put-away one that still has a name or date */
@@ -1338,11 +1338,10 @@ function buildWitnessDoc(data) {
     { label: 'Statement RE', value: data.statementRe, width: W * 0.75 },
     { label: 'Date Taken', value: fmtDateFit(doc, data.dateTaken, W * 0.25 - CELL_X * 2), width: W * 0.25 },
   ], CELL_MIN_H, true);
-  y += 10;
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Statement Given By', value: data.givenBy, width: W / 2 },
     { label: 'Taken By', value: data.takenBy, width: W / 2 },
-  ]);
+  ], CELL_MIN_H, true);
   y += 14;
 
   // ---- The statement, at whatever length it runs to ----
@@ -4263,6 +4262,9 @@ function makeBreakMarker(pageNumber, type) {
   const marker = document.createElement('div');
   marker.className = 'dc-break';
   marker.setAttribute('aria-hidden', 'true');
+  const line = document.createElement('span');
+  line.className = 'dc-break-line';
+  marker.appendChild(line);
   const tag = document.createElement('span');
   tag.className = 'dc-break-tag';
   tag.textContent = 'Page ' + pageNumber;
@@ -4278,14 +4280,18 @@ function makeBreakMarker(pageNumber, type) {
 }
 
 /*
- * Where the printed pages end, drawn across the sheet. A text box is cut where the page ends
- * and carries on over it, the way flowTextBox draws it — unless less than its smallest size is
- * left on the page, when the whole box moves down. Anything else moves down whole, and the
- * line is drawn just above it.
+ * Where the printed pages end, shown on the sheet the way the PDF will lay it out. A text box
+ * is cut where the page ends and carries on over it, the way flowTextBox draws it, so the line
+ * runs through the box — unless less than its smallest size is left on the page, when the
+ * whole box moves down. Anything else moves down whole, and here it really does: a gap is put
+ * in front of it the height of what was left on the page, so what sits on page two on paper
+ * sits below the line on screen too, rather than jammed up under the box above.
  *
  * Everything is measured in the sheet's own pixels: getBoundingClientRect reports zoomed ones
- * under large text, and the markers are placed with `top`, which the zoom scales again.
+ * under large text, and the markers are placed with `top` and `height`, which the zoom scales
+ * again.
  */
+const PAGE_GAP_PX = 28;         // between the end of one page on screen and the start of the next
 function updatePageBreaks(type) {
   const entry = FORM_BUILDERS[type];
   if (!entry) return;
@@ -4318,7 +4324,7 @@ function updatePageBreaks(type) {
         pageStart = boundary;
       } else if (top > pageStart) {
         pages += 1;
-        marks.push({ y: top - 10, page: pages, inside: false });
+        marks.push({ y: boundary, page: pages, inside: false, block, top });
         pageStart = top;
       } else {
         break;                  // already at the top of a page and still too tall
@@ -4335,12 +4341,26 @@ function updatePageBreaks(type) {
   }
   if (actualPages !== pages) return;
 
+  // Gaps push everything under them down, so a line placed by measurement further along
+  // moves by the gaps put in above it
   const border = parseFloat(getComputedStyle(form).borderTopWidth) || 0;
+  let shift = 0;
   marks.forEach(mark => {
     const marker = makeBreakMarker(mark.page, type);
-    marker.classList.toggle('is-inside', mark.inside);
-    marker.style.top = (mark.y - border) + 'px';
-    form.appendChild(marker);
+    if (mark.inside) {
+      marker.classList.add('is-inside');
+      marker.style.top = (mark.y + shift - border) + 'px';
+      form.appendChild(marker);
+    } else {
+      const left = mark.y - mark.top;                 // what was left of the page under the block
+      // The gap goes in above the block's own top margin, so the line sits that much further down
+      const margin = parseFloat(getComputedStyle(mark.block).marginTop) || 0;
+      marker.classList.add('is-gap');
+      marker.style.setProperty('--line', (left + margin) + 'px');
+      marker.style.height = (left + PAGE_GAP_PX) + 'px';
+      form.insertBefore(marker, mark.block);
+      shift += left + PAGE_GAP_PX;
+    }
   });
 }
 

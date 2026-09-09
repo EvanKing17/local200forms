@@ -1619,7 +1619,7 @@ input[type="radio"] { width: 15px; height: 15px; }
 .dc-compact-head .dc-head-text { min-width: 0; }
 .dc-compact-head .dc-logo { width: 85.333px; }              /* 64pt WITNESS_LOGO_W */
 .dc-compact-head .dc-doc-note { margin-top: 2px; text-align: left; font-size: 11.333px; }
-.dc-compact-head + .dc-doc-rule { margin: 8px 0 14px; }
+.dc-compact-head + .dc-doc-rule { margin: 8px 0 0; }        /* the first band sits on the rule */
 
 /* ---------- Yes/No question rows ---------- */
 .dc-question {
@@ -1873,43 +1873,36 @@ input[type="radio"] { width: 15px; height: 15px; }
 }
 
 /* ---------- Page-break markers ---------- */
-/* Drawn across the sheet where the printed page ends, through a text box when that is where
-   it falls. Absolutely placed, so it shifts nothing under it. */
+/* Where the printed page ends. Through a text box it is a line laid over the text; in front of
+   a block that moves to the next page it is a real gap, the height of what was left on the
+   page, so the block sits below the line on screen as it does on paper. --line is where the
+   line falls inside a gap. */
 .dc-break {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  pointer-events: none;
+}
+.dc-break.is-inside {
   position: absolute;
   left: 0;
   right: 0;
-  z-index: 2;
   height: 0;
-  margin: 0;
-  border-top: 1px dashed var(--dc-primary);
-  pointer-events: none;
 }
+.dc-break-line {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: var(--line, 0px);
+  border-top: 1px dashed var(--dc-primary);
+}
+.dc-break.is-inside .dc-break-line { left: 0; right: 0; }
 
+.dc-break-tag,
 .dc-break-initials {
   position: absolute;
-  right: 72px;
-  bottom: 6px;
-  padding-right: 110px;
-  border-bottom: 1px solid var(--dc-ink);
-  font-family: Helvetica, Arial, sans-serif;
-  font-size: 8.667px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--dc-label);
-  white-space: nowrap;
-}
-
-.dc-break-tag {
-  position: absolute;
-  top: 50%;
-  right: 0;
+  top: var(--line, 0px);
   transform: translateY(-50%);
-  background: var(--dc-primary);
-  color: #fff;
-  border-radius: 3px;
-  padding: 2px 8px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 9px;
   font-weight: 700;
@@ -1917,6 +1910,30 @@ input[type="radio"] { width: 15px; height: 15px; }
   text-transform: uppercase;
   white-space: nowrap;
 }
+.dc-break-tag {
+  right: 0;
+  background: var(--dc-primary);
+  color: #fff;
+  border-radius: 3px;
+  padding: 2px 8px;
+}
+.dc-break-initials {
+  right: 68px;
+  padding: 2px 6px;
+  background: #fff;
+  color: var(--dc-label);
+  border: 1px dashed var(--dc-border);
+  border-radius: 3px;
+}
+.dc-break-initials::after {
+  content: "";
+  display: inline-block;
+  width: 90px;
+  margin-left: 6px;
+  border-bottom: 1px solid var(--dc-ink);
+  vertical-align: baseline;
+}
+
 
 /* ---------- Update banner ---------- */
 .update-banner {
