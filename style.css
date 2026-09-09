@@ -939,6 +939,17 @@ input[type="radio"] { width: 15px; height: 15px; }
 .dc-sig-add:hover { text-decoration: underline; }
 .dc-sig-add:disabled { color: var(--c-text-faint); cursor: default; text-decoration: none; }
 
+/* The statement box: prose weight, with bold and italic where the writer put them */
+.dc-box .dc-rich {
+  font-weight: 400;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  outline: none;
+}
+.dc-rich b, .dc-rich strong { font-weight: 700; }
+.dc-rich i, .dc-rich em { font-style: italic; }
+.dc-rich:focus { background: var(--dc-field-bg); border-radius: 2px; }
+
 /* ---------- Form chrome: title bar and ribbon ----------
  * A navy title bar with the document's name, then a white ribbon of labelled commands in
  * named groups, the way Office lays out a document window. Sticky as one block: everything

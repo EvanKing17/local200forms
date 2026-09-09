@@ -1346,7 +1346,7 @@ function buildWitnessDoc(data) {
   y += 14;
 
   // ---- The statement, at whatever length it runs to ----
-  y = flowTextBox(doc, marginX, y, W, 'Statement:', data.statement, 240);
+  y = flowRichBox(doc, marginX, y, W, 'Statement:', data.statement, 240);
   y += 18;
 
   // ---- Who signs it. The band and its first line stay together on a page ----
@@ -1418,6 +1418,252 @@ function signatureLine(doc, x, y, w, row) {
 }
 
 const witnessForm = document.getElementById('witnessForm');
+
+/* ============ Rich text: the statement keeps its bold, italic and paragraphs ============
+ *
+ * A statement is usually typed up elsewhere first and pasted in, and what Word or Google Docs
+ * put on the clipboard carries its bold, italic and paragraph breaks. The box keeps them. Under
+ * the box the statement is kept as Markdown in an ordinary field, so the draft, the .grv, the
+ * Word text and the PDF's own copy of the data are all still plain text: **bold**, *italic*,
+ * one line per paragraph, a blank line where there was an empty one.
+ */
+function escapeHtml(text) {
+  return String(text).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+/* One line of Markdown as runs of text, each knowing whether it is bold or italic */
+function parseInlineMarkdown(line) {
+  const runs = [];
+  const re = /\*\*(.+?)\*\*|(^|[^\w*])\*([^*\n]+?)\*(?!\w)|(^|[^\w_])_([^_\n]+?)_(?!\w)/g;
+  let at = 0, m;
+  while ((m = re.exec(line))) {
+    const lead = m[2] !== undefined ? m[2] : (m[4] !== undefined ? m[4] : '');
+    const start = m.index + lead.length;
+    if (start > at) runs.push({ text: line.slice(at, start), bold: false, italic: false });
+    if (m[1] !== undefined) {
+      // bold, which may itself hold an italic run
+      parseInlineMarkdown(m[1]).forEach(r => runs.push({ text: r.text, bold: true, italic: r.italic }));
+    } else {
+      runs.push({ text: m[3] !== undefined ? m[3] : m[5], bold: false, italic: true });
+    }
+    at = m.index + m[0].length;
+  }
+  if (at < line.length) runs.push({ text: line.slice(at), bold: false, italic: false });
+  return runs;
+}
+
+function markdownToHtml(md) {
+  if (!String(md || '').trim()) return '';              // nothing typed is an empty box, not one blank line
+  return String(md || '').replace(/\r/g, '').split('\n').map(line => {
+    if (!line.trim()) return '<div><br></div>';
+    const html = parseInlineMarkdown(line).map(r => {
+      let t = escapeHtml(r.text);
+      if (r.italic) t = '<i>' + t + '</i>';
+      if (r.bold) t = '<b>' + t + '</b>';
+      return t;
+    }).join('');
+    return '<div>' + html + '</div>';
+  }).join('');
+}
+
+/*
+ * Markup back to Markdown: the box's own contents after typing, or whatever the clipboard
+ * brought. Word says bold with <b>; Google Docs says it with a font-weight on a span, and wraps
+ * the whole paste in a <b> that its own style sets back to normal, so the style is believed
+ * over the tag whenever it says anything.
+ */
+const RICH_BLOCK = /^(P|DIV|LI|H[1-6]|BLOCKQUOTE|TR|UL|OL|SECTION|ARTICLE|TABLE|PRE|DL|DT|DD)$/;
+
+function htmlToMarkdown(root) {
+  const lines = [[]];
+  const cur = () => lines[lines.length - 1];
+  const push = (text, bold, italic) => {
+    const line = cur();
+    const last = line[line.length - 1];
+    if (last && last.bold === bold && last.italic === italic) last.text += text;
+    else line.push({ text, bold, italic });
+  };
+  const newline = () => lines.push([]);
+
+  function styleOf(el, bold, italic) {
+    const tag = el.tagName;
+    const st = el.style || {};
+    const weight = st.fontWeight;
+    let b = bold, i = italic;
+    if (weight && weight !== 'inherit' && weight !== 'initial') b = weight === 'bold' || weight === 'bolder' || parseInt(weight, 10) >= 600;
+    else if (tag === 'B' || tag === 'STRONG' || /^H[1-6]$/.test(tag)) b = true;
+    const slant = st.fontStyle;
+    if (slant && slant !== 'inherit' && slant !== 'initial') i = slant === 'italic' || slant === 'oblique';
+    else if (tag === 'I' || tag === 'EM') i = true;
+    return { bold: b, italic: i };
+  }
+
+  /*
+   * One block is one line, so a block starts a new line only when the current one has had
+   * anything put on it. A <br> on its own inside a block is how an editor shows an empty line
+   * rather than a break, so it only marks the line as present; anywhere else it breaks.
+   */
+  function loneBreak(br) {
+    return Array.from(br.parentNode.childNodes).every(n => n === br || (n.nodeType === 3 && !n.nodeValue.trim()));
+  }
+  function walk(node, bold, italic, pre) {
+    if (node.nodeType === 3) {
+      const text = pre ? node.nodeValue : node.nodeValue.replace(/[\r\n\t]+/g, ' ');
+      if (text) push(text.replace(/\u00a0/g, ' '), bold, italic);
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName;
+    if (tag === 'BR') { if (loneBreak(node)) push('', false, false); else newline(); return; }
+    if (tag === 'STYLE' || tag === 'SCRIPT' || tag === 'META' || tag === 'TITLE' || tag === 'HEAD') return;
+    const { bold: b, italic: i } = styleOf(node, bold, italic);
+    if (RICH_BLOCK.test(tag) && cur().length) newline();
+    if (tag === 'LI') push('- ', false, false);
+    node.childNodes.forEach(child => walk(child, b, i, pre || tag === 'PRE'));
+  }
+  walk(root, false, false, false);
+
+  const out = lines.map(runs => runs.map(r => {
+    if (!r.text.trim()) return r.text;
+    const lead = r.text.match(/^\s*/)[0];
+    const trail = r.text.match(/\s*$/)[0];
+    let mid = r.text.trim();
+    if (r.italic) mid = '*' + mid + '*';
+    if (r.bold) mid = '**' + mid + '**';
+    return lead + mid + trail;
+  }).join('').replace(/\s+$/, '').replace(/^ +/, ''));
+  // Blank lines in the middle are the paragraph spacing; blank lines at the ends are nothing
+  while (out.length && !out[out.length - 1]) out.pop();
+  while (out.length && !out[0]) out.shift();
+  return out.join('\n');
+}
+
+/* The field under a box, which is what the form actually submits */
+function richField(box) {
+  return box.parentNode.querySelector('textarea[name]');
+}
+
+function syncRichToField(box) {
+  const field = richField(box);
+  if (field) field.value = htmlToMarkdown(box);
+}
+
+/* Fills every rich box on a form from its field: after a draft, a file, or a clear */
+function syncRichFields(form) {
+  form.querySelectorAll('.dc-rich').forEach(box => {
+    const field = richField(box);
+    box.innerHTML = field ? markdownToHtml(field.value) : '';
+    autoGrow(box);
+  });
+}
+
+/* Puts Markdown into the box at the caret, or at the end if the caret is elsewhere */
+function insertMarkdown(box, md) {
+  const html = markdownToHtml(md);
+  const sel = window.getSelection();
+  const inBox = sel && sel.rangeCount && box.contains(sel.getRangeAt(0).commonAncestorContainer);
+  let done = false;
+  if (inBox && document.execCommand) {
+    try { done = document.execCommand('insertHTML', false, html); } catch { done = false; }
+  }
+  if (!done) box.insertAdjacentHTML('beforeend', html);
+  syncRichToField(box);
+  box.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+document.querySelectorAll('.dc-rich').forEach(box => {
+  box.addEventListener('input', () => syncRichToField(box));
+  box.addEventListener('paste', (e) => {
+    const data = e.clipboardData;
+    if (!data) return;
+    const html = data.getData('text/html');
+    const text = data.getData('text/plain');
+    if (!html && !text) return;
+    e.preventDefault();
+    const md = html ? htmlToMarkdown(new DOMParser().parseFromString(html, 'text/html').body) : text;
+    insertMarkdown(box, md);
+  });
+});
+
+/* ---------- The same text in the PDF, bold and italic where it was ---------- */
+function richFontStyle(run) {
+  return run.bold && run.italic ? 'bolditalic' : run.bold ? 'bold' : run.italic ? 'italic' : 'normal';
+}
+
+/* Lines of styled words that fit `maxWidth`, one paragraph per Markdown line; empty stays empty */
+function richLines(doc, md, maxWidth, size) {
+  doc.setFontSize(size);
+  const lines = [];
+  String(md || '').replace(/\r/g, '').split('\n').forEach(paragraph => {
+    const words = [];
+    parseInlineMarkdown(paragraph).forEach(run => {
+      run.text.split(/(\s+)/).forEach(part => {
+        if (part) words.push({ text: part, bold: run.bold, italic: run.italic, space: /^\s+$/.test(part) });
+      });
+    });
+    let line = [], width = 0;
+    words.forEach(word => {
+      doc.setFont('helvetica', richFontStyle(word));
+      const w = doc.getTextWidth(word.text);
+      if (!word.space && line.length && width + w > maxWidth) { lines.push(line); line = []; width = 0; }
+      if (word.space && !line.length) return;        // a wrapped line does not start with a space
+      line.push({ ...word, width: w });
+      width += w;
+    });
+    lines.push(line);
+  });
+  return lines;
+}
+
+function drawRichLine(doc, x, y, line) {
+  let px = x;
+  line.forEach(word => {
+    doc.setFont('helvetica', richFontStyle(word));
+    if (!word.space) doc.text(word.text, px, y);
+    px += word.width;
+  });
+}
+
+/* flowTextBox for a statement with emphasis in it: the same box, running over pages the same way */
+function flowRichBox(doc, x, y, w, label, md, minH = 26) {
+  const fontSize = 9.5, lineHeight = 12;
+  doc.setTextColor(...DC.ink);
+  const allLines = richLines(doc, md, w - CELL_X * 2, fontSize);
+  let idx = 0, currentY = y, first = true;
+  do {
+    if (currentY + 6 + minH > PAGE_BOTTOM) {
+      doc.addPage();
+      currentY = 40;
+    }
+    let boxY = currentY;
+    if (label) {
+      const text = first ? label : label.replace(/:\s*$/, '') + ' (continued):';
+      setLabelStyle(doc);
+      doc.text(text.replace(/:\s*$/, '').toUpperCase(), x, currentY);
+      clearLabelStyle(doc);
+      boxY = currentY + 6;
+    }
+    const availH = PAGE_BOTTOM - boxY;
+    const maxLines = Math.max(1, Math.floor((availH - 10) / lineHeight));
+    const remaining = allLines.length - idx;
+    const linesThisBox = Math.max(1, Math.min(remaining, maxLines));
+    const boxH = Math.min(availH, Math.max(minH, linesThisBox * lineHeight + 10));
+    doc.setDrawColor(...DC.border);
+    doc.setLineWidth(0.75);
+    doc.roundedRect(x, boxY, w, boxH, DC_RADIUS, DC_RADIUS);
+    doc.setFontSize(fontSize);
+    doc.setTextColor(...DC.ink);
+    allLines.slice(idx, idx + linesThisBox).forEach((line, i) => drawRichLine(doc, x + CELL_X, boxY + 14 + i * lineHeight, line));
+    idx += linesThisBox;
+    currentY = boxY + boxH;
+    first = false;
+    if (idx < allLines.length) {
+      doc.addPage();
+      currentY = 40;
+    }
+  } while (idx < allLines.length);
+  return currentY;
+}
 
 witnessForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -2407,6 +2653,7 @@ function clearForm(form) {
   // Clearing starts the next grievance, and it's still you filing it
   applyRememberedSubmitter(form);
   applyFormDefaults(form);
+  syncRichFields(form);
   form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
   if (currentFormType) {
     discardDraft(currentFormType);
@@ -2429,6 +2676,7 @@ function populateForm(form, data) {
     }
   });
   syncSignatureRows(form);
+  syncRichFields(form);
 }
 
 function showForm(type, data) {
@@ -3592,6 +3840,7 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
   form.addEventListener('reset', () => {
     setTimeout(() => {
       form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
+      syncRichFields(form);
       form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
     }, 0);
   });

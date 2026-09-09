@@ -396,6 +396,7 @@ function run(win, doc) {
   function fieldNames(win, form) {
     return win.navigableFields(form).map(el => {
       if (el.name) return el.name;
+      if (el.dataset && el.dataset.field) return el.dataset.field;   // a rich box stands in for its field
       const picker = el.closest('.datepicker');
       const hidden = picker && picker.querySelector('input[type=hidden]');
       return hidden ? hidden.name : el.className.split(' ')[0];
@@ -1336,7 +1337,7 @@ function run(win, doc) {
     win.showForm('witness');
     win.clearForm(form);
     form.elements.statement.value = Array.from({ length: 60 }, (_, i) => 'Line ' + i + ' of what was seen.').join('\n');
-    form.elements.statement.dispatchEvent(new win.Event('input', { bubbles: true }));
+    win.syncRichFields(form);                       // the box follows its field, as after a draft
     win.updatePageBreaks('witness');
     const marks = form.querySelectorAll('.dc-break');
     const inside = marks.length === 1 && marks[0].classList.contains('is-inside');
@@ -1351,6 +1352,43 @@ function run(win, doc) {
     win.showHome();
     return (inside && throughBox && asksInitials && printed) ||
       { detail: 'marks=' + marks.length + ' inside=' + inside + ' throughBox=' + throughBox + ' initials=' + asksInitials + ' printed=' + printed };
+  });
+
+  check(g9c, 'A paste from Word keeps its bold, italic and paragraphs, and the PDF draws them', () => {
+    const form = doc.getElementById('witnessForm');
+    win.showForm('witness');
+    win.clearForm(form);
+    const box = form.querySelector('.dc-rich');
+    const data = new win.DataTransfer();
+    data.setData('text/html', '<html><body><p class=MsoNormal>He said <b>no</b> twice.</p><p class=MsoNormal>&nbsp;</p>' +
+      '<p class=MsoNormal><span style="font-style:italic">Then</span> he <span style="font-weight:700">left</span>.</p></body></html>');
+    box.dispatchEvent(new win.ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    const md = form.elements.statement.value;
+    const kept = md === 'He said **no** twice.\n\n*Then* he **left**.';
+    const shown = box.querySelectorAll('b').length === 2 && box.querySelectorAll('i').length === 1 &&
+                  box.querySelectorAll('div').length === 3;
+    // Back and forth without loss, so a draft comes back exactly as it was
+    win.syncRichFields(form);
+    const stable = win.htmlToMarkdown(box) === md;
+    const pdf = win.buildWitnessDoc(win.fd(form));
+    const lines = win.richLines(pdf, md, 400, 9.5);
+    const styled = lines[0].some(w => w.text === 'no' && w.bold) && lines[2].some(w => w.text === 'Then' && w.italic) &&
+                   lines[1].length === 0;
+    const raw = atob(pdf.output('datauristring').split(',')[1]);
+    const drawn = raw.indexOf('(no)') !== -1 && raw.indexOf('(Then)') !== -1;
+    win.clearForm(form);
+    const cleared = box.textContent.trim() === '' && form.elements.statement.value === '';
+    win.showHome();
+    return (kept && shown && stable && styled && drawn && cleared) ||
+      { detail: 'md=' + JSON.stringify(md) + ' shown=' + shown + ' stable=' + stable + ' styled=' + styled + ' drawn=' + drawn + ' cleared=' + cleared };
+  });
+
+  check(g9c, 'A Google Docs paste is read by its styles, not its wrapping tag', () => {
+    const body = new win.DOMParser().parseFromString(
+      '<b style="font-weight:normal" id="docs-internal-guid"><p><span style="font-weight:400">Plain </span>' +
+      '<span style="font-weight:700">heavy</span><span style="font-style:italic;font-weight:400"> slanted</span></p></b>', 'text/html').body;
+    const md = win.htmlToMarkdown(body);
+    return md === 'Plain **heavy** *slanted*' || { detail: JSON.stringify(md) };
   });
 
   const g9d = group('Cover page');
