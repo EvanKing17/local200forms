@@ -2,8 +2,34 @@
 
 Working notes, not documentation. `README.md` describes what the app already does.
 
-Current build: **v71**, committed, not yet pushed. v70 is what is deployed and what Evan is
-testing.
+Current build: **v85**, pushed and deployed 2026-09-09. Nothing is queued.
+
+---
+
+## Done 2026-09-09
+
+- **v72 to v77 — chrome fixes and names.** The redesigned form list could not open a form
+  (flex beat the hidden attribute); download names are now who, form, date; the forms are
+  named Monetary Grievance, Policy Grievance, Plant Committee Fact Sheet, 4.01 Investigation
+  Form; forms.config.js carries a ?v= so a rename is not stuck behind the cache. v73 and v75
+  were bump-only builds from a scripting slip.
+- **v78 — Mark-up editor.** Select tool with handles, marquee and Shift-click, move, resize,
+  delete, duplicate, nudge; a Note tool with wrapped text that exports as real Helvetica
+  text; undo covers every change. Pictures are re-encoded at 2000px JPEG on the way into the
+  PDF, which took a six-photo grievance from 25MB to a few, and bakes in camera rotation.
+- **v79 to v82 — Witness Statement.** Fifth form on Local 200 paper: statement RE, date
+  taken, given by, taken by, a statement that flows over pages, and signature lines as three
+  underlines with the caption under each; Witness first, Union Rep second, up to six lines,
+  dates defaulting to today. Multi-page statements are initialled on every page but the
+  signed one and carry a page count. Compact header. Cover page under Tools.
+- **v83 to v85 — Rich statement.** The statement box keeps bold, italic and paragraphs
+  pasted from Word or Google Docs (held as Markdown in the field underneath), the PDF draws
+  the runs in matching faces, and pasted paragraphs keep one blank line between. Page-break
+  lines on screen now lay pages out as the PDF does: a moved block gets a real gap in front of
+  it, and the signature band and lines move as one.
+
+Test suite: 208/208 at v83. v84 and v85 went out on previews only, by Evan's instruction for
+minor changes.
 
 ---
 
