@@ -263,7 +263,9 @@ document.addEventListener('keydown', (e) => {
 const MONTH_NAMES_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_NAMES_SHORT = MONTH_NAMES_FULL.map(m => m.slice(0, 3));
 
-function buildFilename(name, formTypeLabel, occurredIso) {
+/* "Evan King - Fact Sheet August 26 2026.pdf": who, which form, when. The form is named the
+   way the config names it, so a folder of downloads reads the same as the form list. */
+function buildFilename(name, formTitle, occurredIso) {
   // The date of the incident, not the day the PDF happened to be made — a grievance gets
   // reprinted and refiled, and it's the occurrence that identifies it. Falls back to today
   // when the incident date hasn't been filled in yet.
@@ -278,7 +280,8 @@ function buildFilename(name, formTypeLabel, occurredIso) {
     dateStr = `${MONTH_NAMES_FULL[today.getMonth()]} ${today.getDate()} ${today.getFullYear()}`;
   }
   const safeName = (name || 'Unnamed').trim().replace(/[\\/:*?"<>|]/g, '') || 'Unnamed';
-  return `${safeName} - ${dateStr} ${formTypeLabel}.pdf`;
+  const safeTitle = String(formTitle || '').trim().replace(/[\\/:*?"<>|]/g, '');
+  return `${safeName} - ${safeTitle} ${dateStr}.pdf`;
 }
 
 const FORM_SIGNATURE = 'local200forms-v1';
@@ -901,7 +904,7 @@ fordForm.addEventListener('submit', (e) => {
   confirmFlags('ford', () => {
     const data = fd(e.target);
     const doc = buildFordDoc(data);
-    openWithAttachments(doc, 'ford', buildFilename(data.employeeName, 'Grievance Claim', data.dateIncident));
+    openWithAttachments(doc, 'ford', buildFilename(data.employeeName, FORMS_CONFIG.ford.title, data.dateIncident));
   });
 });
 
@@ -982,7 +985,7 @@ policyForm.addEventListener('submit', (e) => {
   confirmFlags('policy', () => {
     const data = fd(e.target);
     const doc = buildPolicyDoc(data);
-    openWithAttachments(doc, 'policy', buildFilename(data.employeeName, 'Policy Grievance', data.dateIncident));
+    openWithAttachments(doc, 'policy', buildFilename(data.employeeName, FORMS_CONFIG.policy.title, data.dateIncident));
   });
 });
 
@@ -1214,7 +1217,7 @@ uniforForm.addEventListener('submit', (e) => {
   confirmFlags('unifor', () => {
     const data = fd(e.target);
     const doc = buildUniforDoc(data);
-    openWithAttachments(doc, 'unifor', buildFilename(data.grievorName, 'Fact Sheet', data.uniforDateIncident));
+    openWithAttachments(doc, 'unifor', buildFilename(data.grievorName, FORMS_CONFIG.unifor.title, data.uniforDateIncident));
   });
 });
 
@@ -1279,7 +1282,7 @@ investigationForm.addEventListener('submit', (e) => {
   confirmFlags('investigation', () => {
     const data = fd(e.target);
     const doc = buildInvestigationDoc(data);
-    openWithAttachments(doc, 'investigation', buildFilename(data.supervisorName, 'Investigation Form', data.dateInfraction));
+    openWithAttachments(doc, 'investigation', buildFilename(data.supervisorName, FORMS_CONFIG.investigation.title, data.dateInfraction));
   });
 });
 
@@ -2201,7 +2204,9 @@ function saveGrv(type) {
   const form = FORM_BUILDERS[type].form;
   const payload = buildGrv(type);
   const who = (form.elements[KEY_FIELD] && form.elements[KEY_FIELD].value.trim()) || 'Grievance';
-  const name = who.replace(/[\/:*?"<>|]/g, '').trim() + ' - ' + FORM_BUILDERS[type].label + '.grv';
+  // Named the same way as the PDF, less the date: a draft has no filing date yet
+  const title = String(FORMS_CONFIG[type].title || FORM_BUILDERS[type].label).replace(/[\/:*?"<>|]/g, '').trim();
+  const name = who.replace(/[\/:*?"<>|]/g, '').trim() + ' - ' + title + '.grv';
 
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/grievance+json' });
   const url = URL.createObjectURL(blob);

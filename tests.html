@@ -273,19 +273,19 @@ function run(win, doc) {
   });
   check(g5, 'Filename uses the date of the incident, not today', () => {
     const out = win.buildFilename('Jane Doe', 'Fact Sheet', '2026-06-09');
-    return out === 'Jane Doe - June 9 2026 Fact Sheet.pdf' || { detail: out };
+    return out === 'Jane Doe - Fact Sheet June 9 2026.pdf' || { detail: out };
   });
   check(g5, 'Filename falls back to today when no incident date is set', () => {
     const out = win.buildFilename('Jane Doe', 'Fact Sheet', '');
-    return /^Jane Doe - \w+ \d+ \d{4} Fact Sheet\.pdf$/.test(out) || { detail: out };
+    return /^Jane Doe - Fact Sheet \w+ \d+ \d{4}\.pdf$/.test(out) || { detail: out };
   });
   check(g5, 'The incident date is not shifted by time zone', () => {
     // Parsed from the string; new Date('2026-01-01') would be the 31st west of UTC
     const out = win.buildFilename('X', 'Y', '2026-01-01');
-    return out === 'X - January 1 2026 Y.pdf' || { detail: out };
+    return out === 'X - Y January 1 2026.pdf' || { detail: out };
   });
   check(g5, 'Filename uses the spelled-out date', () =>
-    /^Jane - \w+ \d+ \d{4} Fact Sheet\.pdf$/.test(win.buildFilename('Jane', 'Fact Sheet')) ||
+    /^Jane - Fact Sheet \w+ \d+ \d{4}\.pdf$/.test(win.buildFilename('Jane', 'Fact Sheet')) ||
     { detail: win.buildFilename('Jane', 'Fact Sheet') });
 
   const g6 = group('Page breaks');
