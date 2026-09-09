@@ -1288,7 +1288,7 @@ document.getElementById('investigationClear').addEventListener('click', () => {
  */
 const SIG_MAX = 6;
 const SIG_DEFAULT_ROWS = 2;
-const SIG_ROW_H = 44;            // pt: room for an actual signature
+const SIG_ROW_H = 52;            // pt: room to sign above the line, and the caption under it
 
 function drawWitnessHeader(doc, marginX, W) {
   const top = UNIFOR_HEADER_TOP;
@@ -1357,16 +1357,42 @@ function buildWitnessDoc(data) {
   y += 10;
   rows.forEach(row => {
     if (y + SIG_ROW_H > PAGE_BOTTOM) { doc.addPage(); y = 40; }
-    y = boxedGrid(doc, marginX, y, W, [
-      { label: (row.role || '').trim() || 'Signed By', value: row.name, width: W * 0.4 },
-      { label: 'Signature', value: '', width: W * 0.35 },
-      { label: 'Date', value: fmtDateFit(doc, row.date, W * 0.25 - CELL_X * 2), width: W * 0.25 },
-    ], SIG_ROW_H);
-    y += 8;
+    y = signatureLine(doc, marginX, y, W, row);
   });
 
   embedFormData(doc, 'witness', data);
   return doc;
+}
+
+/*
+ * Three lines across: name, signature, date. What is typed sits on the line and the caption
+ * sits under it, the way a form you sign by hand is laid out. The signature line is left for
+ * the pen.
+ */
+function signatureLine(doc, x, y, w, row) {
+  const gap = 18;
+  const widths = [0.4, 0.35, 0.25].map(f => (w - gap * 2) * f);
+  const lineY = y + 35;
+  const parts = [
+    { label: (row.role || '').trim() || 'Signed By', value: row.name || '' },
+    { label: 'Signature', value: '' },
+    { label: 'Date', value: fmtDateFit(doc, row.date, widths[2]) },
+  ];
+  let px = x;
+  parts.forEach((part, i) => {
+    doc.setDrawColor(...DC.ink);
+    doc.setLineWidth(0.75);
+    doc.line(px, lineY, px + widths[i], lineY);
+    if (part.value) {
+      setValueStyle(doc, 9.5);
+      doc.text(doc.splitTextToSize(part.value, widths[i])[0], px + 2, lineY - 4);
+    }
+    setLabelStyle(doc);
+    doc.text(part.label.toUpperCase(), px, lineY + 9);
+    clearLabelStyle(doc);
+    px += widths[i] + gap;
+  });
+  return y + SIG_ROW_H;
 }
 
 const witnessForm = document.getElementById('witnessForm');
@@ -1473,7 +1499,7 @@ function formDefaults(form) {
   if (form !== witnessForm) return {};
   const today = dateKeyLocal(new Date());
   const defaults = { sigLines: String(SIG_DEFAULT_ROWS), dateTaken: today, sig1Date: today, sig2Date: today };
-  for (let i = 1; i <= SIG_MAX; i++) defaults['sig' + i + 'Role'] = i === 1 ? 'Union Rep' : 'Witness';
+  for (let i = 1; i <= SIG_MAX; i++) defaults['sig' + i + 'Role'] = i === 2 ? 'Union Rep' : 'Witness';
   return defaults;
 }
 

@@ -390,7 +390,7 @@ function run(win, doc) {
     investigation: ['step','supervisorName','area','deptNum','dateInfraction','time','dateFiled',
                     'witnessNames','uniforRep','hrRep','investigation','supervisorRemarks','resolution'],
     witness: ['statementRe','dateTaken','givenBy','takenBy','statement',
-              'sig1Role','sig1Name','sig1Date','sig2Role','sig2Name','sig2Date'],
+              'sig1Name','sig1Role','sig1Date','sig2Name','sig2Role','sig2Date'],
   };
 
   function fieldNames(win, form) {
@@ -1249,7 +1249,7 @@ function run(win, doc) {
     const today = win.dateKeyLocal(new Date());
     const data = win.fd(form);
     const dated = data.dateTaken === today && data.sig1Date === today && data.sig2Date === today;
-    const roles = data.sig1Role === 'Union Rep' && data.sig2Role === 'Witness';
+    const roles = data.sig1Role === 'Witness' && data.sig2Role === 'Union Rep';
     const showing = form.querySelectorAll('[data-sig-row]:not([hidden])').length;
     const empty = !win.formHasContent('witness');
     win.showHome();

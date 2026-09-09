@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=79">
+<link rel="stylesheet" href="style.css?v=81">
 </head>
 <body>
 
@@ -1173,105 +1173,105 @@
       <div class="dc-band dc-block"><span>Signatures</span></div>
       <!-- Six lines are here; sigLines says how many show. See the signature-line code in script.js. -->
       <div class="dc-signatures">
-        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="1">
-          <label>
-            <input class="dc-field-label dc-role-input" name="sig1Role" value="Union Rep" autocomplete="off"
+        <div class="dc-sig-row" data-sig-row="1">
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><textarea class="dc-value" name="sig1Name" rows="1" autocomplete="name" aria-label="Line 1 name"
+                      data-word-label="Line 1 name"></textarea></span>
+            <input class="dc-field-label dc-role-input" name="sig1Role" value="Witness" autocomplete="off"
                    aria-label="Who signs line 1" data-word-label="Line 1 signed by">
-            <textarea class="dc-value" name="sig1Name" rows="1" autocomplete="name" aria-label="Line 1 name"
-                      data-word-label="Line 1 name"></textarea>
           </label>
-          <div class="dc-cell">
+          <div class="dc-sigline" aria-hidden="true">
+            <span class="dc-sigline-write"></span>
             <span class="dc-field-label">Signature</span>
-            <div class="dc-value-blank"></div>
           </div>
-          <label>
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><input type="date" name="sig1Date" data-word-label="Line 1 date"></span>
             <span class="dc-field-label">Date</span>
-            <input type="date" name="sig1Date" data-word-label="Line 1 date">
           </label>
           <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
         </div>
-        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="2">
-          <label>
-            <input class="dc-field-label dc-role-input" name="sig2Role" value="Witness" autocomplete="off"
+        <div class="dc-sig-row" data-sig-row="2">
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><textarea class="dc-value" name="sig2Name" rows="1" autocomplete="name" aria-label="Line 2 name"
+                      data-word-label="Line 2 name"></textarea></span>
+            <input class="dc-field-label dc-role-input" name="sig2Role" value="Union Rep" autocomplete="off"
                    aria-label="Who signs line 2" data-word-label="Line 2 signed by">
-            <textarea class="dc-value" name="sig2Name" rows="1" autocomplete="name" aria-label="Line 2 name"
-                      data-word-label="Line 2 name"></textarea>
           </label>
-          <div class="dc-cell">
+          <div class="dc-sigline" aria-hidden="true">
+            <span class="dc-sigline-write"></span>
             <span class="dc-field-label">Signature</span>
-            <div class="dc-value-blank"></div>
           </div>
-          <label>
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><input type="date" name="sig2Date" data-word-label="Line 2 date"></span>
             <span class="dc-field-label">Date</span>
-            <input type="date" name="sig2Date" data-word-label="Line 2 date">
           </label>
           <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
         </div>
-        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="3">
-          <label>
+        <div class="dc-sig-row" data-sig-row="3">
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><textarea class="dc-value" name="sig3Name" rows="1" autocomplete="name" aria-label="Line 3 name"
+                      data-word-label="Line 3 name"></textarea></span>
             <input class="dc-field-label dc-role-input" name="sig3Role" value="Witness" autocomplete="off"
                    aria-label="Who signs line 3" data-word-label="Line 3 signed by">
-            <textarea class="dc-value" name="sig3Name" rows="1" autocomplete="name" aria-label="Line 3 name"
-                      data-word-label="Line 3 name"></textarea>
           </label>
-          <div class="dc-cell">
+          <div class="dc-sigline" aria-hidden="true">
+            <span class="dc-sigline-write"></span>
             <span class="dc-field-label">Signature</span>
-            <div class="dc-value-blank"></div>
           </div>
-          <label>
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><input type="date" name="sig3Date" data-word-label="Line 3 date"></span>
             <span class="dc-field-label">Date</span>
-            <input type="date" name="sig3Date" data-word-label="Line 3 date">
           </label>
           <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
         </div>
-        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="4">
-          <label>
+        <div class="dc-sig-row" data-sig-row="4">
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><textarea class="dc-value" name="sig4Name" rows="1" autocomplete="name" aria-label="Line 4 name"
+                      data-word-label="Line 4 name"></textarea></span>
             <input class="dc-field-label dc-role-input" name="sig4Role" value="Witness" autocomplete="off"
                    aria-label="Who signs line 4" data-word-label="Line 4 signed by">
-            <textarea class="dc-value" name="sig4Name" rows="1" autocomplete="name" aria-label="Line 4 name"
-                      data-word-label="Line 4 name"></textarea>
           </label>
-          <div class="dc-cell">
+          <div class="dc-sigline" aria-hidden="true">
+            <span class="dc-sigline-write"></span>
             <span class="dc-field-label">Signature</span>
-            <div class="dc-value-blank"></div>
           </div>
-          <label>
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><input type="date" name="sig4Date" data-word-label="Line 4 date"></span>
             <span class="dc-field-label">Date</span>
-            <input type="date" name="sig4Date" data-word-label="Line 4 date">
           </label>
           <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
         </div>
-        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="5">
-          <label>
+        <div class="dc-sig-row" data-sig-row="5">
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><textarea class="dc-value" name="sig5Name" rows="1" autocomplete="name" aria-label="Line 5 name"
+                      data-word-label="Line 5 name"></textarea></span>
             <input class="dc-field-label dc-role-input" name="sig5Role" value="Witness" autocomplete="off"
                    aria-label="Who signs line 5" data-word-label="Line 5 signed by">
-            <textarea class="dc-value" name="sig5Name" rows="1" autocomplete="name" aria-label="Line 5 name"
-                      data-word-label="Line 5 name"></textarea>
           </label>
-          <div class="dc-cell">
+          <div class="dc-sigline" aria-hidden="true">
+            <span class="dc-sigline-write"></span>
             <span class="dc-field-label">Signature</span>
-            <div class="dc-value-blank"></div>
           </div>
-          <label>
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><input type="date" name="sig5Date" data-word-label="Line 5 date"></span>
             <span class="dc-field-label">Date</span>
-            <input type="date" name="sig5Date" data-word-label="Line 5 date">
           </label>
           <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
         </div>
-        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="6">
-          <label>
+        <div class="dc-sig-row" data-sig-row="6">
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><textarea class="dc-value" name="sig6Name" rows="1" autocomplete="name" aria-label="Line 6 name"
+                      data-word-label="Line 6 name"></textarea></span>
             <input class="dc-field-label dc-role-input" name="sig6Role" value="Witness" autocomplete="off"
                    aria-label="Who signs line 6" data-word-label="Line 6 signed by">
-            <textarea class="dc-value" name="sig6Name" rows="1" autocomplete="name" aria-label="Line 6 name"
-                      data-word-label="Line 6 name"></textarea>
           </label>
-          <div class="dc-cell">
+          <div class="dc-sigline" aria-hidden="true">
+            <span class="dc-sigline-write"></span>
             <span class="dc-field-label">Signature</span>
-            <div class="dc-value-blank"></div>
           </div>
-          <label>
+          <label class="dc-sigline">
+            <span class="dc-sigline-write"><input type="date" name="sig6Date" data-word-label="Line 6 date"></span>
             <span class="dc-field-label">Date</span>
-            <input type="date" name="sig6Date" data-word-label="Line 6 date">
           </label>
           <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
         </div>
@@ -1586,9 +1586,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=79"></script>
+<script src="forms.config.js?v=81"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=79"></script>
-<script src="script.js?v=79"></script>
+<script src="annotate.js?v=81"></script>
+<script src="script.js?v=81"></script>
 </body>
 </html>
