@@ -81,6 +81,7 @@ button:focus-visible,
   align-items: stretch;
   min-height: 100vh;
 }
+.home-view[hidden] { display: none; }   /* display: flex would otherwise beat the attribute */
 
 .home-rail {
   position: sticky;
@@ -105,6 +106,7 @@ button:focus-visible,
 
 .rail-item {
   display: flex;
+  flex-direction: row;      /* the Upload entry is a label, and labels stack as a column */
   align-items: center;
   gap: 9px;
   width: 100%;
