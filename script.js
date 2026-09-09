@@ -1779,6 +1779,8 @@ function formDefaults(form) {
   const today = dateKeyLocal(new Date());
   const defaults = { sigLines: String(SIG_DEFAULT_ROWS), dateTaken: today, sig1Date: today, sig2Date: today };
   for (let i = 1; i <= SIG_MAX; i++) defaults['sig' + i + 'Role'] = i === 2 ? 'Union Rep' : 'Witness';
+  const name = rememberedSubmitter();
+  if (name) repNameFields(form).forEach(el => { defaults[el.name] = name; });
   return defaults;
 }
 
@@ -1881,11 +1883,33 @@ function rememberSubmitter(value) {
 
 /* Only fills a blank one — anything already there was either typed or restored from a draft */
 function applyRememberedSubmitter(form) {
-  const field = form && form.elements.submittedBy;
-  if (!field || field.value.trim()) return;
   const name = rememberedSubmitter();
-  if (name) field.value = name;
+  if (!form || !name) return;
+  const field = form.elements.submittedBy;
+  if (field && !field.value.trim()) field.value = name;
+  // On the statement the rep is the one who took it, and signs it on the Union Rep line
+  repNameFields(form).forEach(el => {
+    if (el.value.trim()) return;
+    el.value = name;
+    if (el.classList.contains('dc-value')) autoGrow(el);
+  });
 }
+
+/* The fields on the statement that hold the rep's own name: Taken By, and the name on every
+   signature line whose caption reads Union Rep, wherever that line has been moved to */
+function repNameFields(form) {
+  if (form !== witnessForm) return [];
+  const fields = [form.elements.takenBy];
+  signatureRows(form).forEach(row => {
+    const role = row.querySelector('.dc-role-input');
+    if (role && role.value.trim().toLowerCase() === 'union rep') fields.push(row.querySelector('.dc-value'));
+  });
+  return fields.filter(Boolean);
+}
+
+witnessForm.addEventListener('input', (e) => {
+  if (repNameFields(witnessForm).includes(e.target)) rememberSubmitter(e.target.value);
+});
 
 document.querySelectorAll('[name="submittedBy"]').forEach(field => {
   field.addEventListener('input', () => rememberSubmitter(field.value));
@@ -2662,8 +2686,8 @@ function clearForm(form) {
   });
   form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   // Clearing starts the next grievance, and it's still you filing it
-  applyRememberedSubmitter(form);
   applyFormDefaults(form);
+  applyRememberedSubmitter(form);
   syncRichFields(form);
   form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
   if (currentFormType) {
