@@ -8,7 +8,7 @@
  * CACHE is versioned: bump it whenever a precached file changes, or browsers will keep serving
  * the old copy. Old caches are deleted on activate.
  */
-const VERSION = '76';
+const VERSION = '77';
 const CACHE = 'local200forms-v' + VERSION;
 
 /* Must match the ?v= in index.html — bump both together, or the worker will keep serving the
@@ -19,7 +19,7 @@ const SHELL = [
   './style.css?v=' + VERSION,
   './script.js?v=' + VERSION,
   './annotate.js?v=' + VERSION,
-  './forms.config.js',
+  './forms.config.js?v=' + VERSION,
   './unifor-logo.js',
   './jspdf.umd.min.js',
   './vendor/pdf.min.mjs',
