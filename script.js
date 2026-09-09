@@ -9,25 +9,13 @@ const panels = document.querySelectorAll('.form-panel');
  * in Chrome/Edge under file://, but a <script src> tag loads local files fine regardless.
  */
 const DEFAULT_FORMS_CONFIG = {
-  ford: {
-    title: 'Grievance Investigation & Claim Form',
-    homeLabel: 'Grievance Investigation & Claim Form',
-    homeSub: 'Ford — Section A intake',
-  },
-  policy: {
-    title: 'Policy Grievance Form',
-    homeLabel: 'Policy Grievance Form',
-    homeSub: 'Ford — policy grievance',
-  },
-  unifor: {
-    title: 'Local 200 Grievance Committee Fact Sheet',
-    homeLabel: 'Local 200 Fact Sheet',
-    homeSub: 'Unifor — first stage appeal',
-  },
+  ford: { title: 'Monetary Grievance', homeLabel: 'Monetary Grievance', homeSub: '' },
+  policy: { title: 'Policy Grievance', homeLabel: 'Policy Grievance', homeSub: '' },
+  unifor: { title: 'Plant Committee Fact Sheet', homeLabel: 'Plant Committee Fact Sheet', homeSub: '' },
   investigation: {
     title: '4.01 Investigation Form',
     homeLabel: '4.01 Investigation Form',
-    homeSub: 'Workplace incident intake',
+    homeSub: 'Work done by a supervisor or other salaried member',
   },
 };
 const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };

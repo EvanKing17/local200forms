@@ -2227,7 +2227,8 @@ function run(win, doc) {
       const bytes = new Uint8Array(win.buildFordDoc(win.fd(ford)).output('arraybuffer'));
       const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
       const items = (await (await pdf.getPage(1)).getTextContent()).items;
-      const title = items.find(i => i.str.indexOf('Grievance Investigation') !== -1);
+      const heading = doc.getElementById('form-ford-heading').textContent.trim();
+      const title = items.find(i => i.str.indexOf(heading) !== -1);
       const parts = items.filter(i => monster.indexOf(i.str.trim()) !== -1 && i.str.trim().length > 3);
       const joined = items.map(i => i.str).join(' ').replace(/\s+/g, ' ');
       return { title, parts, whole: joined.indexOf(name) !== -1,
