@@ -1388,7 +1388,11 @@ function run(win, doc) {
       '<b style="font-weight:normal" id="docs-internal-guid"><p><span style="font-weight:400">Plain </span>' +
       '<span style="font-weight:700">heavy</span><span style="font-style:italic;font-weight:400"> slanted</span></p></b>', 'text/html').body;
     const md = win.htmlToMarkdown(body);
-    return md === 'Plain **heavy** *slanted*' || { detail: JSON.stringify(md) };
+    // Paragraphs set apart by their spacing come through set apart by a blank line
+    const spaced = win.htmlToMarkdown(new win.DOMParser().parseFromString(
+      '<p class=MsoNormal>First.</p><p class=MsoNormal>Second.</p><p class=MsoNormal>&nbsp;</p><p class=MsoNormal>Third.</p>', 'text/html').body);
+    return (md === 'Plain **heavy** *slanted*' && spaced === 'First.\n\nSecond.\n\nThird.') ||
+      { detail: JSON.stringify(md) + ' / ' + JSON.stringify(spaced) };
   });
 
   const g9d = group('Cover page');

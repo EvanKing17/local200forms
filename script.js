@@ -1475,6 +1475,7 @@ const RICH_BLOCK = /^(P|DIV|LI|H[1-6]|BLOCKQUOTE|TR|UL|OL|SECTION|ARTICLE|TABLE|
 
 function htmlToMarkdown(root) {
   const lines = [[]];
+  let afterParagraph = false;     // a <p> just closed: the next block gets a blank line before it
   const cur = () => lines[lines.length - 1];
   const push = (text, bold, italic) => {
     const line = cur();
@@ -1516,9 +1517,19 @@ function htmlToMarkdown(root) {
     if (tag === 'BR') { if (loneBreak(node)) push('', false, false); else newline(); return; }
     if (tag === 'STYLE' || tag === 'SCRIPT' || tag === 'META' || tag === 'TITLE' || tag === 'HEAD') return;
     const { bold: b, italic: i } = styleOf(node, bold, italic);
-    if (RICH_BLOCK.test(tag) && cur().length) newline();
+    /*
+     * A document's paragraphs are set apart by their spacing, not by empty paragraphs, so a
+     * <p> that follows a <p> gets a blank line between: that is the spacing, kept. Our own box
+     * is <div> per line, and those stay one to one.
+     */
+    if (RICH_BLOCK.test(tag)) {
+      if (cur().length) newline();
+      if (afterParagraph) { push('', false, false); newline(); }
+      afterParagraph = false;
+    }
     if (tag === 'LI') push('- ', false, false);
     node.childNodes.forEach(child => walk(child, b, i, pre || tag === 'PRE'));
+    if (tag === 'P' || /^H[1-6]$/.test(tag)) afterParagraph = true;
   }
   walk(root, false, false, false);
 
@@ -1531,10 +1542,11 @@ function htmlToMarkdown(root) {
     if (r.bold) mid = '**' + mid + '**';
     return lead + mid + trail;
   }).join('').replace(/\s+$/, '').replace(/^ +/, ''));
-  // Blank lines in the middle are the paragraph spacing; blank lines at the ends are nothing
-  while (out.length && !out[out.length - 1]) out.pop();
-  while (out.length && !out[0]) out.shift();
-  return out.join('\n');
+  // Blank lines in the middle are the paragraph spacing, one at a time; at the ends they are nothing
+  const kept = out.filter((line, i) => line || (i > 0 && out[i - 1]));
+  while (kept.length && !kept[kept.length - 1]) kept.pop();
+  while (kept.length && !kept[0]) kept.shift();
+  return kept.join('\n');
 }
 
 /* The field under a box, which is what the form actually submits */
