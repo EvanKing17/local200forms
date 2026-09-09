@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=70">
+<link rel="stylesheet" href="style.css?v=71">
 </head>
 <body>
 
@@ -24,59 +24,69 @@
   <span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span>
 </button>
 
-<!-- ================= HOME: FORM LIBRARY ================= -->
+<!-- ================= HOME: FORM LIBRARY =================
+     A navy rail down the left with the odd jobs, and the forms as one numbered list, the way
+     Word's start screen lays out a document library. -->
 <div class="home-view" id="homeView">
-  <h1 class="home-title">Forms</h1>
-
-  <div class="skeleton" id="skeleton" hidden aria-hidden="true"></div>
-
-  <div class="form-cards">
-    <button class="form-card" data-form="ford">
-      <span class="picker-index">01</span>
-      <span class="picker-label">Grievance Investigation &amp; Claim Form</span>
-      <span class="picker-sub">Ford — Section A intake</span>
-    </button>
-    <button class="form-card" data-form="policy">
-      <span class="picker-index">02</span>
-      <span class="picker-label">Policy Grievance Form</span>
-      <span class="picker-sub">Ford — policy grievance</span>
-    </button>
-    <button class="form-card" data-form="unifor">
-      <span class="picker-index">03</span>
-      <span class="picker-label">Local 200 Fact Sheet</span>
-      <span class="picker-sub">Unifor — first stage appeal</span>
-    </button>
-    <button class="form-card" data-form="investigation">
-      <span class="picker-index">04</span>
-      <span class="picker-label">4.01 Investigation Form</span>
-      <span class="picker-sub">Workplace incident intake</span>
-    </button>
-  </div>
-
-  <!-- Opening a PDF is a rare errand, so it doesn't hold a box of its own any more: drop a file
-       anywhere on the page. The file picker stays as a plain link, because a phone or tablet
-       has nothing to drag with. -->
-  <div class="home-actions">
-    <button type="button" class="home-action is-danger" id="clearAllForms" hidden>Clear all forms</button>
-    <button type="button" class="home-action" id="openBuilder">New PDF from images</button>
-    <label class="home-action" for="uploadInput">Upload a PDF</label>
+  <nav class="home-rail" aria-label="Union Forms">
+    <div class="rail-title">Union Forms</div>
+    <span class="rail-item is-current" aria-current="page">Forms</span>
+    <button type="button" class="rail-item" id="openBuilder">New PDF from images</button>
+    <!-- Opening a PDF is a rare errand: drop a file anywhere on the page. The picker stays as a
+         plain control, because a phone or tablet has nothing to drag with. -->
+    <label class="rail-item" for="uploadInput">Upload a PDF</label>
     <input type="file" id="uploadInput" accept="application/pdf,application/json,.json,.grv" hidden>
-  </div>
-  <p class="upload-error" id="uploadError" hidden></p>
-</div>
+    <!-- Odd jobs that aren't filling in a form. One rail entry, because most reps never need any. -->
+    <div class="tools" id="tools" hidden>
+      <button type="button" class="rail-item tools-button" id="toolsButton" aria-expanded="false"
+              aria-haspopup="true" aria-controls="toolsMenu">Tools</button>
+      <div class="tools-menu" id="toolsMenu" hidden role="menu">
+        <button type="button" role="menuitem" data-tool="drot">DROT Audit</button>
+      </div>
+    </div>
+    <span class="rail-spacer"></span>
+    <button type="button" class="rail-item rail-text-size" data-text-size
+            aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span><span class="rail-text-size-label">Larger text</span></button>
+    <!-- Which build this is, for when someone says a fix isn't there yet. Read off the ?v= on
+         script.js so there is nothing extra to remember to bump. -->
+    <span class="app-version" id="appVersion" hidden></span>
+  </nav>
 
-<!-- Which build this is, for when someone says a fix isn't there yet. Read off the ?v= on
-     script.js so there is nothing extra to remember to bump. -->
-<span class="app-version" id="appVersion" hidden></span>
+  <div class="home-main">
+    <h1 class="home-title">Start a form</h1>
+    <p class="home-sub">Drafts save on this device as you type. Drop a finished PDF anywhere to reopen it.</p>
 
-<!-- Odd jobs that aren't filling in a form. Tucked in the corner because most reps never
-     need any of them. -->
-<div class="tools" id="tools" hidden>
-  <div class="tools-menu" id="toolsMenu" hidden role="menu">
-    <button type="button" role="menuitem" data-tool="drot">DROT Audit</button>
+    <div class="skeleton" id="skeleton" hidden aria-hidden="true"></div>
+
+    <div class="form-cards">
+      <button class="form-card" data-form="ford">
+        <span class="picker-index">01</span>
+        <span class="picker-text"><span class="picker-label">Grievance Investigation &amp; Claim Form</span><span class="picker-sub">Ford — Section A intake</span></span>
+        <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+      <button class="form-card" data-form="policy">
+        <span class="picker-index">02</span>
+        <span class="picker-text"><span class="picker-label">Policy Grievance Form</span><span class="picker-sub">Ford — policy grievance</span></span>
+        <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+      <button class="form-card" data-form="unifor">
+        <span class="picker-index">03</span>
+        <span class="picker-text"><span class="picker-label">Local 200 Fact Sheet</span><span class="picker-sub">Unifor — first stage appeal</span></span>
+        <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+      <button class="form-card" data-form="investigation">
+        <span class="picker-index">04</span>
+        <span class="picker-text"><span class="picker-label">4.01 Investigation Form</span><span class="picker-sub">Workplace incident intake</span></span>
+        <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    </div>
+
+    <div class="home-actions">
+      <span class="home-note">…or drop a PDF anywhere on this page to reopen it.</span>
+      <button type="button" class="home-action is-danger" id="clearAllForms" hidden>Clear all forms</button>
+    </div>
+    <p class="upload-error" id="uploadError" hidden></p>
   </div>
-  <button type="button" class="tools-button" id="toolsButton" aria-expanded="false"
-          aria-haspopup="true" aria-controls="toolsMenu">Tools</button>
 </div>
 
 <!-- ================= DROT AUDIT =================
@@ -152,34 +162,54 @@
        the department, so they render as empty boxes with no controls. -->
   <section class="form-panel active" id="form-ford" aria-labelledby="form-ford-heading">
     <div class="dc-toolbar">
-      <button type="button" class="dc-back" data-back-to-forms>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
-        </svg>
-        Forms
-      </button>
-      <div class="dc-tools">
-        <button type="button" class="dc-tool" data-word-out="ford"
-                data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg></button>
-        <button type="button" class="dc-tool" data-word-in="ford"
-                data-tip="Bring back from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Bring back from Word"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg></button>
-        <span class="dc-tool-sep" aria-hidden="true"></span>
-        <button type="button" class="dc-tool" data-markup-form="ford"
-                data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg></button>
-        <button type="button" class="dc-tool" id="fordClear"
-                data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg></button>
-        <span class="dc-tool-sep" aria-hidden="true"></span>
-        <div class="dc-advanced">
-          <button type="button" class="dc-tool" data-advanced="ford" aria-expanded="false"
-                  data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
-          <div class="dc-advanced-menu" data-advanced-menu="ford" hidden>
-            <p class="dc-advanced-head">Advanced</p>
-            <button type="button" data-save-grv="ford">Save as .grv</button>
-          </div>
-        </div>
+      <div class="dc-titlebar">
+        <button type="button" class="dc-back" data-back-to-forms>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+          Forms
+        </button>
+        <span class="dc-titlebar-sep" aria-hidden="true"></span>
+        <span class="dc-titlebar-app">Union Forms</span>
+        <span class="dc-titlebar-doc" data-form-title="ford">Grievance Investigation &amp; Claim Form</span>
+        <span class="dc-titlebar-spacer"></span>
+        <span class="dc-saved" role="status"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Draft saved</span>
+        <button type="button" class="bar-text-size" data-text-size
+                aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span></button>
       </div>
-      <button type="submit" class="btn-primary" form="fordForm">Print/Download PDF</button>
+      <div class="dc-ribbon">
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-word-out="ford"
+                    data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg>Send to Word</button>
+            <button type="button" class="dc-tool" data-word-in="ford"
+                    data-tip="Import from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Import from Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg>Import from Word</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Word</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-markup-form="ford"
+                    data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>Mark up</button>
+            <button type="button" class="dc-tool" id="fordClear"
+                    data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>Clear form</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Document</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row dc-advanced">
+            <button type="button" class="dc-tool" data-advanced="ford" aria-expanded="false"
+                    data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>Advanced</button>
+            <div class="dc-advanced-menu" data-advanced-menu="ford" hidden>
+              <p class="dc-advanced-head">Advanced</p>
+              <button type="button" data-save-grv="ford">Save as .grv</button>
+            </div>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Other</span>
+        </div>
+        <span class="dc-ribbon-spacer"></span>
+        <button type="submit" class="dc-ribbon-print" form="fordForm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print / Download PDF</button>
+      </div>
     </div>
 
     <form id="fordForm" class="dc-page">
@@ -359,34 +389,54 @@
        buildPolicyDoc() is the Ford document without the hours grid or Section D. -->
   <section class="form-panel" id="form-policy" aria-labelledby="form-policy-heading">
     <div class="dc-toolbar">
-      <button type="button" class="dc-back" data-back-to-forms>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
-        </svg>
-        Forms
-      </button>
-      <div class="dc-tools">
-        <button type="button" class="dc-tool" data-word-out="policy"
-                data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg></button>
-        <button type="button" class="dc-tool" data-word-in="policy"
-                data-tip="Bring back from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Bring back from Word"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg></button>
-        <span class="dc-tool-sep" aria-hidden="true"></span>
-        <button type="button" class="dc-tool" data-markup-form="policy"
-                data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg></button>
-        <button type="button" class="dc-tool" id="policyClear"
-                data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg></button>
-        <span class="dc-tool-sep" aria-hidden="true"></span>
-        <div class="dc-advanced">
-          <button type="button" class="dc-tool" data-advanced="policy" aria-expanded="false"
-                  data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
-          <div class="dc-advanced-menu" data-advanced-menu="policy" hidden>
-            <p class="dc-advanced-head">Advanced</p>
-            <button type="button" data-save-grv="policy">Save as .grv</button>
-          </div>
-        </div>
+      <div class="dc-titlebar">
+        <button type="button" class="dc-back" data-back-to-forms>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+          Forms
+        </button>
+        <span class="dc-titlebar-sep" aria-hidden="true"></span>
+        <span class="dc-titlebar-app">Union Forms</span>
+        <span class="dc-titlebar-doc" data-form-title="policy">Policy Grievance Form</span>
+        <span class="dc-titlebar-spacer"></span>
+        <span class="dc-saved" role="status"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Draft saved</span>
+        <button type="button" class="bar-text-size" data-text-size
+                aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span></button>
       </div>
-      <button type="submit" class="btn-primary" form="policyForm">Print/Download PDF</button>
+      <div class="dc-ribbon">
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-word-out="policy"
+                    data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg>Send to Word</button>
+            <button type="button" class="dc-tool" data-word-in="policy"
+                    data-tip="Import from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Import from Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg>Import from Word</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Word</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-markup-form="policy"
+                    data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>Mark up</button>
+            <button type="button" class="dc-tool" id="policyClear"
+                    data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>Clear form</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Document</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row dc-advanced">
+            <button type="button" class="dc-tool" data-advanced="policy" aria-expanded="false"
+                    data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>Advanced</button>
+            <div class="dc-advanced-menu" data-advanced-menu="policy" hidden>
+              <p class="dc-advanced-head">Advanced</p>
+              <button type="button" data-save-grv="policy">Save as .grv</button>
+            </div>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Other</span>
+        </div>
+        <span class="dc-ribbon-spacer"></span>
+        <button type="submit" class="dc-ribbon-print" form="policyForm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print / Download PDF</button>
+      </div>
     </div>
 
     <form id="policyForm" class="dc-page">
@@ -509,34 +559,54 @@
        same repeated SP header and "pg. N / 5" footer the PDF draws. -->
   <section class="form-panel" id="form-unifor" aria-labelledby="form-unifor-heading">
     <div class="dc-toolbar">
-      <button type="button" class="dc-back" data-back-to-forms>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
-        </svg>
-        Forms
-      </button>
-      <div class="dc-tools">
-        <button type="button" class="dc-tool" data-word-out="unifor"
-                data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg></button>
-        <button type="button" class="dc-tool" data-word-in="unifor"
-                data-tip="Bring back from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Bring back from Word"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg></button>
-        <span class="dc-tool-sep" aria-hidden="true"></span>
-        <button type="button" class="dc-tool" data-markup-form="unifor"
-                data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg></button>
-        <button type="button" class="dc-tool" id="uniforClear"
-                data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg></button>
-        <span class="dc-tool-sep" aria-hidden="true"></span>
-        <div class="dc-advanced">
-          <button type="button" class="dc-tool" data-advanced="unifor" aria-expanded="false"
-                  data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
-          <div class="dc-advanced-menu" data-advanced-menu="unifor" hidden>
-            <p class="dc-advanced-head">Advanced</p>
-            <button type="button" data-save-grv="unifor">Save as .grv</button>
-          </div>
-        </div>
+      <div class="dc-titlebar">
+        <button type="button" class="dc-back" data-back-to-forms>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+          Forms
+        </button>
+        <span class="dc-titlebar-sep" aria-hidden="true"></span>
+        <span class="dc-titlebar-app">Union Forms</span>
+        <span class="dc-titlebar-doc" data-form-title="unifor">Local 200 Fact Sheet</span>
+        <span class="dc-titlebar-spacer"></span>
+        <span class="dc-saved" role="status"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Draft saved</span>
+        <button type="button" class="bar-text-size" data-text-size
+                aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span></button>
       </div>
-      <button type="submit" class="btn-primary" form="uniforForm">Print/Download PDF</button>
+      <div class="dc-ribbon">
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-word-out="unifor"
+                    data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg>Send to Word</button>
+            <button type="button" class="dc-tool" data-word-in="unifor"
+                    data-tip="Import from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Import from Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg>Import from Word</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Word</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-markup-form="unifor"
+                    data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>Mark up</button>
+            <button type="button" class="dc-tool" id="uniforClear"
+                    data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>Clear form</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Document</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row dc-advanced">
+            <button type="button" class="dc-tool" data-advanced="unifor" aria-expanded="false"
+                    data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>Advanced</button>
+            <div class="dc-advanced-menu" data-advanced-menu="unifor" hidden>
+              <p class="dc-advanced-head">Advanced</p>
+              <button type="button" data-save-grv="unifor">Save as .grv</button>
+            </div>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Other</span>
+        </div>
+        <span class="dc-ribbon-spacer"></span>
+        <button type="submit" class="dc-ribbon-print" form="uniforForm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print / Download PDF</button>
+      </div>
     </div>
 
     <form id="uniforForm" class="dc-sheets">
@@ -871,34 +941,54 @@
   <!-- ================= 4.01 INVESTIGATION FORM (document view) ================= -->
   <section class="form-panel" id="form-investigation" aria-labelledby="form-investigation-heading">
     <div class="dc-toolbar">
-      <button type="button" class="dc-back" data-back-to-forms>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
-        </svg>
-        Forms
-      </button>
-      <div class="dc-tools">
-        <button type="button" class="dc-tool" data-word-out="investigation"
-                data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg></button>
-        <button type="button" class="dc-tool" data-word-in="investigation"
-                data-tip="Bring back from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Bring back from Word"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg></button>
-        <span class="dc-tool-sep" aria-hidden="true"></span>
-        <button type="button" class="dc-tool" data-markup-form="investigation"
-                data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg></button>
-        <button type="button" class="dc-tool" id="investigationClear"
-                data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg></button>
-        <span class="dc-tool-sep" aria-hidden="true"></span>
-        <div class="dc-advanced">
-          <button type="button" class="dc-tool" data-advanced="investigation" aria-expanded="false"
-                  data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
-          <div class="dc-advanced-menu" data-advanced-menu="investigation" hidden>
-            <p class="dc-advanced-head">Advanced</p>
-            <button type="button" data-save-grv="investigation">Save as .grv</button>
-          </div>
-        </div>
+      <div class="dc-titlebar">
+        <button type="button" class="dc-back" data-back-to-forms>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+          Forms
+        </button>
+        <span class="dc-titlebar-sep" aria-hidden="true"></span>
+        <span class="dc-titlebar-app">Union Forms</span>
+        <span class="dc-titlebar-doc" data-form-title="investigation">4.01 Investigation Form</span>
+        <span class="dc-titlebar-spacer"></span>
+        <span class="dc-saved" role="status"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Draft saved</span>
+        <button type="button" class="bar-text-size" data-text-size
+                aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span></button>
       </div>
-      <button type="submit" class="btn-primary" form="investigationForm">Print/Download PDF</button>
+      <div class="dc-ribbon">
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-word-out="investigation"
+                    data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg>Send to Word</button>
+            <button type="button" class="dc-tool" data-word-in="investigation"
+                    data-tip="Import from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Import from Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg>Import from Word</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Word</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-markup-form="investigation"
+                    data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>Mark up</button>
+            <button type="button" class="dc-tool" id="investigationClear"
+                    data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>Clear form</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Document</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row dc-advanced">
+            <button type="button" class="dc-tool" data-advanced="investigation" aria-expanded="false"
+                    data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>Advanced</button>
+            <div class="dc-advanced-menu" data-advanced-menu="investigation" hidden>
+              <p class="dc-advanced-head">Advanced</p>
+              <button type="button" data-save-grv="investigation">Save as .grv</button>
+            </div>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Other</span>
+        </div>
+        <span class="dc-ribbon-spacer"></span>
+        <button type="submit" class="dc-ribbon-print" form="investigationForm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print / Download PDF</button>
+      </div>
     </div>
 
     <form id="investigationForm" class="dc-page">
@@ -1256,7 +1346,7 @@
 <script src="jspdf.umd.min.js"></script>
 <script src="forms.config.js"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=70"></script>
-<script src="script.js?v=70"></script>
+<script src="annotate.js?v=71"></script>
+<script src="script.js?v=71"></script>
 </body>
 </html>

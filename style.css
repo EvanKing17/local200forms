@@ -72,68 +72,137 @@ button:focus-visible,
 }
 
 /* ---------- Home: form library ---------- */
+/* ---------- Home: rail and form list ----------
+ * A navy rail down the left holds the odd jobs and the text-size control; the forms sit in
+ * the main column as one numbered list, the way an Office start screen lays out documents.
+ */
 .home-view {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 40px) 60px;
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.home-rail {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 224px;
+  height: 100vh;
+  flex-shrink: 0;
+  padding: 26px 18px;
+  background: var(--dc-primary);
+}
+
+.rail-title {
+  color: #fff;
+  font-weight: 700;
+  font-size: 17px;
+  padding: 0 10px 18px;
+}
+
+.rail-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #C8D3E0;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.rail-item:hover { background: rgba(255, 255, 255, 0.10); color: #fff; }
+.rail-item.is-current { color: #fff; background: rgba(255, 255, 255, 0.12); cursor: default; }
+.rail-item:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.rail-spacer { flex: 1; }
+.is-large-text .home-rail { height: 80vh; }   /* 100vh at zoom 1.25 */
+
+.rail-text-size { align-items: baseline; }
+.rail-text-size .tsz-small { font-size: 11px; }
+.rail-text-size .tsz-large { font-size: 16px; }
+.rail-text-size[aria-pressed="true"] { color: #fff; }
+
+.home-main {
+  flex: 1;
+  min-width: 0;
+  max-width: 900px;
+  padding: 34px 36px 60px;
 }
 
 .home-title {
-  font-size: clamp(22px, 3vw, 28px);
+  font-size: 22px;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   color: var(--c-text);
 }
 
 .home-sub {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--c-text-muted);
-  margin: 0 0 28px;
+  margin: 0 0 22px;
 }
 
+/* The list is one white card; each form is a row in it */
 .form-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin-bottom: 32px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 16px;
 }
 
 .form-card {
-  font-family: var(--font-sans);
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-lg);
-  padding: 18px 20px;
-  cursor: pointer;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 15px 18px;
+  font-family: var(--font-sans);
+  background: none;
+  border: none;
+  border-bottom: 1px solid #eceff3;
   color: var(--c-text-muted);
   text-align: left;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
 }
-
-.form-card:hover {
-  border-color: var(--c-accent);
-  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.12);
-}
+.form-card:last-child { border-bottom: none; }
+.form-card:hover { background: #f6f8fb; }
 
 .picker-index {
-  font-size: 11px;
+  width: 22px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--c-text-faint);
 }
 
+.picker-text { min-width: 0; flex: 1; }
+
 .picker-label {
+  display: block;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 14.5px;
   color: var(--c-text);
 }
 
 .picker-sub {
-  font-size: 11.5px;
+  display: block;
+  font-size: 12px;
   color: var(--c-text-faint);
+  margin-top: 1px;
 }
+.picker-sub:empty { display: none; }
+
+.picker-chevron { flex-shrink: 0; color: var(--c-text-faint); }
 
 .upload-error {
   margin: 14px 0 0;
@@ -148,13 +217,18 @@ button:focus-visible,
 
 /* ---------- Workspace ---------- */
 .workspace {
-  padding: clamp(12px, 2vw, 24px) clamp(12px, 3vw, 32px) 60px;
+  padding: 0 0 60px;
 }
 
 .workspace[hidden] { display: none; }
 
-.form-panel { display: none; min-width: 0; position: relative; }   /* the contents rail is placed against the panel */
-.form-panel.active { display: block; }
+.form-panel {
+  display: none;
+  min-width: 0;
+  position: relative;       /* the contents rail is placed against the panel */
+  --panel-pad: clamp(12px, 4vw, 32px);
+}
+.form-panel.active { display: block; padding: 0 var(--panel-pad); }
 
 /* ---------- Sheet / sections ---------- */
 .sheet-header {
@@ -775,6 +849,11 @@ input[type="radio"] { width: 15px; height: 15px; }
 }
 
 
+/* ---------- Form chrome: title bar and ribbon ----------
+ * A navy title bar with the document's name, then a white ribbon of labelled commands in
+ * named groups, the way Office lays out a document window. Sticky as one block: everything
+ * that measures against "the toolbar" (jumps, the contents rail) reads this element's height.
+ */
 .dc-toolbar {
   position: sticky;
   top: 0;
@@ -789,6 +868,98 @@ input[type="radio"] { width: 15px; height: 15px; }
   padding: 12px 0;
   background: var(--c-bg);
 }
+
+.form-panel > .dc-toolbar {
+  display: block;
+  max-width: none;
+  margin: 0 calc(-1 * var(--panel-pad)) 24px;   /* back out the panel's side padding: the chrome runs edge to edge */
+  padding: 0;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.dc-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 5px 12px;
+  background: var(--dc-primary);
+  color: #fff;
+}
+.dc-titlebar .dc-back {
+  margin-right: 0;
+  padding: 6px 10px 6px 8px;
+  font-size: 13px;
+  color: #fff;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 6px;
+}
+.dc-titlebar .dc-back:hover { background: rgba(255, 255, 255, 0.14); color: #fff; border-color: transparent; }
+.dc-titlebar .dc-back:focus-visible { outline-color: #fff; }
+.dc-titlebar-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.28); }
+.dc-titlebar-app { font-weight: 600; font-size: 13px; white-space: nowrap; }
+.dc-titlebar-doc {
+  min-width: 0;
+  font-size: 13px;
+  color: #8FA3BC;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dc-titlebar-doc::before { content: "— "; }
+.dc-titlebar-spacer { flex: 1; }
+.dc-titlebar .bar-text-size { width: 38px; height: 28px; }
+.dc-titlebar .tsz-small { font-size: 10px; }
+.dc-titlebar .tsz-large { font-size: 15px; }
+
+.dc-ribbon {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;          /* a phone can't fit every group on one line */
+  padding: 6px 12px 4px;
+}
+.dc-ribbon-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 6px;
+}
+.dc-ribbon-row { display: flex; gap: 2px; }
+.dc-ribbon-name {
+  margin-top: 2px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+}
+.dc-ribbon-sep { width: 1px; margin: 4px 6px; background: #e9ebee; }
+.dc-ribbon-spacer { flex: 1; }
+
+.dc-ribbon-print {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  align-self: flex-start;
+  width: 96px;
+  height: 68px;
+  padding: 6px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--dc-primary);
+  background: #e8eef5;
+  border: 1px solid #c9d6e4;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dc-ribbon-print:hover { background: #dbe6f2; border-color: #aec2d8; }
 
 .dc-page {
   width: 816px;
@@ -1041,7 +1212,6 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 @media (max-width: 900px) {
   .dc-page { padding: 24px 20px; }
-  .dc-toolbar { padding: 12px 0; }
   .dc-cols-4 { grid-template-columns: repeat(2, 1fr); }
   .dc-cols-211 { grid-template-columns: 1fr; }
   .dc-field-grid > label,
@@ -1675,7 +1845,7 @@ input[type="radio"] { width: 15px; height: 15px; }
 
   .workspace { padding: 0 !important; }
   .form-panel { display: none !important; }
-  .form-panel.active { display: block !important; }
+  .form-panel.active { display: block !important; padding: 0 !important; }
 
   .dc-page {
     width: 816px;              /* 8.5in — the padding below is the PDF's own 40pt margin */
@@ -1717,9 +1887,13 @@ input[type="radio"] { width: 15px; height: 15px; }
 /* ---------- Toolbar status: draft saved, and missing-field notices ---------- */
 .dc-saved,
 .dc-notice {
-  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 12px;
+  color: #D9DFE5;
+  white-space: nowrap;
   opacity: 0;
   transition: opacity 0.2s ease;
   pointer-events: none;
@@ -1727,17 +1901,6 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 .dc-saved.is-visible,
 .dc-notice.is-visible { opacity: 1; }
-
-.dc-saved { color: var(--c-text-faint); }
-
-.dc-notice {
-  color: #8a5a00;
-  background: #fdf6e3;
-  border: 1px solid #f0dfae;
-  border-radius: 999px;
-  padding: 4px 12px;
-  font-weight: 600;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .dc-saved, .dc-notice { transition: none; }
@@ -1771,7 +1934,10 @@ input[type="radio"] { width: 15px; height: 15px; }
   align-items: center;
   gap: 20px;
   flex-wrap: wrap;
+  padding: 0 2px;
 }
+
+.home-note { font-size: 12px; color: var(--c-text-faint); }
 
 .home-action {
   font-family: var(--font-sans);
@@ -1789,6 +1955,24 @@ input[type="radio"] { width: 15px; height: 15px; }
 .home-action:hover { color: var(--c-text); text-decoration-color: currentColor; }
 .home-action.is-danger { color: #b91c1c; }
 .home-action.is-danger:hover { color: #911616; }
+
+/* The rail is a column on a desk and a strip on a phone */
+@media (max-width: 700px) {
+  .home-view { flex-direction: column; }
+  .home-rail {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    width: auto;
+    height: auto;
+    padding: 14px 12px;
+  }
+  .rail-title { width: 100%; padding: 0 10px 8px; }
+  .rail-item { width: auto; }
+  .rail-spacer { display: none; }
+  .home-main { padding: 24px 16px 48px; }
+}
 
 /* ---------- Drag a PDF anywhere on the page ---------- */
 .drop-overlay {
@@ -1873,12 +2057,9 @@ input[type="radio"] { width: 15px; height: 15px; }
 .dc-field-grid .datepicker-trigger { font-weight: 700; }
 
 /* ---------- Draft marker on the form list ---------- */
-.form-card { position: relative; }
-
+/* Sits in the row, before the chevron */
 .draft-flag {
-  position: absolute;
-  top: 14px;
-  right: 14px;
+  flex-shrink: 0;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1913,17 +2094,13 @@ input[type="radio"] { width: 15px; height: 15px; }
 .is-large-text .editor-tools { width: auto; min-width: 200px; }
 
 /* A control in a bar that already has buttons: same mark, sized to sit beside them */
-/* Quiet enough to ignore, there when you go looking for it */
+/* Quiet enough to ignore, there when you go looking for it: the foot of the rail */
 .app-version {
-  position: fixed;
-  right: 10px;
-  bottom: 8px;
-  z-index: 80;
   font-family: var(--font-mono);
   font-size: 10.5px;
   line-height: 1;
-  color: var(--c-text-faint);
-  opacity: 0.65;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 6px 12px 0;
   pointer-events: none;
   user-select: none;
 }
@@ -2052,52 +2229,37 @@ input[type="radio"] { width: 15px; height: 15px; }
  * .grv is behind the overflow: it was sitting next to the download button dressed the same,
  * and people were reaching for it when they wanted the PDF.
  */
-.dc-tools {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-right: auto;
-  padding: 3px;
-  background: var(--c-surface-alt);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-}
-
+/* Icon over label, so every command says what it is without a tooltip */
 .dc-tool {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 30px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 5px;
+  gap: 5px;
+  width: 82px;
+  height: 68px;
+  padding: 6px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  color: #3d4351;
   background: none;
-  color: var(--c-text-muted);
+  border: 1px solid transparent;
+  border-radius: 6px;
   cursor: pointer;
 }
-
-.dc-tool:hover {
-  background: var(--c-surface);
-  border-color: var(--c-border-strong);
-  color: var(--c-text);
-}
+.dc-tool:hover { background: var(--c-surface-alt); color: var(--c-text); }
 .dc-tool:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 1px; }
-.dc-tool[aria-expanded="true"] { background: var(--c-surface); border-color: var(--c-border-strong); }
-
-.dc-tool-sep {
-  width: 1px;
-  height: 18px;
-  margin: 0 3px;
-  background: var(--c-border-strong);
-}
+.dc-tool[aria-expanded="true"] { background: var(--c-surface-alt); border-color: var(--c-border-strong); }
 
 .dc-advanced { position: relative; }
 
 .dc-advanced-menu {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  left: 0;
   z-index: 30;
   min-width: 170px;
   padding: 5px;
@@ -2149,38 +2311,16 @@ input[type="radio"] { width: 15px; height: 15px; }
 .tip-name { display: block; font-size: 12.5px; font-weight: 700; color: var(--c-text); }
 .tip-note { display: block; margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--c-text-muted); }
 
-@media (max-width: 640px) {
-  .dc-tools { order: 3; margin-right: 0; }
-}
-
 /* ---------- Tools, and the DROT audit ---------- */
-.tools {
-  position: fixed;
-  right: 12px;
-  bottom: 26px;
-  z-index: 85;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
+.tools { position: relative; }
 .tools[hidden] { display: none; }
 
-.tools-button {
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--c-text-muted);
-  background: var(--c-surface);
-  border: 1px solid var(--c-border-strong);
-  border-radius: 999px;
-  padding: 7px 14px;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.08);
-}
-.tools-button:hover { border-color: var(--c-accent); color: var(--c-text); }
-
+/* Opens beside the rail entry rather than under it, so it never pushes the rail about */
 .tools-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 8px);
+  z-index: 85;
   background: var(--c-surface);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
@@ -2204,6 +2344,10 @@ input[type="radio"] { width: 15px; height: 15px; }
   cursor: pointer;
 }
 .tools-menu button:hover { background: var(--c-surface-alt); color: var(--c-accent); }
+
+@media (max-width: 700px) {
+  .tools-menu { top: calc(100% + 6px); left: 0; }
+}
 
 .drot-view {
   max-width: 720px;
@@ -2303,11 +2447,11 @@ input[type="radio"] { width: 15px; height: 15px; }
  */
 .dc-toc { display: none; }
 
-/* Needs the page's right margin to clear the fixed text-size control. The page centres in what
- * is left after the 32px workspace padding and the 220px rail, so (W - 64 - 220 - 816) / 2 has
- * to reach the control's 56px less the 32px padding, plus 6px: W = 1160. */
+/* The page centres in what is left after the panel's 32px side padding and the 220px rail, so
+ * the rail needs (W - 64 - 220 - 816) / 2 of margin to sit in; at W = 1160 that is 30px. */
 @media screen and (min-width: 1160px) {
-  .form-panel.active { padding-left: 220px; }
+  .form-panel.active { padding-left: calc(220px + var(--panel-pad)); }
+  .form-panel.active > .dc-toolbar { margin-left: calc(-220px - var(--panel-pad)); }
   .dc-toc {
     display: block;
     position: absolute;
@@ -2318,16 +2462,17 @@ input[type="radio"] { width: 15px; height: 15px; }
   }
   .dc-toc-inner {
     position: sticky;
-    top: 0;
-    max-height: 100vh;
+    top: var(--dc-chrome, 120px);   /* set from the chrome's measured height */
+    max-height: calc(100vh - var(--dc-chrome, 120px));
     overflow-y: auto;
-    padding: 12px 0 24px;      /* the toolbar's own 12px, so Contents lines up with Forms */
+    padding: 24px 0;
   }
 }
 /* Large text zooms the panel by 1.25, so the same room needs a wider window:
  * (W - 64 - 1.25 x 1036) / 2 has to reach 30, which is W = 1420 */
 @media screen and (max-width: 1419px) {
-  .is-large-text .form-panel.active { padding-left: 0; }
+  .is-large-text .form-panel.active { padding-left: var(--panel-pad); }
+  .is-large-text .form-panel.active > .dc-toolbar { margin-left: calc(-1 * var(--panel-pad)); }
   .is-large-text .dc-toc { display: none; }
 }
 
@@ -2397,6 +2542,8 @@ input[type="radio"] { width: 15px; height: 15px; }
   cursor: pointer;
 }
 .text-size-toggle:hover { border-color: var(--c-accent); color: var(--c-accent); }
+/* The rail and the form title bar carry their own copy, so the floating one steps aside there */
+body.has-bar-text-size .text-size-toggle { display: none; }
 .text-size-toggle[aria-pressed="true"] {
   background: var(--dc-primary);
   border-color: var(--dc-primary);
@@ -2407,13 +2554,6 @@ input[type="radio"] { width: 15px; height: 15px; }
 .tsz-small { font-size: 12px; font-weight: 700; }
 .tsz-large { font-size: 18px; font-weight: 700; }
 
-/* Keep page content clear of the control where the column would otherwise run under it */
-@media (max-width: 960px) {
-  .dc-toolbar { padding-right: 52px; }
-}
-@media (max-width: 900px) {
-  .home-view { padding-right: 68px; }
-}
 
 /* ---------- Supporting documents on a form ---------- */
 .dc-attachments {

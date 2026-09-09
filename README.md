@@ -41,6 +41,10 @@ because the page on screen *is* the page that comes out.
 - **Enter moves to the next field**, and Shift+Enter back — these were spreadsheets
   before they were this, and the muscle memory is real. In the big narrative
   boxes Enter makes a new paragraph, and Ctrl+Enter moves on.
+- **The form list is an Office-style start screen**: a navy rail with the odd jobs and
+  the text-size control, and the forms as one numbered list. A form opens under a navy
+  title bar and a ribbon of labelled commands in named groups, with Print as the big
+  button on the right.
 - **Ctrl+P prints the form itself**, without the toolbar or the app around it.
 - **Larger text** scales the whole sheet for reading, and is remembered. It
   works on every screen — the form list, a form, the image builder, the mark-up
@@ -173,13 +177,13 @@ Fact Sheet's radio answers.
 
 It carries values only. Attached documents are not part of it.
 
-The build number sits in the bottom right of the form list — handy when someone
+The build number sits at the foot of the rail on the form list — handy when someone
 says a fix isn't there yet. It's read off the `?v=` on `script.js`, so it can't
 disagree with what's actually being served.
 
 ## Tools
 
-**Tools** in the bottom-right corner of the form list. Odd jobs that aren't
+**Tools** in the rail down the left of the form list. Odd jobs that aren't
 filling in a form.
 
 ### DROT Audit

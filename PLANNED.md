@@ -2,77 +2,33 @@
 
 Working notes, not documentation. `README.md` describes what the app already does.
 
-Current build: **v69**, pushed and deployed.
-
-Decisions below were taken with Evan on 2026-09-08. Everything in sections 1
-and 2 is to be finished and polished today. Order: the confirmation modal and
-the table of contents first, the rest in any order.
+Current build: **v71**, committed, not yet pushed. v70 is what is deployed and what Evan is
+testing.
 
 ---
 
-## 1. Clear form needs a confirmation modal — first
+## Done today (2026-09-08)
 
-The per-form Clear buttons (`fordClear`, `policyClear`, `uniforClear`,
-`investigationClear`, and the generic path in `FORM_BUILDERS`) wipe the whole
-form on one click with no prompt. Only "Clear all forms" on the home screen
-asks, and that is a native `confirm()`.
+- **v70 — Clear form asks first.** A dialog with a red Clear, a Save first that writes the
+  .grv, and Cancel as the default and Escape action. Clear all forms uses it with the count and
+  no Save first (one file per form, so one button could not honestly cover several). An empty
+  form clears without asking. Save first closes the dialog on its own about 1.5s after saving.
+- **v70 — Contents panel.** Every form lists its section bands down the left, the company's
+  blank ones included, current one marked; the Fact Sheet's five sheets are headings in it and
+  the toolbar sheet menu is gone. Shows at 1160px and up (1420px in large text: below that the
+  Print button would slide under the text-size control); never prints.
+- **v70 — Yes/No round trip.** No logic change needed: the matcher already strips punctuation
+  and case, so "Yes." reads back. Two tests lock it in; "Yes please" is flagged, not guessed.
+- **v71 — Office-style chrome, from the Claude Design handoff (3a + 1b).** The form list is a
+  navy rail (odd jobs, Larger text, build number) beside one numbered list of forms. A form
+  opens under a navy title bar (Forms, document name, Draft saved, Larger text) and a ribbon of
+  labelled commands in Word / Document / Other groups with Print as the big button. The floating
+  text-size button now shows only on the builder and the DROT audit, which have no chrome. The
+  contents rail starts below the chrome, measured from its real height.
 
-Replace both with an in-app modal that makes the destructive nature obvious:
-
-- Title and body state plainly that everything typed in this form will be
-  erased and the saved draft discarded.
-- Three buttons: a red **Clear form** (destructive), a **Save first** in a
-  safe colour that runs the existing `.grv` save for that form and then
-  closes the modal without clearing, and a neutral **Cancel**.
-- Cancel is the default / Escape action. Clear must not be the focused button
-  when the modal opens.
-- "Clear all forms" uses the same modal with the count in the wording.
-- Skip the modal entirely when the form is empty (`formHasContent` is false).
-- DOM only, never prints — same `@media print` rule as the flags.
-
----
-
-## 2. Table of contents for forms
-
-A navigation panel down the left margin, like Acrobat's bookmarks.
-
-Decided:
-
-- **Every form** gets it, including short ones.
-- **Open by default.**
-- Lists every section band (`.dc-band`) in the open form as a jump target,
-  **including bands with no editable field** (Department Response, Employee
-  Relations, Payroll), so a rep can jump to the parts HR fills in.
-- Entries show the band title only. No filled / unfilled indicator.
-- Sticks in the left margin while the sheet scrolls.
-- Highlights the section you're currently in.
-- Hides below roughly 1100px of window width — there's no margin to put it in.
-- Must not print. Add it to the `@media print` block.
-
-Also decided:
-
-- **The Fact Sheet's sheet nav folds into the panel.** The toolbar's five-page
-  indicator and jump menu (`buildSheetNav`) goes away; the panel shows each
-  page as a heading with its section bands indented beneath. One list instead
-  of two controls navigating different things.
-
-Implementation note:
-
-- `syncCurrentSheet` already works out "which thing have we scrolled past" by
-  measuring positions against the sticky toolbar. Reuse that approach rather
-  than an IntersectionObserver, for the reason in that function's comment: it
-  can be checked at any scroll position instead of waiting on a callback.
-
----
-
-## 3. Small fixes, any order
-
-- **Word round trip, Yes/No fields.** Radio questions export as
-  `HEADING  (Yes / No)` and read back whichever word survives. Dictating into
-  Word may produce "Yes." with a full stop, which would not match. Strip
-  trailing punctuation when matching choices and do it now. Decided: try to
-  parse it; if no choice matches, leave the radio unset so the field shows as
-  not filled rather than guessing. Worst case the rep sees a flag and picks it.
+Not verified by Claude: Evan asked for no test runs or in-app checks. The full suite has not
+been run since v69 (v70's agents reported 188/188 in their own runs). The review pass over v70
+was cut short by a usage limit and has not been re-run over v71.
 
 ---
 

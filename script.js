@@ -51,6 +51,8 @@ function applyFormsConfig() {
     }
     const heading = document.getElementById(`form-${type}-heading`);
     if (heading && cfg.title != null) heading.textContent = cfg.title;
+    const bar = document.querySelector(`[data-form-title="${type}"]`);
+    if (bar && cfg.title != null) bar.textContent = cfg.title;
   });
 }
 
@@ -1917,6 +1919,7 @@ function setDrotStatus(message) {
 
 function showDrot() {
   currentFormType = null;
+  tuckTextSize(false);
   homeView.hidden = true;
   workspace.hidden = true;
   builderView.hidden = true;
@@ -2001,8 +2004,15 @@ const homeView = document.getElementById('homeView');
 showVersion(!homeView.hidden);
 showTools(!homeView.hidden);
 
+/* The home rail and the form title bar carry the text-size control; the floating one is for
+   the screens that have no chrome of their own */
+function tuckTextSize(tucked) {
+  document.body.classList.toggle('has-bar-text-size', tucked);
+}
+
 function showHome() {
   currentFormType = null;
+  tuckTextSize(true);
   homeView.hidden = false;
   workspace.hidden = true;
   builderView.hidden = true;
@@ -2056,6 +2066,7 @@ function populateForm(form, data) {
 
 function showForm(type, data) {
   currentFormType = type;
+  tuckTextSize(true);
   homeView.hidden = true;
   builderView.hidden = true;
   drotView.hidden = true;
@@ -2395,6 +2406,7 @@ let builderFit = DEFAULT_BUILDER_FIT;
 
 function showBuilder() {
   currentFormType = null;
+  tuckTextSize(false);
   homeView.hidden = true;
   workspace.hidden = true;
   builderView.hidden = false;
@@ -3869,7 +3881,8 @@ function noticeFor(type) {
     notice = document.createElement('span');
     notice.className = 'dc-notice';
     notice.setAttribute('role', 'status');
-    toolbar.insertBefore(notice, toolbar.querySelector('.btn-secondary'));
+    const bar = toolbar.querySelector('.dc-titlebar') || toolbar;
+    bar.insertBefore(notice, bar.querySelector('.dc-saved'));
   }
   return notice;
 }
@@ -3925,7 +3938,7 @@ function refreshDraftFlags() {
       flag = document.createElement('span');
       flag.className = 'draft-flag';
       flag.textContent = 'Draft';
-      card.appendChild(flag);
+      card.insertBefore(flag, card.querySelector('.picker-chevron'));
     } else if (!has && flag) {
       flag.remove();
     }
@@ -3954,6 +3967,8 @@ function applyTextSize(large) {
     button.setAttribute('aria-pressed', String(large));
     button.setAttribute('title', label);
     button.setAttribute('aria-label', label);
+    const text = button.querySelector('.rail-text-size-label');
+    if (text) text.textContent = label;
   });
   if (currentFormType) {
     FORM_BUILDERS[currentFormType].form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
@@ -4077,6 +4092,8 @@ function buildFormToc(type) {
    * the browser decides to deliver a callback.
    */
   function sync() {
+    // The rail's list sticks just under the chrome, whose height depends on how it wrapped
+    panel.style.setProperty('--dc-chrome', toolbar.getBoundingClientRect().height + 'px');
     // The line has to sit below where a jump parks a section, or the one you just jumped to
     // reads as still being the previous one
     const line = toolbar.getBoundingClientRect().bottom + TOC_JUMP_GAP + 8;

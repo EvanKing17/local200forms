@@ -682,19 +682,19 @@ function run(win, doc) {
       const shown = () => win.getComputedStyle(toc).display;
       const indent = () => win.getComputedStyle(panel).paddingLeft;
       if (shown() !== 'block') failures.push('at 1200 display=' + shown());
-      if (indent() !== '220px') failures.push('at 1200 padding=' + indent());
+      if (indent() !== '252px') failures.push('at 1200 padding=' + indent());
       if (toc.getBoundingClientRect().right > form.getBoundingClientRect().left) failures.push('rail overlaps the page');
       const width = Math.round(form.getBoundingClientRect().width);
       if (width !== 816) failures.push('page width ' + width);
       const sticky = win.getComputedStyle(toc.firstElementChild).position;
       if (sticky !== 'sticky') failures.push('list is ' + sticky);
       toggle.click(); await tick();
-      if (shown() !== 'none' || indent() !== '0px') failures.push('large text at 1200: display=' + shown() + ' padding=' + indent());
+      if (shown() !== 'none' || indent() !== '32px') failures.push('large text at 1200: display=' + shown() + ' padding=' + indent());
       toggle.click(); await tick();
       if (shown() !== 'block') failures.push('after large text off display=' + shown());
       host.style.width = '1000px'; await tick();
       const narrowMatches = win.matchMedia('(min-width: 1160px)').matches;
-      if (shown() !== 'none' || indent() !== '0px' || narrowMatches) {
+      if (shown() !== 'none' || indent() !== '32px' || narrowMatches) {
         failures.push('at 1000: display=' + shown() + ' padding=' + indent() + ' matches=' + narrowMatches);
       }
       host.style.width = '1200px'; await tick();
@@ -738,15 +738,19 @@ function run(win, doc) {
     return (String(home) === '1.25' && String(form) === '1.25' && stored === 'large' && String(back) === '1') ||
       { detail: 'home=' + home + ' form=' + form + ' stored=' + stored + ' restored=' + back };
   });
-  check(g6e, 'The text-size control is fixed and on every page', () => {
+  check(g6e, 'The text-size control is on every page, in the chrome where there is one', () => {
+    // The rail and the title bar carry it; the floating button is for the screens without either
     const toggle = doc.getElementById('textSizeToggle');
-    const fixed = win.getComputedStyle(toggle).position === 'fixed';
+    const showing = el => el && el.getBoundingClientRect().width > 0;
     win.showHome();
-    const onHome = toggle.getBoundingClientRect().width > 0;
+    const onHome = showing(doc.querySelector('.home-rail [data-text-size]')) && !showing(toggle);
     win.showForm('unifor');
-    const onForm = toggle.getBoundingClientRect().width > 0;
-    return (fixed && onHome && onForm) ||
-      { detail: 'fixed=' + fixed + ' home=' + onHome + ' form=' + onForm };
+    const onForm = showing(doc.querySelector('#form-unifor .dc-titlebar [data-text-size]')) && !showing(toggle);
+    win.showBuilder();
+    const inBuilder = showing(toggle) && win.getComputedStyle(toggle).position === 'fixed';
+    win.showHome();
+    return (onHome && onForm && inBuilder) ||
+      { detail: 'home=' + onHome + ' form=' + onForm + ' builder=' + inBuilder };
   });
   check(g6e, 'Nothing overflows sideways, zoomed or not', () => {
     const toggle = doc.getElementById('textSizeToggle');
@@ -2467,7 +2471,7 @@ function run(win, doc) {
     FORMS.forEach(f => {
       const bar = doc.querySelector('#form-' + f.type + ' .dc-toolbar');
       const hero = bar.querySelector('button[type=submit]');
-      if (hero.textContent.trim() !== 'Print/Download PDF') wrong.push(f.type + ' hero: ' + hero.textContent);
+      if (hero.textContent.trim() !== 'Print / Download PDF') wrong.push(f.type + ' hero: ' + hero.textContent);
       // saving a .grv belongs in Advanced, not loose in the toolbar
       if (bar.querySelector('.dc-tools > [data-save-grv]')) wrong.push(f.type + ' has .grv in the open');
       if (!bar.querySelector('[data-advanced-menu="' + f.type + '"] [data-save-grv]')) {
