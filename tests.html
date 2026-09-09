@@ -1127,6 +1127,115 @@ function run(win, doc) {
     return label === 'Upload a PDF' || { detail: label };
   });
 
+  const g9b = group('Editing marks');
+
+  // A document open in the editor, with a way to drag on its first page
+  const editing = async (name) => {
+    const src = win.buildInvestigationDoc(win.fd(doc.getElementById('investigationForm')));
+    const item = await win.Annotator.readFile(asFile(src, name));
+    win.openEditor(item, () => {});
+    const canvas = doc.querySelector('#editorPages .editor-canvas');
+    const r = canvas.getBoundingClientRect();
+    const ev = (t, x, y, extra) => new win.PointerEvent(t, Object.assign({ clientX: r.left + x * r.width,
+      clientY: r.top + y * r.height, pointerId: 1, bubbles: true, cancelable: true }, extra || {}));
+    const drag = (tool, x1, y1, x2, y2, extra) => {
+      if (tool) doc.querySelector('#editorTools .tool[data-tool="' + tool + '"]').click();
+      canvas.dispatchEvent(ev('pointerdown', x1, y1, extra));
+      canvas.dispatchEvent(ev('pointermove', (x1 + x2) / 2, (y1 + y2) / 2, extra));
+      canvas.dispatchEvent(ev('pointermove', x2, y2, extra));
+      canvas.dispatchEvent(ev('pointerup', x2, y2, extra));
+    };
+    const near = (a, b) => Math.abs(a - b) < 0.01;
+    return { item, page: item.pages[0], canvas, drag, near };
+  };
+
+  checkAsync(g9b, 'A box can be picked up and moved, and undo puts it back', async () => {
+    const { page, drag, near } = await editing('Move.pdf');
+    drag('rect', 0.2, 0.2, 0.4, 0.4);
+    const box = page.annotations[0];
+    const pickedUp = !doc.getElementById('selectionRow').hidden &&
+                     doc.getElementById('selectionLabel').textContent === 'Box';
+    drag('select', 0.3, 0.3, 0.5, 0.5);
+    const moved = near(box.x, 0.4) && near(box.y, 0.4) && near(box.w, 0.2);
+    doc.getElementById('editorUndo').click();
+    const back = near(box.x, 0.2) && near(box.y, 0.2);
+    doc.getElementById('editorDone').click();
+    return (pickedUp && moved && back) ||
+      { detail: 'pickedUp=' + pickedUp + ' moved=' + moved + ' back=' + back + ' x=' + box.x.toFixed(3) };
+  });
+
+  checkAsync(g9b, 'A handle resizes a box', async () => {
+    const { page, drag, near } = await editing('Resize.pdf');
+    drag('rect', 0.2, 0.2, 0.4, 0.4);
+    const box = page.annotations[0];
+    drag('select', 0.4, 0.4, 0.6, 0.7);               // the bottom-right handle
+    const grown = near(box.x, 0.2) && near(box.y, 0.2) && near(box.w, 0.4) && near(box.h, 0.5);
+    doc.getElementById('editorUndo').click();
+    const back = near(box.w, 0.2) && near(box.h, 0.2);
+    doc.getElementById('editorDone').click();
+    return (grown && back) || { detail: 'grown=' + grown + ' back=' + back + ' w=' + box.w.toFixed(3) + ' h=' + box.h.toFixed(3) };
+  });
+
+  checkAsync(g9b, 'Dragging across several marks picks them all up, and Delete removes them', async () => {
+    const { page, drag } = await editing('Marquee.pdf');
+    drag('rect', 0.2, 0.2, 0.3, 0.3);
+    drag('ellipse', 0.5, 0.5, 0.6, 0.6);
+    drag('select', 0.05, 0.05, 0.95, 0.95);
+    const both = doc.getElementById('selectionLabel').textContent === '2 marks';
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
+    const gone = page.annotations.length === 0;
+    doc.getElementById('editorUndo').click();
+    const restored = page.annotations.length === 2;
+    doc.getElementById('editorDone').click();
+    return (both && gone && restored) || { detail: 'both=' + both + ' gone=' + gone + ' restored=' + restored };
+  });
+
+  checkAsync(g9b, 'Shift+click adds to what is picked up, and the panel restyles all of it', async () => {
+    const { page, drag } = await editing('Shift.pdf');
+    drag('rect', 0.2, 0.2, 0.3, 0.3);
+    drag('rect', 0.5, 0.5, 0.6, 0.6);
+    drag('select', 0.25, 0.25, 0.25, 0.25);
+    drag(null, 0.55, 0.55, 0.55, 0.55, { shiftKey: true });
+    const two = doc.getElementById('selectionLabel').textContent === '2 marks';
+    const slider = doc.getElementById('editorWidth');
+    slider.value = '9';
+    slider.dispatchEvent(new win.Event('input', { bubbles: true }));
+    slider.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const thick = page.annotations.every(a => a.width === 9);
+    doc.getElementById('editorUndo').click();
+    const thin = page.annotations.every(a => a.width === 3);
+    doc.getElementById('editorDone').click();
+    return (two && thick && thin) || { detail: 'two=' + two + ' thick=' + thick + ' thin=' + thin };
+  });
+
+  checkAsync(g9b, 'A note typed on the page comes out of the file as text', async () => {
+    const { item, page, drag } = await editing('Note.pdf');
+    drag('text', 0.3, 0.3, 0.3, 0.3);
+    const box = doc.querySelector('#editorPages .editor-text-input');
+    const opened = !!box;
+    if (box) { box.value = 'Signed under protest'; box.dispatchEvent(new win.Event('input', { bubbles: true })); }
+    win.finishTextEdit(false);
+    const kept = page.annotations.length === 1 && page.annotations[0].text === 'Signed under protest';
+    doc.getElementById('editorDone').click();
+
+    const bytes = await win.Annotator.standalone(item);
+    const pdfjs = await win.Annotator.loadPdfJs();
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise;
+    const text = (await (await pdf.getPage(1)).getTextContent()).items.map(i => i.str).join(' ');
+    const inFile = text.indexOf('Signed under protest') !== -1;
+    return (opened && kept && inFile) || { detail: 'opened=' + opened + ' kept=' + kept + ' inFile=' + inFile };
+  });
+
+  checkAsync(g9b, 'An empty note is not kept', async () => {
+    const { page, drag } = await editing('Blank.pdf');
+    drag('text', 0.3, 0.3, 0.3, 0.3);
+    win.finishTextEdit(false);
+    const none = page.annotations.length === 0;
+    const undoOff = doc.getElementById('editorUndo').disabled;
+    doc.getElementById('editorDone').click();
+    return (none && undoOff) || { detail: 'marks=' + page.annotations.length + ' undoDisabled=' + undoOff };
+  });
+
   const g10 = group('Filling a form from JSON');
   const asJson = (obj, name) =>
     new win.File([typeof obj === 'string' ? obj : JSON.stringify(obj)], name, { type: 'application/json' });
@@ -1494,6 +1603,20 @@ function run(win, doc) {
       return Math.round(s.width) + 'x' + Math.round(s.height);
     });
   };
+
+  checkAsync(g14, 'A big picture is written into the file smaller, and its page stays its own size', async () => {
+    const big = await madeImage(3000, 2200);
+    const item = await win.Annotator.readFile(big);
+    const before = item.bytes.length;
+    const packed = await win.Annotator.encodeForPdf(item);
+    const bitmap = await win.createImageBitmap(new win.Blob([packed.bytes]));
+    const shrunk = packed.kind === 'jpg' && bitmap.width <= 2000 && bitmap.height <= 2000;
+    const untouched = item.bytes.length === before;
+    const sizes = await sizesOf(await win.Annotator.compile([item], 'image'));
+    const pageKept = sizes[0] === '2250x1650';       // 3000 x 2200 at 96 to the inch
+    return (shrunk && untouched && pageKept) ||
+      { detail: 'kind=' + packed.kind + ' ' + bitmap.width + 'x' + bitmap.height + ' untouched=' + untouched + ' page=' + JSON.stringify(sizes[0]) };
+  });
 
   checkAsync(g14, 'Each image becomes a page its own size', async () => {
     const items = [await win.Annotator.readFile(await madeImage(400, 200)),

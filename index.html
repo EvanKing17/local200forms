@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=77">
+<link rel="stylesheet" href="style.css?v=78">
 </head>
 <body>
 
@@ -1103,44 +1103,67 @@
   <div class="editor-body">
     <div class="editor-tools" id="editorTools">
       <div class="tool-group" role="group" aria-label="Tool">
-        <button type="button" class="tool" data-tool="pen" aria-pressed="true">
+        <button type="button" class="tool" data-tool="select" aria-pressed="true" title="Select (V)">
+          <span class="tool-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 3l14 8-6 2-3 6z"></path>
+            </svg>
+          </span>Select<kbd>V</kbd></button>
+        <button type="button" class="tool" data-tool="pen" aria-pressed="false" title="Draw (P)">
           <span class="tool-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path>
             </svg>
-          </span>Draw</button>
-        <button type="button" class="tool" data-tool="highlight" aria-pressed="false">
+          </span>Draw<kbd>P</kbd></button>
+        <button type="button" class="tool" data-tool="highlight" aria-pressed="false" title="Highlight (H)">
           <span class="tool-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
               <path d="M9 11l-4 4v4h4l4-4"></path><path d="M13 15L21 7a2 2 0 0 0-3-3l-8 8"></path>
             </svg>
-          </span>Highlight</button>
-        <button type="button" class="tool" data-tool="arrow" aria-pressed="false">
+          </span>Highlight<kbd>H</kbd></button>
+        <button type="button" class="tool" data-tool="arrow" aria-pressed="false" title="Arrow (A)">
           <span class="tool-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
               <line x1="5" y1="19" x2="19" y2="5"></line><polyline points="11 5 19 5 19 13"></polyline>
             </svg>
-          </span>Arrow</button>
-        <button type="button" class="tool" data-tool="rect" aria-pressed="false">
+          </span>Arrow<kbd>A</kbd></button>
+        <button type="button" class="tool" data-tool="rect" aria-pressed="false" title="Box (B)">
           <span class="tool-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
               <rect x="4" y="6" width="16" height="12" rx="1.5"></rect>
             </svg>
-          </span>Box</button>
-        <button type="button" class="tool" data-tool="ellipse" aria-pressed="false">
+          </span>Box<kbd>B</kbd></button>
+        <button type="button" class="tool" data-tool="ellipse" aria-pressed="false" title="Oval (O)">
           <span class="tool-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
               <ellipse cx="12" cy="12" rx="8" ry="6"></ellipse>
             </svg>
-          </span>Oval</button>
-        <button type="button" class="tool" data-tool="pixelate" aria-pressed="false">
+          </span>Oval<kbd>O</kbd></button>
+        <button type="button" class="tool" data-tool="text" aria-pressed="false" title="Note (T)">
+          <span class="tool-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 6V4h14v2"></path><path d="M12 4v16"></path><path d="M9 20h6"></path>
+            </svg>
+          </span>Note<kbd>T</kbd></button>
+        <button type="button" class="tool" data-tool="pixelate" aria-pressed="false" title="Blur (X)">
           <span class="tool-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
               <rect x="4" y="6" width="4" height="4"></rect><rect x="10" y="6" width="4" height="4" opacity=".5"></rect>
               <rect x="16" y="6" width="4" height="4"></rect><rect x="4" y="12" width="4" height="4" opacity=".5"></rect>
               <rect x="10" y="12" width="4" height="4"></rect><rect x="16" y="12" width="4" height="4" opacity=".5"></rect>
             </svg>
-          </span>Blur</button>
+          </span>Blur<kbd>X</kbd></button>
+      </div>
+
+      <p class="tool-hint" id="toolHint"></p>
+
+      <!-- What is picked up. The rows below then edit these marks rather than the tool. -->
+      <div class="selection-row" id="selectionRow" hidden>
+        <span class="selection-label" id="selectionLabel"></span>
+        <div class="selection-actions">
+          <button type="button" class="selection-action" id="selectionDuplicate" title="Duplicate (Ctrl+D)">Duplicate</button>
+          <button type="button" class="selection-action is-danger" id="selectionDelete" title="Delete">Delete</button>
+        </div>
       </div>
 
       <div class="tool-row" id="colourRow">
@@ -1153,6 +1176,11 @@
         <input type="range" id="editorWidth" min="1" max="14" value="4" aria-label="Thickness">
       </div>
 
+      <div class="tool-row" id="sizeRow" hidden>
+        <span class="tool-label">Size <b id="sizeValue">16</b></span>
+        <input type="range" id="editorSize" min="8" max="48" value="16" aria-label="Text size">
+      </div>
+
       <label class="tool-check" id="fillRow">
         <input type="checkbox" id="editorFill"> Solid fill
       </label>
@@ -1163,6 +1191,10 @@
         This hides the content, it doesn’t remove it. Whatever is underneath stays in the file
         and can be recovered by anyone who opens it. Don’t rely on it to redact names, addresses
         or anything else confidential.
+      </p>
+
+      <p class="tool-keys">
+        <b>Delete</b> removes, <b>Ctrl+Z</b> undoes, arrows nudge, <b>Shift</b>+click adds to a selection.
       </p>
     </div>
 
@@ -1344,9 +1376,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=77"></script>
+<script src="forms.config.js?v=78"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=77"></script>
-<script src="script.js?v=77"></script>
+<script src="annotate.js?v=78"></script>
+<script src="script.js?v=78"></script>
 </body>
 </html>

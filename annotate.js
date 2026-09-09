@@ -144,6 +144,69 @@
     ctx.fill();
   }
 
+  /* ---------- Text ----------
+   * A note typed onto the page, wrapped to its box. Helvetica on screen and in the file, so the
+   * lines break in the same places in both. `size` scales with the page the way stroke widths
+   * do, so a note reads the same size on a letter sheet and on a screenshot.
+   */
+  const TEXT_FONT = 'Helvetica, Arial, sans-serif';
+  const LINE_HEIGHT = 1.25;
+  const TEXT_PAD = 0.35;          // of the font size, inside the box on every side
+
+  function fontSizeFor(page, a) {
+    return Math.max(3, (a.size || 16) * Math.min(page.width, page.height) / 700);
+  }
+
+  function wrapWith(measure, text, maxWidth) {
+    const lines = [];
+    String(text || '').split('\n').forEach(paragraph => {
+      const words = paragraph.split(/\s+/).filter(Boolean);
+      if (!words.length) { lines.push(''); return; }
+      let line = '';
+      words.forEach(word => {
+        const trial = line ? line + ' ' + word : word;
+        if (line && measure(trial) > maxWidth) { lines.push(line); line = word; }
+        else line = trial;
+      });
+      lines.push(line);
+    });
+    return lines;
+  }
+
+  /* The lines a note breaks into inside a box `boxW` wide, with the font size in those units */
+  function textLayout(page, a, boxW, measureAt) {
+    const size = fontSizeFor(page, a) * (boxW / page.width);
+    const pad = size * TEXT_PAD;
+    const lines = wrapWith(t => measureAt(t, size), a.text, Math.max(size, a.w * boxW - pad * 2));
+    return { size, pad, lines, height: lines.length * size * LINE_HEIGHT + pad * 2 };
+  }
+
+  let scratch = null;
+  function canvasMeasure(ctx) {
+    return (text, size) => { ctx.font = size + 'px ' + TEXT_FONT; return ctx.measureText(text).width; };
+  }
+
+  /* How tall a note is, as a fraction of its page, measured without a canvas on screen */
+  function textHeight(page, a) {
+    if (!scratch) scratch = document.createElement('canvas').getContext('2d');
+    const boxW = 1000;
+    const layout = textLayout(page, a, boxW, canvasMeasure(scratch));
+    return layout.height / (boxW * page.height / page.width);
+  }
+
+  function drawText(ctx, a, page, w, h) {
+    const layout = textLayout(page, a, w, canvasMeasure(ctx));
+    a.h = layout.height / h;
+    ctx.font = layout.size + 'px ' + TEXT_FONT;
+    ctx.fillStyle = a.color;
+    ctx.textBaseline = 'alphabetic';
+    const x = a.x * w + layout.pad;
+    const ascent = layout.size * 0.78 + (layout.size * (LINE_HEIGHT - 1)) / 2;
+    layout.lines.forEach((line, i) => {
+      ctx.fillText(line, x, a.y * h + layout.pad + i * layout.size * LINE_HEIGHT + ascent);
+    });
+  }
+
   function drawAnnotation(ctx, canvas, page, a) {
     const w = canvas.width, h = canvas.height;
     const scale = w / page.width;               // page units to canvas pixels
@@ -154,7 +217,9 @@
     ctx.strokeStyle = a.color;
     ctx.lineWidth = lineWidth;
 
-    if (a.type === 'pen' || a.type === 'highlight') {
+    if (a.type === 'text') {
+      if (!a.editing) drawText(ctx, a, page, w, h);   // while it is being typed, the box on top shows it
+    } else if (a.type === 'pen' || a.type === 'highlight') {
       if (a.type === 'highlight') {
         ctx.globalAlpha = 0.4;
         ctx.lineWidth = lineWidth * 4;
@@ -180,6 +245,88 @@
       pixelate(ctx, canvas, a);
     }
     ctx.restore();
+  }
+
+  /* ---------- Geometry ----------
+   * Everything the editor needs to pick a mark up, move it and resize it. All in fractions of
+   * the page, like the marks themselves.
+   */
+  function boundsOf(a, page) {
+    if (a.type === 'arrow') {
+      return { x: Math.min(a.x1, a.x2), y: Math.min(a.y1, a.y2),
+               w: Math.abs(a.x2 - a.x1), h: Math.abs(a.y2 - a.y1) };
+    }
+    if (a.points) {
+      let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+      a.points.forEach(([x, y]) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); });
+      return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+    }
+    if (a.type === 'text') {
+      const h = a.h || (page ? textHeight(page, a) : 0.05);
+      return { x: a.x, y: a.y, w: a.w, h };
+    }
+    return { x: a.x, y: a.y, w: a.w, h: a.h };
+  }
+
+  function segmentDistance(px, py, x1, y1, x2, y2, aspect) {
+    // aspect turns fractions of a non-square page into comparable distances
+    const dx = (x2 - x1) * aspect, dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? (((px - x1) * aspect) * dx + (py - y1) * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = (x1 * aspect) + t * dx, cy = y1 + t * dy;
+    return Math.hypot(px * aspect - cx, py - cy);
+  }
+
+  /* Is the point on the mark? `tol` is in fractions of the page height; `aspect` is w/h */
+  function hits(a, page, px, py, tol, aspect) {
+    if (a.type === 'arrow') return segmentDistance(px, py, a.x1, a.y1, a.x2, a.y2, aspect) <= tol;
+    if (a.points) {
+      const reach = tol + (strokeWidthFor(page, a) / page.height) * (a.type === 'highlight' ? 2 : 0.5);
+      if (a.points.length === 1) return Math.hypot((px - a.points[0][0]) * aspect, py - a.points[0][1]) <= reach;
+      for (let i = 1; i < a.points.length; i++) {
+        const [x1, y1] = a.points[i - 1], [x2, y2] = a.points[i];
+        if (segmentDistance(px, py, x1, y1, x2, y2, aspect) <= reach) return true;
+      }
+      return false;
+    }
+    const b = boundsOf(a, page);
+    return px >= b.x - tol / aspect && px <= b.x + b.w + tol / aspect && py >= b.y - tol && py <= b.y + b.h + tol;
+  }
+
+  function overlaps(a, page, box) {
+    const b = boundsOf(a, page);
+    return b.x < box.x + box.w && b.x + b.w > box.x && b.y < box.y + box.h && b.y + b.h > box.y;
+  }
+
+  function translate(a, dx, dy) {
+    if (a.type === 'arrow') { a.x1 += dx; a.x2 += dx; a.y1 += dy; a.y2 += dy; return; }
+    if (a.points) { a.points = a.points.map(([x, y]) => [x + dx, y + dy]); return; }
+    a.x += dx;
+    a.y += dy;
+  }
+
+  /* Maps a mark from one box into another, so a resize works the same for every kind */
+  function fitTo(a, from, to) {
+    const sx = from.w > 0 ? to.w / from.w : 1;
+    const sy = from.h > 0 ? to.h / from.h : 1;
+    const mx = x => to.x + (x - from.x) * sx;
+    const my = y => to.y + (y - from.y) * sy;
+    if (a.type === 'arrow') { a.x1 = mx(a.x1); a.x2 = mx(a.x2); a.y1 = my(a.y1); a.y2 = my(a.y2); return; }
+    if (a.points) { a.points = a.points.map(([x, y]) => [mx(x), my(y)]); return; }
+    a.x = to.x;
+    a.y = to.y;
+    a.w = Math.max(0.002, to.w);
+    if (a.type !== 'text') a.h = Math.max(0.002, to.h);
+  }
+
+  function snapshot(a) {
+    return JSON.parse(JSON.stringify(a));
+  }
+
+  function restore(a, saved) {
+    Object.keys(a).forEach(k => { if (!(k in saved)) delete a[k]; });
+    Object.assign(a, snapshot(saved));
   }
 
   function renderPage(target, page) {
@@ -211,6 +358,13 @@
     return PDFLib.rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
   }
 
+  /* One Helvetica per output document, embedded the first time a note needs it */
+  const fonts = new WeakMap();
+  async function helvetica(PDFLib, out) {
+    if (!fonts.has(out)) fonts.set(out, await out.embedFont(PDFLib.StandardFonts.Helvetica));
+    return fonts.get(out);
+  }
+
   async function drawOnPdfPage(PDFLib, out, pdfPage, page) {
     const { width, height } = pdfPage.getSize();
     const sx = v => v * width;
@@ -220,7 +374,21 @@
       const colour = a.color ? hexToRgb(PDFLib, a.color) : PDFLib.rgb(0, 0, 0);
       const thickness = strokeWidthFor(page, a) * (width / page.width);
 
-      if (a.type === 'pen' || a.type === 'highlight') {
+      if (a.type === 'text') {
+        if (!String(a.text || '').trim()) continue;
+        const font = await helvetica(PDFLib, out);
+        const layout = textLayout(page, a, width, (t, size) => font.widthOfTextAtSize(t, size));
+        const ascent = layout.size * 0.78 + (layout.size * (LINE_HEIGHT - 1)) / 2;
+        layout.lines.forEach((line, i) => {
+          if (!line) return;
+          line = line.replace(/[^\x20-\x7e\xa0-\xff\u2013\u2014\u2018\u2019\u201c\u201d\u2022\u2026]/g, '?');
+          pdfPage.drawText(line, {
+            x: sx(a.x) + layout.pad,
+            y: sy(a.y) - layout.pad - i * layout.size * LINE_HEIGHT - ascent,
+            size: layout.size, font, color: colour,
+          });
+        });
+      } else if (a.type === 'pen' || a.type === 'highlight') {
         const highlight = a.type === 'highlight';
         for (let i = 1; i < a.points.length; i++) {
           pdfPage.drawLine({
@@ -294,7 +462,7 @@
         const partner = next && next.kind !== 'pdf' ? next : null;
         const first = await embedImage(out, item);
         const second = partner ? await embedImage(out, partner) : null;
-        const layout = pairBoxes(first, second);
+        const layout = pairBoxes(naturalSize(item), partner ? naturalSize(partner) : null);
         const sheet = out.addPage(layout.page);
 
         sheet.drawImage(first, layout.top);
@@ -308,7 +476,7 @@
       }
 
       const image = await embedImage(out, item);
-      const box = imageBox(image, fit);
+      const box = imageBox(naturalSize(item), fit);
       const sheet = out.addPage(box.page);
       sheet.drawImage(image, box);
       // The marks were placed against the image, so they are drawn in that same box
@@ -317,8 +485,46 @@
     return out;
   }
 
-  function embedImage(out, item) {
-    return item.kind === 'png' ? out.embedPng(item.bytes) : out.embedJpg(item.bytes);
+  /*
+   * A phone photo is 3-5MB and four thousand pixels across; six of them made a 25MB grievance.
+   * Anything big is drawn to a canvas at a size that still prints sharp and written back out as
+   * JPEG. Going through a canvas also bakes in the camera's rotation flag, which pdf-lib would
+   * otherwise leave for the reader to ignore. The original bytes are never touched: a small
+   * screenshot goes in as it is, and `item.bytes` is what a .grv or a re-upload gets.
+   */
+  const EMBED_MAX_EDGE = 2000;               // about 240dpi across a letter sheet
+  const EMBED_KEEP_BYTES = 700 * 1024;
+  const EMBED_QUALITY = 0.86;
+
+  async function encodeForPdf(item) {
+    const page = item.pages[0];
+    const edge = Math.max(page.width, page.height);
+    if (item.bytes.length <= EMBED_KEEP_BYTES && edge <= EMBED_MAX_EDGE) return { kind: item.kind, bytes: item.bytes };
+    const scale = Math.min(1, EMBED_MAX_EDGE / edge);
+    const bitmap = await createImageBitmap(new Blob([item.bytes]));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';                  // JPEG has no transparency; a clear PNG lands on white
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    if (bitmap.close) bitmap.close();
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', EMBED_QUALITY));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    // Never trade up: if the original was the smaller file, it stays
+    if (scale === 1 && bytes.length >= item.bytes.length) return { kind: item.kind, bytes: item.bytes };
+    return { kind: 'jpg', bytes };
+  }
+
+  async function embedImage(out, item) {
+    if (!item.embedded) item.embedded = await encodeForPdf(item);
+    return item.embedded.kind === 'png' ? out.embedPng(item.embedded.bytes) : out.embedJpg(item.embedded.bytes);
+  }
+
+  /* The picture's own pixel size, which decides its page, whatever size it was written out at */
+  function naturalSize(item) {
+    return { width: item.pages[0].width, height: item.pages[0].height };
   }
 
   /* Makes a box on a sheet look like a page, so marks land where the picture actually is */
@@ -330,6 +536,7 @@
       drawEllipse: (o) => sheet.drawEllipse(shift(o, box.x, box.y)),
       drawSvgPath: (p, o) => sheet.drawSvgPath(p, shift(o, box.x, box.y)),
       drawImage: (img, o) => sheet.drawImage(img, shift(o, box.x, box.y)),
+      drawText: (t, o) => sheet.drawText(t, shift(o, box.x, box.y)),
     };
   }
 
@@ -459,6 +666,7 @@
 
   window.Annotator = {
     readFile, renderPage, drawAnnotation, appendTo, standalone, renderToCanvases, compile, imageBox, pairBoxes,
-    loadPdfJs, loadPdfLib, strokeWidthFor,
+    loadPdfJs, loadPdfLib, strokeWidthFor, fontSizeFor, textHeight, encodeForPdf,
+    geometry: { boundsOf, hits, overlaps, translate, fitTo, snapshot, restore },
   };
 })();

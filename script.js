@@ -4140,10 +4140,13 @@ const TOOL_SETTINGS = {
   rect: { color: '#C31A1A', width: 3, fill: false },
   ellipse: { color: '#C31A1A', width: 3, fill: false },
   pixelate: { color: '#111111', width: 3 },
+  text: { color: '#C31A1A', size: 16 },
+  select: {},
 };
 
 const FREEHAND_TOOLS = ['pen', 'highlight'];
 const DRAG_TOOLS = ['rect', 'ellipse', 'pixelate', 'arrow'];
+const NOTE_TOOLS = ['text', 'select'];
 
 const attachments = { ford: [], policy: [], unifor: [], investigation: [] };
 
@@ -4163,32 +4166,70 @@ const editorPages = document.getElementById('editorPages');
 const editorNameInput = document.getElementById('editorName');
 const editorPageLabel = document.getElementById('editorPageLabel');
 const brushCursor = document.getElementById('brushCursor');
+const G = () => window.Annotator.geometry;
 
 let editorDoc = null;
-let editorTool = 'pen';
+let editorTool = 'select';
 let editorOnDone = null;
 let pageCanvases = [];
 
-function settings() {
-  return TOOL_SETTINGS[editorTool];
+/*
+ * What is picked up at the moment: marks on one page. Everything in the side panel then works
+ * on these rather than on the tool's own settings, which is how a box drawn too thin gets
+ * thickened after the fact instead of drawn again.
+ */
+const selection = { pageIndex: -1, items: [] };
+
+function selected() {
+  return editorDoc && selection.pageIndex > -1 ? selection.items : [];
 }
 
-function coloursForTool() {
-  return editorTool === 'highlight' ? HIGHLIGHT_COLOURS : INK_COLOURS;
+function selectMarks(pageIndex, items) {
+  const before = selection.pageIndex;
+  selection.pageIndex = items.length ? pageIndex : -1;
+  selection.items = items.slice();
+  if (before > -1 && before !== selection.pageIndex) repaint(before);
+  if (selection.pageIndex > -1) repaint(selection.pageIndex);
+  syncToolOptions();
 }
+
+function clearSelection() {
+  if (selection.pageIndex > -1) selectMarks(selection.pageIndex, []);
+}
+
+/* The tool's own settings, or the selection's when there is one */
+function settings() {
+  return TOOL_SETTINGS[editorTool] || TOOL_SETTINGS.pen;
+}
+
+function currentColour() {
+  const picked = selected();
+  return picked.length ? (picked.find(a => a.color) || {}).color || settings().color : settings().color;
+}
+
+function coloursFor() {
+  const picked = selected();
+  const highlighting = picked.length ? picked.every(a => a.type === 'highlight') : editorTool === 'highlight';
+  return highlighting ? HIGHLIGHT_COLOURS : INK_COLOURS;
+}
+
+const TOOL_NAMES = { select: 'Selection', pen: 'Drawing', highlight: 'Highlight', arrow: 'Arrow',
+                     rect: 'Box', ellipse: 'Oval', text: 'Note', pixelate: 'Blur' };
 
 function buildSwatches() {
   const host = document.getElementById('editorSwatches');
   host.innerHTML = '';
-  coloursForTool().forEach(colour => {
+  const current = currentColour();
+  coloursFor().forEach(colour => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'swatch';
     button.style.background = colour;
     button.setAttribute('aria-label', colour);
-    button.setAttribute('aria-pressed', String(colour === settings().color));
+    button.setAttribute('aria-pressed', String(colour === current));
     button.addEventListener('click', () => {
-      settings().color = colour;
+      applyToSelection(a => a.type !== 'pixelate', a => { a.color = colour; });
+      if (!selected().length) settings().color = colour;
       host.querySelectorAll('.swatch').forEach(s => s.setAttribute('aria-pressed', String(s === button)));
       updateBrushCursor();
     });
@@ -4196,16 +4237,47 @@ function buildSwatches() {
   });
 }
 
+/*
+ * One panel serves both jobs. With nothing picked up it shows the tool's settings; with marks
+ * picked up it shows theirs, and edits go to them. The rows that make no sense for what is
+ * shown are hidden rather than greyed, so the panel is only ever as long as it needs to be.
+ */
 function syncToolOptions() {
-  const set = settings();
-  editor.classList.toggle('is-freehand', FREEHAND_TOOLS.includes(editorTool));
-  const shape = editorTool === 'rect' || editorTool === 'ellipse';
-  document.getElementById('colourRow').hidden = editorTool === 'pixelate';
-  document.getElementById('widthRow').hidden = editorTool === 'pixelate';
+  const picked = selected();
+  const has = pred => picked.some(pred);
+  const kinds = new Set(picked.map(a => a.type));
+  const single = kinds.size === 1 ? picked[0].type : null;
+  const set = picked.length ? picked[0] : settings();
+
+  editor.classList.toggle('is-freehand', FREEHAND_TOOLS.includes(editorTool) && !picked.length);
+  editor.classList.toggle('is-selecting', editorTool === 'select');
+
+  const head = document.getElementById('selectionRow');
+  head.hidden = !picked.length;
+  if (picked.length) {
+    document.getElementById('selectionLabel').textContent =
+      picked.length === 1 ? TOOL_NAMES[single] : picked.length + ' marks';
+  }
+
+  const colour = picked.length ? has(a => a.type !== 'pixelate') : editorTool !== 'pixelate' && editorTool !== 'select';
+  const width = picked.length ? has(a => a.type !== 'pixelate' && a.type !== 'text')
+                              : !['pixelate', 'select', 'text'].includes(editorTool);
+  const size = picked.length ? has(a => a.type === 'text') : editorTool === 'text';
+  const shape = picked.length ? has(a => a.type === 'rect' || a.type === 'ellipse')
+                              : editorTool === 'rect' || editorTool === 'ellipse';
+  document.getElementById('colourRow').hidden = !colour;
+  document.getElementById('widthRow').hidden = !width;
+  document.getElementById('sizeRow').hidden = !size;
   document.getElementById('fillRow').hidden = !shape;
-  document.getElementById('fillNote').hidden = !(shape && set.fill);
-  document.getElementById('editorWidth').value = set.width;
-  document.getElementById('widthValue').textContent = set.width;
+  document.getElementById('fillNote').hidden = !(shape && !!set.fill);
+  document.getElementById('toolHint').textContent = HINTS[editorTool] || '';
+
+  const widthOf = picked.find(a => a.width) || set;
+  document.getElementById('editorWidth').value = widthOf.width || 4;
+  document.getElementById('widthValue').textContent = widthOf.width || 4;
+  const sizeOf = picked.find(a => a.type === 'text') || TOOL_SETTINGS.text;
+  document.getElementById('editorSize').value = sizeOf.size || 16;
+  document.getElementById('sizeValue').textContent = sizeOf.size || 16;
   document.getElementById('editorFill').checked = !!set.fill;
   document.querySelectorAll('#editorTools .tool').forEach(button => {
     button.setAttribute('aria-pressed', String(button.dataset.tool === editorTool));
@@ -4214,18 +4286,84 @@ function syncToolOptions() {
   updateBrushCursor();
 }
 
+const HINTS = {
+  select: 'Click a mark to pick it up, drag the handles to resize it. Drag across several to pick them all up, or hold Shift and click.',
+  pen: 'Drag to draw.',
+  highlight: 'Drag across the words.',
+  arrow: 'Drag from the tail to the point.',
+  rect: 'Drag out a box.',
+  ellipse: 'Drag out an oval.',
+  text: 'Click where the note should go, then type.',
+  pixelate: 'Drag over what should be hidden. It is covered, not removed.',
+};
+
+function setTool(tool) {
+  editorTool = tool;
+  if (tool !== 'select') clearSelection();
+  pageCanvases.forEach(c => { c.style.cursor = ''; });   // the select tool sets its own
+  syncToolOptions();
+}
+
 document.querySelectorAll('#editorTools .tool').forEach(button => {
-  button.addEventListener('click', () => { editorTool = button.dataset.tool; syncToolOptions(); });
+  button.addEventListener('click', () => setTool(button.dataset.tool));
 });
+
+/*
+ * A slider is dragged, not clicked: `input` fires on every pixel, `change` once at the end. The
+ * marks follow every pixel so you can see the width you are choosing, and one undo step is
+ * recorded when the drag ends.
+ */
+let sliderBefore = null;
+
+function sliderStart() {
+  if (!sliderBefore && selected().length) sliderBefore = selected().map(a => G().snapshot(a));
+}
+
+function sliderEnd() {
+  if (sliderBefore) {
+    const before = sliderBefore;
+    sliderBefore = null;
+    recordChange(selection.pageIndex, selected(), before);
+  }
+}
+
 document.getElementById('editorWidth').addEventListener('input', (e) => {
-  settings().width = +e.target.value;
-  document.getElementById('widthValue').textContent = e.target.value;
+  sliderStart();
+  const width = +e.target.value;
+  document.getElementById('widthValue').textContent = width;
+  applyToSelection(a => a.type !== 'pixelate' && a.type !== 'text', a => { a.width = width; }, true);
+  if (!selected().length) settings().width = width;
   updateBrushCursor();
 });
+document.getElementById('editorWidth').addEventListener('change', sliderEnd);
+
+document.getElementById('editorSize').addEventListener('input', (e) => {
+  sliderStart();
+  const size = +e.target.value;
+  document.getElementById('sizeValue').textContent = size;
+  applyToSelection(a => a.type === 'text', a => { a.size = size; }, true);
+  if (!selected().length) TOOL_SETTINGS.text.size = size;
+});
+document.getElementById('editorSize').addEventListener('change', sliderEnd);
+
 document.getElementById('editorFill').addEventListener('change', (e) => {
-  settings().fill = e.target.checked;
+  applyToSelection(a => a.type === 'rect' || a.type === 'ellipse', a => { a.fill = e.target.checked; });
+  if (!selected().length) settings().fill = e.target.checked;
   document.getElementById('fillNote').hidden = !e.target.checked;
 });
+
+document.getElementById('selectionDelete').addEventListener('click', deleteSelection);
+document.getElementById('selectionDuplicate').addEventListener('click', duplicateSelection);
+
+/* Changes a setting on the picked-up marks and records it, unless a slider is still moving */
+function applyToSelection(pred, change, live) {
+  const targets = selected().filter(pred);
+  if (!targets.length) return;
+  const before = live ? null : targets.map(a => G().snapshot(a));
+  targets.forEach(change);
+  repaint(selection.pageIndex);
+  if (before) recordChange(selection.pageIndex, targets, before);
+}
 
 /* ---------- The cursor shows what the tool will actually lay down ----------
  * A crosshair tells you nothing about how wide a highlighter stroke is going to be, which is
@@ -4270,9 +4408,7 @@ function moveBrushCursor(e) {
   /*
    * The marker is positioned inside the stage, which scrolls, so its coordinates are measured
    * from the top of the whole document rather than the top of the visible part. Without the
-   * scroll offset it sits further and further above the pointer the further down you go — and
-   * because the real cursor is hidden while a freehand tool is up, that reads as the mouse
-   * lagging behind or disappearing.
+   * scroll offset it sits further and further above the pointer the further down you go.
    */
   brushCursor.style.left = (e.clientX - stage.left + editorStage.scrollLeft) + 'px';
   brushCursor.style.top = (e.clientY - stage.top + editorStage.scrollTop) + 'px';
@@ -4318,11 +4454,13 @@ function openEditor(doc, onDone) {
   editorNameInput.value = doc.name.replace(/\.[^.]+$/, '');
   editor.hidden = false;
   document.body.style.overflow = 'hidden';
+  selection.pageIndex = -1;
+  selection.items = [];
+  markHistory = [];
+  undone = [];
   syncToolOptions();
   layoutPages();
   editorStage.scrollTop = 0;
-  markHistory = [];
-  undone = [];
   syncHistoryButtons();
 }
 
@@ -4332,6 +4470,7 @@ function markCount() {
 
 /* Backing out throws the marks away, so it asks first — Done keeps them and doesn't */
 function closeEditor(discarding) {
+  finishTextEdit(true);
   if (discarding && markCount()) {
     const marks = markCount();
     const what = marks === 1 ? 'one mark' : marks + ' marks';
@@ -4347,6 +4486,8 @@ function closeEditor(discarding) {
   editorDoc = null;
   editorOnDone = null;
   pageCanvases = [];
+  selection.pageIndex = -1;
+  selection.items = [];
   /*
    * Backing out hands back nothing. It used to hand back the document either way, so Back ran
    * the same callback as Done and went forward to the preview — whose own Back reopened the
@@ -4359,17 +4500,25 @@ document.getElementById('editorBack').addEventListener('click', () => closeEdito
 document.getElementById('editorDone').addEventListener('click', () => closeEditor(false));
 
 /* ---------- Undo and redo ----------
- * A single record of what was done, in the order it happened, rather than looking for the last
- * page that has anything on it — that undid whatever was furthest down the document instead of
- * whatever was drawn most recently, which is why the order felt arbitrary.
+ * One list of steps in the order they happened. A step knows how to take itself back and how
+ * to do itself again, so adding, moving, resizing, restyling and deleting all undo the same way.
  */
 let markHistory = [];
 let undone = [];
 
-function recordStroke(pageIndex, annotation) {
-  markHistory.push({ pageIndex, annotation });
-  undone = [];                     // a new mark ends the branch that could have been redone
+function recordStep(step) {
+  markHistory.push(step);
+  undone = [];                     // a new step ends the branch that could have been redone
   syncHistoryButtons();
+}
+
+function recordStroke(pageIndex, annotation) {
+  const page = editorDoc.pages[pageIndex];
+  recordStep({
+    pageIndex, annotation,
+    undo() { const at = page.annotations.indexOf(annotation); if (at > -1) page.annotations.splice(at, 1); },
+    redo() { page.annotations.push(annotation); },
+  });
 }
 
 function forgetStroke(annotation) {
@@ -4378,38 +4527,252 @@ function forgetStroke(annotation) {
   syncHistoryButtons();
 }
 
+/* The marks as they are now, against how they were before the change */
+function recordChange(pageIndex, items, before) {
+  const after = items.map(a => G().snapshot(a));
+  if (JSON.stringify(after) === JSON.stringify(before)) return;
+  recordStep({
+    pageIndex, items,
+    undo() { items.forEach((a, i) => G().restore(a, before[i])); },
+    redo() { items.forEach((a, i) => G().restore(a, after[i])); },
+  });
+}
+
+function recordRemoval(pageIndex, items) {
+  const page = editorDoc.pages[pageIndex];
+  const places = items.map(a => page.annotations.indexOf(a));
+  recordStep({
+    pageIndex, items,
+    undo() { items.forEach((a, i) => page.annotations.splice(Math.min(places[i], page.annotations.length), 0, a)); },
+    redo() { items.forEach(a => { const at = page.annotations.indexOf(a); if (at > -1) page.annotations.splice(at, 1); }); },
+  });
+}
+
 function syncHistoryButtons() {
   document.getElementById('editorUndo').disabled = markHistory.length === 0;
   document.getElementById('editorRedo').disabled = undone.length === 0;
 }
 
 function repaint(pageIndex) {
-  const page = editorDoc.pages[pageIndex];
-  if (page && pageCanvases[pageIndex]) window.Annotator.renderPage(pageCanvases[pageIndex], page);
+  const page = editorDoc && editorDoc.pages[pageIndex];
+  const canvas = pageCanvases[pageIndex];
+  if (!page || !canvas) return;
+  window.Annotator.renderPage(canvas, page);
+  if (selection.pageIndex === pageIndex) drawSelection(canvas, page, selection.items);
 }
 
-document.getElementById('editorUndo').addEventListener('click', () => {
+function undo() {
   if (!editorDoc || !markHistory.length) return;
+  finishTextEdit(false);
   const step = markHistory.pop();
-  const page = editorDoc.pages[step.pageIndex];
-  const at = page.annotations.indexOf(step.annotation);
-  if (at > -1) page.annotations.splice(at, 1);
+  step.undo();
   undone.push(step);
+  // Whatever was undone is left picked up, so it can be put straight back with the panel
+  const kept = (step.items || [step.annotation]).filter(a => editorDoc.pages[step.pageIndex].annotations.includes(a));
+  selection.pageIndex = kept.length ? step.pageIndex : -1;
+  selection.items = kept;
   repaint(step.pageIndex);
+  syncToolOptions();
   syncHistoryButtons();
-});
+}
 
-document.getElementById('editorRedo').addEventListener('click', () => {
+function redo() {
   if (!editorDoc || !undone.length) return;
+  finishTextEdit(false);
   const step = undone.pop();
-  editorDoc.pages[step.pageIndex].annotations.push(step.annotation);
+  step.redo();
   markHistory.push(step);
+  const kept = (step.items || [step.annotation]).filter(a => editorDoc.pages[step.pageIndex].annotations.includes(a));
+  selection.pageIndex = kept.length ? step.pageIndex : -1;
+  selection.items = kept;
   repaint(step.pageIndex);
+  syncToolOptions();
   syncHistoryButtons();
-});
+}
+
+document.getElementById('editorUndo').addEventListener('click', undo);
+document.getElementById('editorRedo').addEventListener('click', redo);
+
+function deleteSelection() {
+  const items = selected();
+  if (!items.length) return;
+  const pageIndex = selection.pageIndex;
+  const page = editorDoc.pages[pageIndex];
+  recordRemoval(pageIndex, items);
+  items.forEach(a => { const at = page.annotations.indexOf(a); if (at > -1) page.annotations.splice(at, 1); });
+  selection.items = [];
+  selection.pageIndex = -1;
+  repaint(pageIndex);
+  syncToolOptions();
+}
+
+function duplicateSelection() {
+  const items = selected();
+  if (!items.length) return;
+  const pageIndex = selection.pageIndex;
+  const page = editorDoc.pages[pageIndex];
+  const copies = items.map(a => { const c = G().snapshot(a); G().translate(c, 0.02, 0.02); return c; });
+  copies.forEach(c => page.annotations.push(c));
+  recordStep({
+    pageIndex, items: copies,
+    undo() { copies.forEach(c => { const at = page.annotations.indexOf(c); if (at > -1) page.annotations.splice(at, 1); }); },
+    redo() { copies.forEach(c => page.annotations.push(c)); },
+  });
+  selectMarks(pageIndex, copies);
+}
+
+/* ---------- Selection chrome ----------
+ * A dashed outline round each picked-up mark and, for one on its own, handles to resize it by.
+ * Sizes are in screen pixels: the canvas is scaled to fit the stage, so a handle drawn in
+ * canvas pixels would shrink with the page.
+ */
+const HANDLE = 9;           // px on screen
+const HANDLE_REACH = 8;
+
+function screenScale(canvas) {
+  const shown = canvas.getBoundingClientRect().width;
+  return shown ? canvas.width / shown : 1;
+}
+
+function handlesFor(a, page, canvas) {
+  const b = G().boundsOf(a, page);
+  const w = canvas.width, h = canvas.height;
+  const px = (x, y) => ({ x: x * w, y: y * h });
+  if (a.type === 'arrow') {
+    return [{ id: 'a', cursor: 'move', ...px(a.x1, a.y1) }, { id: 'b', cursor: 'move', ...px(a.x2, a.y2) }];
+  }
+  const x0 = b.x, y0 = b.y, x1 = b.x + b.w, y1 = b.y + b.h, xm = b.x + b.w / 2, ym = b.y + b.h / 2;
+  if (a.type === 'text') {
+    return [{ id: 'w', cursor: 'ew-resize', ...px(x0, ym) }, { id: 'e', cursor: 'ew-resize', ...px(x1, ym) }];
+  }
+  const corners = [
+    { id: 'nw', cursor: 'nwse-resize', ...px(x0, y0) }, { id: 'ne', cursor: 'nesw-resize', ...px(x1, y0) },
+    { id: 'sw', cursor: 'nesw-resize', ...px(x0, y1) }, { id: 'se', cursor: 'nwse-resize', ...px(x1, y1) },
+  ];
+  if (a.points) return corners;
+  return corners.concat([
+    { id: 'n', cursor: 'ns-resize', ...px(xm, y0) }, { id: 's', cursor: 'ns-resize', ...px(xm, y1) },
+    { id: 'w', cursor: 'ew-resize', ...px(x0, ym) }, { id: 'e', cursor: 'ew-resize', ...px(x1, ym) },
+  ]);
+}
+
+function drawSelection(canvas, page, items) {
+  if (!items.length) return;
+  const ctx = canvas.getContext('2d');
+  const k = screenScale(canvas);
+  const w = canvas.width, h = canvas.height;
+  ctx.save();
+  items.forEach(a => {
+    const b = G().boundsOf(a, page);
+    const pad = 4 * k;
+    ctx.setLineDash([5 * k, 4 * k]);
+    ctx.lineWidth = 1.5 * k;
+    ctx.strokeStyle = '#2563eb';
+    if (a.type === 'arrow') {
+      ctx.beginPath();
+      ctx.moveTo(a.x1 * w, a.y1 * h);
+      ctx.lineTo(a.x2 * w, a.y2 * h);
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(b.x * w - pad, b.y * h - pad, b.w * w + pad * 2, b.h * h + pad * 2);
+    }
+  });
+  if (items.length === 1) {
+    ctx.setLineDash([]);
+    handlesFor(items[0], page, canvas).forEach(hd => {
+      const r = (HANDLE / 2) * k;
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 1.5 * k;
+      ctx.beginPath();
+      if (items[0].type === 'arrow') ctx.arc(hd.x, hd.y, r, 0, Math.PI * 2);
+      else ctx.rect(hd.x - r, hd.y - r, r * 2, r * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+  }
+  ctx.restore();
+}
+
+/* ---------- Notes: typed in a box laid over the page ----------
+ * The text is typed into a real text box sitting exactly where the note is, in the same size
+ * and colour. While it is open the note itself is not drawn, so nothing shows twice.
+ */
+let textEdit = null;      // { box, a, pageIndex, canvas, page, before }
+
+function beginTextEdit(a, pageIndex, canvas, page, fresh) {
+  finishTextEdit(false);
+  const wrap = canvas.parentNode;
+  const box = document.createElement('textarea');
+  box.className = 'editor-text-input';
+  box.value = a.text || '';
+  box.spellcheck = true;
+  box.setAttribute('aria-label', 'Note');
+  // Photographed before the editing flag goes on, or undo would put a hidden note back
+  textEdit = { box, a, pageIndex, canvas, page, before: fresh ? null : G().snapshot(a), fresh };
+  a.editing = true;
+  wrap.appendChild(box);
+  placeTextEdit();
+  repaint(pageIndex);
+  box.focus();
+  box.addEventListener('input', () => { autoGrowTextEdit(); });
+  box.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); finishTextEdit(true); }
+    else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); finishTextEdit(false); }
+    e.stopPropagation();
+  });
+  box.addEventListener('blur', () => finishTextEdit(false));
+}
+
+function placeTextEdit() {
+  if (!textEdit) return;
+  const { box, a, canvas, page } = textEdit;
+  const shown = canvas.getBoundingClientRect();
+  const scale = shown.width / canvas.width;
+  const size = window.Annotator.fontSizeFor(page, a) * (canvas.width / page.width) * scale;
+  box.style.left = (a.x * shown.width) + 'px';
+  box.style.top = (a.y * shown.height) + 'px';
+  box.style.width = (a.w * shown.width) + 'px';
+  box.style.fontSize = size + 'px';
+  box.style.padding = (size * 0.35) + 'px';
+  box.style.lineHeight = '1.25';
+  box.style.color = a.color;
+  autoGrowTextEdit();
+}
+
+function autoGrowTextEdit() {
+  if (!textEdit) return;
+  textEdit.box.style.height = 'auto';
+  textEdit.box.style.height = textEdit.box.scrollHeight + 'px';
+}
+
+function finishTextEdit(cancel) {
+  if (!textEdit) return;
+  const { box, a, pageIndex, page, before, fresh } = textEdit;
+  textEdit = null;
+  const typed = box.value.replace(/\s+$/, '');
+  box.remove();
+  delete a.editing;
+  if (cancel && before) G().restore(a, before);
+  else if (!cancel) a.text = typed;
+  const empty = !String(a.text || '').trim();
+  if (empty || (cancel && fresh)) {
+    // Nothing typed, so no note: the step that added it goes too
+    const at = page.annotations.indexOf(a);
+    if (at > -1) page.annotations.splice(at, 1);
+    forgetStroke(a);
+    if (selection.items.includes(a)) { selection.items = selection.items.filter(x => x !== a); if (!selection.items.length) selection.pageIndex = -1; }
+  } else if (before && !cancel) {
+    recordChange(pageIndex, [a], [before]);
+  }
+  a.h = window.Annotator.textHeight(page, a);
+  repaint(pageIndex);
+  syncToolOptions();
+}
 
 /* ---------- Marking up ---------- */
 let stroke = null;
+let gesture = null;       // what the pointer is doing with the select tool
 
 function attachDrawing(canvas, page, index) {
   function pointOn(e) {
@@ -4419,10 +4782,38 @@ function attachDrawing(canvas, page, index) {
       Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
     ];
   }
+  const aspect = () => page.width / page.height;
+  // Eight screen pixels, as a fraction of the page's height
+  const tolerance = () => HANDLE_REACH / canvas.getBoundingClientRect().height;
 
   canvas.addEventListener('pointerenter', () => { cursorOver = { canvas, page }; updateBrushCursor(); });
   canvas.addEventListener('pointerleave', () => { if (!stroke) { cursorOver = null; brushCursor.hidden = true; } });
   canvas.addEventListener('pointermove', moveBrushCursor);
+
+  function handleAt(x, y) {
+    if (selection.pageIndex !== index || selection.items.length !== 1) return null;
+    const r = canvas.getBoundingClientRect();
+    const px = x * canvas.width, py = y * canvas.height;
+    const reach = HANDLE_REACH * (canvas.width / r.width);
+    return handlesFor(selection.items[0], page, canvas).find(hd => Math.hypot(hd.x - px, hd.y - py) <= reach) || null;
+  }
+
+  function markAt(x, y) {
+    const tol = tolerance();
+    // Topmost first, so the mark drawn last is the one a click lands on
+    for (let i = page.annotations.length - 1; i >= 0; i--) {
+      if (G().hits(page.annotations[i], page, x, y, tol, aspect())) return page.annotations[i];
+    }
+    return null;
+  }
+
+  // The cursor says what a press would do: move a mark, resize it, or draw a box round several
+  canvas.addEventListener('pointermove', (e) => {
+    if (editorTool !== 'select' || gesture) return;
+    const [x, y] = pointOn(e);
+    const hd = handleAt(x, y);
+    canvas.style.cursor = hd ? hd.cursor : (markAt(x, y) ? 'move' : 'default');
+  });
 
   /*
    * Drawing used to repaint the whole page on every pointermove: clear, redraw the full-size
@@ -4432,23 +4823,41 @@ function attachDrawing(canvas, page, index) {
    *
    * Instead the settled page is photographed once when a stroke starts. Each frame is then that
    * photograph plus the one stroke being drawn, which costs the same whether the page has one
-   * mark on it or fifty.
+   * mark on it or fifty. Moving picked-up marks works the same way: the photograph is the page
+   * without them, and each frame adds them back wherever they are now.
    */
   let settled = null;
   let frame = 0;
 
-  function paintStroke() {
+  function paintFrame() {
     frame = 0;
-    if (!stroke || !settled) return;
+    if (!settled) return;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(settled, 0, 0);
-    window.Annotator.drawAnnotation(ctx, canvas, page, stroke);
+    if (stroke) window.Annotator.drawAnnotation(ctx, canvas, page, stroke);
+    if (gesture) {
+      gesture.items.forEach(a => window.Annotator.drawAnnotation(ctx, canvas, page, a));
+      if (gesture.kind === 'marquee') drawMarquee(ctx, gesture.box);
+      else drawSelection(canvas, page, gesture.items);
+    }
+  }
+
+  function drawMarquee(ctx, box) {
+    const k = screenScale(canvas);
+    ctx.save();
+    ctx.fillStyle = 'rgba(37, 99, 235, 0.08)';
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 1 * k;
+    ctx.setLineDash([4 * k, 3 * k]);
+    ctx.fillRect(box.x * canvas.width, box.y * canvas.height, box.w * canvas.width, box.h * canvas.height);
+    ctx.strokeRect(box.x * canvas.width, box.y * canvas.height, box.w * canvas.width, box.h * canvas.height);
+    ctx.restore();
   }
 
   function paintSoon() {
     // One paint per frame, however many moves arrive in between
-    if (!frame) frame = requestAnimationFrame(paintStroke);
+    if (!frame) frame = requestAnimationFrame(paintFrame);
   }
 
   function stopPainting() {
@@ -4457,21 +4866,98 @@ function attachDrawing(canvas, page, index) {
     settled = null;
   }
 
+  /* The page as it stands, without the marks about to move */
+  function photograph(without) {
+    settled = document.createElement('canvas');
+    settled.width = canvas.width;
+    settled.height = canvas.height;
+    const skip = new Set(without || []);
+    const rest = { ...page, annotations: page.annotations.filter(a => !skip.has(a)) };
+    window.Annotator.renderPage(settled, rest);
+  }
+
+  function beginSelectGesture(e, x, y) {
+    const hd = handleAt(x, y);
+    if (hd) {
+      const a = selection.items[0];
+      gesture = { kind: 'resize', handle: hd.id, items: [a], before: [G().snapshot(a)],
+                  start: G().boundsOf(a, page), from: [x, y] };
+      photograph([a]);
+      return;
+    }
+    const hit = markAt(x, y);
+    if (hit) {
+      let items;
+      if (e.shiftKey) {
+        items = selection.pageIndex === index && selection.items.includes(hit)
+          ? selection.items.filter(a => a !== hit)
+          : (selection.pageIndex === index ? selection.items.concat(hit) : [hit]);
+        selectMarks(index, items);
+        return;                                   // a shift-click only changes what is picked up
+      }
+      items = selection.pageIndex === index && selection.items.includes(hit) ? selection.items : [hit];
+      if (items !== selection.items) selectMarks(index, items);
+      gesture = { kind: 'move', items, before: items.map(a => G().snapshot(a)), from: [x, y], last: [x, y], moved: false };
+      photograph(items);
+      return;
+    }
+    if (!e.shiftKey) clearSelection();
+    gesture = { kind: 'marquee', items: [], from: [x, y], box: { x, y, w: 0, h: 0 }, add: e.shiftKey };
+    photograph([]);
+  }
+
+  function resizeTo(x, y) {
+    const a = gesture.items[0];
+    const s = gesture.start;
+    const hd = gesture.handle;
+    if (a.type === 'arrow') {
+      G().restore(a, gesture.before[0]);
+      if (hd === 'a') { a.x1 = x; a.y1 = y; } else { a.x2 = x; a.y2 = y; }
+      return;
+    }
+    let x0 = s.x, y0 = s.y, x1 = s.x + s.w, y1 = s.y + s.h;
+    if (hd.includes('w')) x0 = x;
+    if (hd.includes('e')) x1 = x;
+    if (hd.includes('n')) y0 = y;
+    if (hd.includes('s')) y1 = y;
+    const to = { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) };
+    G().restore(a, gesture.before[0]);
+    G().fitTo(a, s, to);
+  }
+
   canvas.addEventListener('pointerdown', (e) => {
     if (!editorDoc) return;
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
     e.preventDefault();
+    if (textEdit) finishTextEdit(false);
     canvas.setPointerCapture(e.pointerId);
     cursorOver = { canvas, page };
     const [x, y] = pointOn(e);
     const set = settings();
 
-    editor.classList.add('is-drawing');     // pan is blocked only for the length of the stroke
+    if (editorTool === 'select') {
+      editor.classList.add('is-drawing');
+      beginSelectGesture(e, x, y);
+      if (!gesture) editor.classList.remove('is-drawing');
+      return;
+    }
 
-    // The page as it stands, before this stroke joins it
-    settled = document.createElement('canvas');
-    settled.width = canvas.width;
-    settled.height = canvas.height;
-    window.Annotator.renderPage(settled, page);
+    if (editorTool === 'text') {
+      const a = { type: 'text', color: set.color, size: set.size, x, y, w: 0.3, h: 0.05, text: '' };
+      // Keep the box on the page
+      a.w = Math.min(a.w, 1 - x);
+      page.annotations.push(a);
+      recordStroke(index, a);
+      selection.pageIndex = index;
+      selection.items = [a];
+      beginTextEdit(a, index, canvas, page, true);
+      syncToolOptions();
+      return;
+    }
+
+    editor.classList.add('is-drawing');     // pan is blocked only for the length of the stroke
+    clearSelection();
+    photograph([]);
 
     if (editorTool === 'arrow') {
       stroke = { type: 'arrow', color: set.color, width: set.width, x1: x, y1: y, x2: x, y2: y };
@@ -4487,8 +4973,23 @@ function attachDrawing(canvas, page, index) {
   });
 
   canvas.addEventListener('pointermove', (e) => {
-    if (!stroke || stroke.pageIndex !== index) return;
     const [x, y] = pointOn(e);
+    if (gesture) {
+      if (gesture.kind === 'move') {
+        const dx = x - gesture.last[0], dy = y - gesture.last[1];
+        gesture.items.forEach(a => G().translate(a, dx, dy));
+        gesture.last = [x, y];
+        gesture.moved = gesture.moved || Math.hypot(x - gesture.from[0], y - gesture.from[1]) > 0.002;
+      } else if (gesture.kind === 'resize') {
+        resizeTo(x, y);
+      } else {
+        const [fx, fy] = gesture.from;
+        gesture.box = { x: Math.min(fx, x), y: Math.min(fy, y), w: Math.abs(x - fx), h: Math.abs(y - fy) };
+      }
+      paintSoon();
+      return;
+    }
+    if (!stroke || stroke.pageIndex !== index) return;
     if (stroke.points) {
       stroke.points.push([x, y]);
     } else if (stroke.type === 'arrow') {
@@ -4503,23 +5004,101 @@ function attachDrawing(canvas, page, index) {
     paintSoon();
   });
 
+  function endGesture() {
+    const g = gesture;
+    gesture = null;
+    stopPainting();
+    if (g.kind === 'marquee') {
+      const found = page.annotations.filter(a => g.box.w > 0.002 && g.box.h > 0.002 && G().overlaps(a, page, g.box));
+      const items = g.add && selection.pageIndex === index ? selection.items.concat(found.filter(a => !selection.items.includes(a))) : found;
+      selection.pageIndex = items.length ? index : -1;
+      selection.items = items;
+    } else if (g.kind === 'move' && g.moved) {
+      recordChange(index, g.items, g.before);
+    } else if (g.kind === 'resize') {
+      recordChange(index, g.items, g.before);
+    }
+    repaint(index);
+    syncToolOptions();
+  }
+
   function end() {
+    editor.classList.remove('is-drawing');
+    if (gesture) { endGesture(); return; }
     if (!stroke || stroke.pageIndex !== index) return;
     // A tap that drew nothing shouldn't leave an invisible mark behind
     let empty;
     if (stroke.points) empty = stroke.points.length < 2;
     else if (stroke.type === 'arrow') empty = Math.hypot(stroke.x2 - stroke.x1, stroke.y2 - stroke.y1) < 0.01;
     else empty = stroke.w < 0.005 || stroke.h < 0.005;
-    if (empty) { page.annotations.pop(); forgetStroke(stroke); }
+    const finished = stroke;
+    if (empty) { page.annotations.pop(); forgetStroke(finished); }
+    delete finished.ox;
+    delete finished.oy;
     stroke = null;
-    editor.classList.remove('is-drawing');
-    // Painted in full here, once, so the finished mark is composited like all the others
+    // Painted in full here, once, so the finished mark is composited like all the others. A
+    // shape is left picked up, so its width or colour can be changed straight away.
     stopPainting();
-    window.Annotator.renderPage(canvas, page);
+    if (!empty && finished.type !== 'pen' && finished.type !== 'highlight') {
+      selection.pageIndex = index;
+      selection.items = [finished];
+    }
+    repaint(index);
+    syncToolOptions();
   }
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
+
+  // A note is reopened for typing with a double click, whatever tool is up
+  canvas.addEventListener('dblclick', (e) => {
+    const [x, y] = pointOn(e);
+    const hit = markAt(x, y);
+    if (hit && hit.type === 'text') {
+      selection.pageIndex = index;
+      selection.items = [hit];
+      beginTextEdit(hit, index, canvas, page, false);
+    }
+  });
 }
+
+/* ---------- Keys ----------
+ * The usual ones, and only while the editor is up and nothing is being typed into.
+ */
+document.addEventListener('keydown', (e) => {
+  if (!editorDoc || editor.hidden) return;
+  const typing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.key.toLowerCase() === 'y' && !typing) { e.preventDefault(); redo(); return; }
+  if (typing) return;
+  const picked = selected();
+  if ((e.key === 'Delete' || e.key === 'Backspace') && picked.length) { e.preventDefault(); deleteSelection(); return; }
+  if (e.key === 'Escape') { if (picked.length) clearSelection(); else if (editorTool !== 'select') setTool('select'); return; }
+  if (mod && e.key.toLowerCase() === 'a') {
+    e.preventDefault();
+    const pageIndex = selection.pageIndex > -1 ? selection.pageIndex : (cursorOver ? pageCanvases.indexOf(cursorOver.canvas) : 0);
+    if (pageIndex > -1) selectMarks(pageIndex, editorDoc.pages[pageIndex].annotations.slice());
+    return;
+  }
+  if (mod && e.key.toLowerCase() === 'd' && picked.length) { e.preventDefault(); duplicateSelection(); return; }
+  const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (nudge && picked.length) {
+    e.preventDefault();
+    const canvas = pageCanvases[selection.pageIndex];
+    const r = canvas.getBoundingClientRect();
+    const step = e.shiftKey ? 10 : 1;
+    const before = picked.map(a => G().snapshot(a));
+    picked.forEach(a => G().translate(a, nudge[0] * step / r.width, nudge[1] * step / r.height));
+    recordChange(selection.pageIndex, picked, before);
+    repaint(selection.pageIndex);
+    return;
+  }
+  const shortcut = { v: 'select', p: 'pen', h: 'highlight', a: 'arrow', b: 'rect', o: 'ellipse', t: 'text', x: 'pixelate' }[e.key.toLowerCase()];
+  if (shortcut && !mod) setTool(shortcut);
+});
+
+// A note being typed sits on the page in screen pixels, so it moves when the window does
+window.addEventListener('resize', placeTextEdit);
 
 /* ---------- Attachment list on a form ---------- */
 function attachmentsFor(type) {

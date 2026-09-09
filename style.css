@@ -2731,10 +2731,13 @@ body.has-bar-text-size .text-size-toggle { display: none; }
   min-height: 0;
 }
 
+/* ---------- The side panel ----------
+ * Tools at the top, then whatever the current tool or the picked-up marks can have changed.
+ */
 .editor-tools {
-  width: 216px;
+  width: 232px;
   flex-shrink: 0;
-  padding: 18px 16px;
+  padding: 14px 14px 20px;
   background: var(--c-surface);
   border-right: 1px solid var(--c-border);
   overflow-y: auto;
@@ -2747,35 +2750,93 @@ body.has-bar-text-size .text-size-toggle { display: none; }
 }
 
 .tool-group {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 4px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .tool {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--c-text);
   background: none;
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 9px 10px;
+  padding: 8px 8px;
   cursor: pointer;
   text-align: left;
 }
 .tool:hover { background: var(--c-surface-alt); }
 .tool[aria-pressed="true"] { background: var(--dc-primary); color: #fff; }
+.tool kbd {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--c-text-faint);
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  line-height: 1.2;
+}
+.tool[aria-pressed="true"] kbd { color: rgba(255, 255, 255, 0.75); border-color: rgba(255, 255, 255, 0.35); }
 
-.tool-icon { display: inline-flex; width: 18px; height: 18px; flex-shrink: 0; }
+.tool-icon { display: inline-flex; width: 17px; height: 17px; flex-shrink: 0; }
 .tool-icon svg { width: 100%; height: 100%; }
 
-.tool-row { margin-bottom: 18px; }
+.tool-hint {
+  margin: 0 2px 14px;
+  min-height: 2.9em;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--c-text-muted);
+}
+
+/* What is picked up, with the two things you do to it as a whole */
+.selection-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  background: #eef3fd;
+  border: 1px solid #c7d7f7;
+  border-radius: var(--radius-sm);
+}
+.selection-row[hidden] { display: none; }
+.selection-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--c-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.selection-actions { display: flex; gap: 4px; }
+.selection-action {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.selection-action:hover { border-color: var(--c-accent); color: var(--c-accent); }
+.selection-action.is-danger { color: #b91c1c; }
+.selection-action.is-danger:hover { border-color: #b91c1c; background: #fef2f2; }
+
+.tool-row { margin-bottom: 16px; }
 .tool-row[hidden] { display: none; }
 
 .tool-label {
@@ -2809,12 +2870,14 @@ body.has-bar-text-size .text-size-toggle { display: none; }
   border: 1px solid rgba(0, 0, 0, 0.15);
   cursor: pointer;
   padding: 0;
+  transition: transform 0.12s ease;
 }
+.swatch:hover { transform: scale(1.1); }
 .swatch[aria-pressed="true"] {
   box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--dc-primary);
 }
 
-#editorWidth { width: 100%; accent-color: var(--dc-primary); }
+#editorWidth, #editorSize { width: 100%; accent-color: var(--dc-primary); }
 
 .tool-check {
   display: flex;
@@ -2829,7 +2892,7 @@ body.has-bar-text-size .text-size-toggle { display: none; }
 .tool-check[hidden] { display: none; }
 
 .tool-note {
-  margin: 0;
+  margin: 0 0 14px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--c-text-muted);
@@ -2839,6 +2902,14 @@ body.has-bar-text-size .text-size-toggle { display: none; }
   padding: 10px 12px;
 }
 .tool-note[hidden] { display: none; }
+
+.tool-keys {
+  margin: 8px 2px 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--c-text-faint);
+}
+.tool-keys b { font-weight: 600; color: var(--c-text-muted); }
 
 /* Pages scroll, the way any document reader behaves */
 .editor-stage {
@@ -2868,12 +2939,31 @@ body.has-bar-text-size .text-size-toggle { display: none; }
   /*
    * Scrolling has to keep working over the page — a canvas covers most of the stage, and
    * touch-action: none here stopped two fingers on a trackpad from moving the document at all.
-   * Panning is only blocked while a mark is actually being drawn, below.
+   * Panning is only blocked while a mark is actually being drawn or moved, below.
    */
   touch-action: pan-y;
 }
 
 .editor.is-drawing .editor-canvas { touch-action: none; }
+.editor.is-selecting .editor-canvas { cursor: default; }
+
+/* A note being typed: the same box the note will be drawn in, on top of the page */
+.editor-text-input {
+  position: absolute;
+  z-index: 4;
+  margin: 0;
+  box-sizing: border-box;
+  min-height: 1.6em;
+  font-family: Helvetica, Arial, sans-serif;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1.5px dashed #2563eb;
+  border-radius: 2px;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
 
 .editor-page-number {
   position: absolute;
@@ -2883,9 +2973,6 @@ body.has-bar-text-size .text-size-toggle { display: none; }
   font-size: 11.5px;
   color: rgba(255, 255, 255, 0.55);
 }
-
-/* Freehand tools hide the crosshair and show the actual nib instead */
-.editor-stage:has(.editor-canvas) .editor-canvas { cursor: crosshair; }
 
 /* A ring, not a blob: it shows how wide the nib is without covering what's under it */
 .brush-cursor {
@@ -2911,10 +2998,12 @@ body.has-bar-text-size .text-size-toggle { display: none; }
     width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--c-border);
-    max-height: 40vh;
+    max-height: 42vh;
   }
-  .tool-group { display: grid; grid-template-columns: repeat(3, 1fr); }
-  .tool { flex-direction: column; gap: 4px; font-size: 11.5px; text-align: center; }
+  .tool-group { grid-template-columns: repeat(4, 1fr); }
+  .tool { flex-direction: column; gap: 4px; font-size: 11px; text-align: center; padding: 6px 4px; }
+  .tool kbd { display: none; }
+  .tool-hint { display: none; }
   .editor-title { flex-wrap: wrap; }
 }
 

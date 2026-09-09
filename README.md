@@ -29,8 +29,10 @@ because the page on screen *is* the page that comes out.
   .grv copy before anything is erased.
 - **Attach supporting documents.** Add PDFs or photos to a form and they're
   appended after it, so the grievance and its evidence go in as one file.
-- **Mark them up** — draw, highlight, arrows, boxes and ovals, and blur. Each
-  tool keeps its own colour and thickness; the highlighter has its own palette.
+- **Mark them up** — draw, highlight, arrows, boxes, ovals, typed notes, and blur.
+  Anything placed can be picked up again: move it, resize it by its handles, change
+  its colour or thickness, drag across several to move them together, delete or
+  duplicate. Each tool keeps its own settings; the highlighter has its own palette.
   **Mark up** on a form opens the form *and* its supporting documents as one
   scrolling document, so an arrow on page 1 can point at a photo on page 4.
   A single attachment can still be marked on its own from the list.
