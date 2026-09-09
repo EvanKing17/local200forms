@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=81">
+<link rel="stylesheet" href="style.css?v=82">
 </head>
 <body>
 
@@ -42,6 +42,7 @@
               aria-haspopup="true" aria-controls="toolsMenu">Tools</button>
       <div class="tools-menu" id="toolsMenu" hidden role="menu">
         <button type="button" role="menuitem" data-tool="drot">DROT Audit</button>
+        <button type="button" role="menuitem" data-tool="cover">Cover page</button>
       </div>
     </div>
     <span class="rail-spacer"></span>
@@ -124,6 +125,30 @@
       <button type="button" class="btn-primary" id="drotNext">Next</button>
     </div>
     <p class="drot-status" id="drotStatus" role="status"></p>
+  </div>
+</div>
+
+<!-- ================= COVER PAGE =================
+     A front sheet for a bundle: the matter and the people, centred on a blank page. -->
+<div class="cover-view" id="coverView" hidden>
+  <div class="dc-toolbar">
+    <button type="button" class="dc-back" data-back-to-forms>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+      </svg>
+      Forms
+    </button>
+    <span class="cover-hint">A front sheet for a bundle. Type what it covers.</span>
+    <button type="button" class="btn-primary" id="coverPrint">Print/Download PDF</button>
+  </div>
+
+  <div class="dc-page cover-page">
+    <textarea class="cover-title" id="coverTitle" rows="1" placeholder="Title of the matter" aria-label="Title" spellcheck="true"></textarea>
+    <div class="cover-rule" aria-hidden="true"></div>
+    <textarea class="cover-sub" id="coverSub" rows="2" placeholder="Who is involved, and the file or grievance number" aria-label="Who is involved"></textarea>
+    <input type="text" class="cover-date" id="coverDate" placeholder="Date" aria-label="Date" autocomplete="off">
+    <div class="cover-foot" aria-hidden="true">Unifor Local 200</div>
   </div>
 </div>
 
@@ -1132,14 +1157,15 @@
     </div>
 
     <form id="witnessForm" class="dc-page">
-      <div class="dc-page-head">
-        <span></span>
+      <!-- Title left, small logo right, one rule under both: the statement is the point here -->
+      <div class="dc-page-head dc-compact-head">
+        <div class="dc-head-text">
+          <div class="dc-doc-title" id="form-witness-heading">Witness Statement</div>
+          <p class="dc-doc-note">For Local Union Use Only</p>
+        </div>
         <img class="dc-logo" alt="Unifor" data-unifor-logo>
       </div>
       <div class="dc-doc-rule"></div>
-
-      <div class="dc-doc-title dc-centered" id="form-witness-heading">Witness Statement</div>
-      <p class="dc-doc-note">For Local Union Use Only</p>
 
       <div class="dc-band dc-block"><span>Statement</span></div>
       <div class="dc-field-grid dc-cols-31 dc-attached">
@@ -1586,9 +1612,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=81"></script>
+<script src="forms.config.js?v=82"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=81"></script>
-<script src="script.js?v=81"></script>
+<script src="annotate.js?v=82"></script>
+<script src="script.js?v=82"></script>
 </body>
 </html>

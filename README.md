@@ -189,6 +189,11 @@ disagree with what's actually being served.
 **Tools** in the rail down the left of the form list. Odd jobs that aren't
 filling in a form.
 
+### Cover page
+
+A front sheet for a bundle: the matter, who is involved, and the date, centred on an
+otherwise blank page. What was typed last is kept on the device.
+
 ### DROT Audit
 
 Steps through all 25 departments across Essex and the Annex, one at a time,

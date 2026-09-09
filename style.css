@@ -1052,6 +1052,7 @@ input[type="radio"] { width: 15px; height: 15px; }
 .dc-ribbon-print:hover { background: #dbe6f2; border-color: #aec2d8; }
 
 .dc-page {
+  position: relative;        /* the page-break lines are placed against the sheet */
   width: 816px;
   max-width: 100%;
   margin: 0 auto;
@@ -1602,6 +1603,13 @@ input[type="radio"] { width: 15px; height: 15px; }
 }
 .dc-doc-note + .dc-field-grid { margin-top: 26px; }
 
+/* Title beside a small logo, one rule under both: a header that takes a strip, not a fifth */
+.dc-compact-head { align-items: flex-end; margin-bottom: 0; }
+.dc-compact-head .dc-head-text { min-width: 0; }
+.dc-compact-head .dc-logo { width: 85.333px; }              /* 64pt WITNESS_LOGO_W */
+.dc-compact-head .dc-doc-note { margin-top: 2px; text-align: left; font-size: 11.333px; }
+.dc-compact-head + .dc-doc-rule { margin: 8px 0 14px; }
+
 /* ---------- Yes/No question rows ---------- */
 .dc-question {
   display: flex;
@@ -1854,11 +1862,32 @@ input[type="radio"] { width: 15px; height: 15px; }
 }
 
 /* ---------- Page-break markers ---------- */
+/* Drawn across the sheet where the printed page ends, through a text box when that is where
+   it falls. Absolutely placed, so it shifts nothing under it. */
 .dc-break {
-  position: relative;
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
   height: 0;
-  margin: 20px 0;
+  margin: 0;
   border-top: 1px dashed var(--dc-primary);
+  pointer-events: none;
+}
+
+.dc-break-initials {
+  position: absolute;
+  right: 72px;
+  bottom: 6px;
+  padding-right: 110px;
+  border-bottom: 1px solid var(--dc-ink);
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 8.667px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-label);
+  white-space: nowrap;
 }
 
 .dc-break-tag {
@@ -2452,6 +2481,55 @@ input[type="radio"] { width: 15px; height: 15px; }
 }
 
 .drot-progress { font-size: 13px; color: var(--c-text-muted); margin-right: auto; }
+
+/* ---------- Cover page ---------- */
+.cover-view {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: clamp(12px, 2vw, 24px) clamp(16px, 4vw, 40px) 60px;
+}
+.cover-view[hidden] { display: none; }
+.cover-hint { font-size: 13px; color: var(--c-text-muted); margin-right: auto; }
+
+.cover-page {
+  min-height: 1056px;                /* a letter sheet, so the middle is the middle */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 80px;
+}
+.cover-title,
+.cover-sub,
+.cover-date {
+  display: block;
+  width: 100%;
+  max-width: 586.667px;              /* 440pt of text */
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  font-family: Helvetica, Arial, sans-serif;
+  color: var(--dc-ink);
+  text-align: center;
+  resize: none;
+  overflow: hidden;
+}
+.cover-title { font-size: 34.667px; font-weight: 700; line-height: 1.25; }
+.cover-sub { font-size: 17.333px; line-height: 1.55; color: var(--dc-ink-soft); }
+.cover-date { margin-top: 24px; font-size: 14.667px; color: var(--dc-label-soft); }
+.cover-title:focus, .cover-sub:focus, .cover-date:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
+.cover-rule { width: 240px; border-top: 2px solid var(--dc-primary); margin: 30px 0 40px; }
+.cover-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 40px;
+  text-align: center;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 10.667px;
+  color: var(--dc-label-soft);
+}
 
 .drot-shift {
   flex-direction: row;

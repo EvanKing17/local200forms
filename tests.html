@@ -1311,7 +1311,7 @@ function run(win, doc) {
     const raw = atob(short.output('datauristring').split(',')[1]);
     const printed = raw.indexOf('(STEWARD)') !== -1 && raw.indexOf('(Third)') !== -1 && raw.indexOf('(SIGNATURE)') !== -1;
     const onePage = short.getNumberOfPages() === 1;
-    form.elements.statement.value = Array.from({ length: 45 }, (_, i) => 'Line ' + i + ' of what was seen.').join('\n');
+    form.elements.statement.value = Array.from({ length: 60 }, (_, i) => 'Line ' + i + ' of what was seen.').join('\n');
     const long = win.buildWitnessDoc(win.fd(form));
     const flowed = long.getNumberOfPages() === 2;
     win.clearForm(form);
@@ -1329,6 +1329,45 @@ function run(win, doc) {
     const noCount = !labels.some(l => /sigLines/i.test(l));
     win.showHome();
     return (distinct && lines === 6 && noCount) || { detail: labels.join(' | ') };
+  });
+
+  check(g9c, 'A long statement is cut where the page ends, and every page but the last is initialled', () => {
+    const form = doc.getElementById('witnessForm');
+    win.showForm('witness');
+    win.clearForm(form);
+    form.elements.statement.value = Array.from({ length: 60 }, (_, i) => 'Line ' + i + ' of what was seen.').join('\n');
+    form.elements.statement.dispatchEvent(new win.Event('input', { bubbles: true }));
+    win.updatePageBreaks('witness');
+    const marks = form.querySelectorAll('.dc-break');
+    const inside = marks.length === 1 && marks[0].classList.contains('is-inside');
+    const box = form.querySelector('[name=statement]').closest('.dc-box').getBoundingClientRect();
+    const line = marks.length ? marks[0].getBoundingClientRect() : null;
+    const throughBox = !!line && line.top > box.top && line.top < box.bottom;
+    const asksInitials = marks.length === 1 && !!marks[0].querySelector('.dc-break-initials');
+    const raw = atob(win.buildWitnessDoc(win.fd(form)).output('datauristring').split(',')[1]);
+    const printed = raw.indexOf('(WITNESS INITIALS)') !== -1 && raw.indexOf('(Page 1 of 2)') !== -1 &&
+                    raw.indexOf('(Page 2 of 2)') !== -1 && raw.split('(WITNESS INITIALS)').length === 2;
+    win.clearForm(form);
+    win.showHome();
+    return (inside && throughBox && asksInitials && printed) ||
+      { detail: 'marks=' + marks.length + ' inside=' + inside + ' throughBox=' + throughBox + ' initials=' + asksInitials + ' printed=' + printed };
+  });
+
+  const g9d = group('Cover page');
+  check(g9d, 'Tools offers a cover page, and it builds one sheet with the title on it', () => {
+    win.showHome();
+    doc.getElementById('toolsButton').click();
+    doc.querySelector('[data-tool="cover"]').click();
+    const opened = !doc.getElementById('coverView').hidden && doc.getElementById('homeView').hidden;
+    const dated = doc.getElementById('coverDate').value.trim() !== '';
+    const built = win.buildCoverDoc({ title: 'Grievance of Pat Doe', sub: 'Local 200 and Ford Motor Company', date: 'September 9, 2026' });
+    const raw = atob(built.output('datauristring').split(',')[1]);
+    const onPage = built.getNumberOfPages() === 1 && raw.indexOf('(Grievance of Pat Doe)') !== -1 &&
+                   raw.indexOf('(Local 200 and Ford Motor Company)') !== -1;
+    win.showHome();
+    const closed = doc.getElementById('coverView').hidden;
+    return (opened && dated && onPage && closed) ||
+      { detail: 'opened=' + opened + ' dated=' + dated + ' onPage=' + onPage + ' closed=' + closed };
   });
 
   const g10 = group('Filling a form from JSON');

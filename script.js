@@ -1290,15 +1290,27 @@ const SIG_MAX = 6;
 const SIG_DEFAULT_ROWS = 2;
 const SIG_ROW_H = 52;            // pt: room to sign above the line, and the caption under it
 
+/* Title on the left, a small logo on the right, one rule under both: the statement is what
+   matters here, and a header the Fact Sheet's size took a fifth of the page before it began */
+const WITNESS_LOGO_W = 64;
+
 function drawWitnessHeader(doc, marginX, W) {
-  const top = UNIFOR_HEADER_TOP;
-  const logoH = UNIFOR_LOGO_W / UNIFOR_LOGO_ASPECT;
-  drawUniforLogo(doc, marginX + W, top, UNIFOR_LOGO_W);
-  const ruleY = top + logoH + 10;
+  const top = 40;
+  const logoH = WITNESS_LOGO_W / UNIFOR_LOGO_ASPECT;
+  drawUniforLogo(doc, marginX + W, top, WITNESS_LOGO_W);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(...DC.ink);
+  doc.text(FORMS_CONFIG.witness.title, marginX, top + 13);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...DC.labelSoft);
+  doc.text('For Local Union Use Only', marginX, top + 25);
+  const ruleY = top + Math.max(logoH, 27) + 8;
   doc.setDrawColor(...DC.primary);
   doc.setLineWidth(1.5);
   doc.line(marginX, ruleY, marginX + W, ruleY);
-  return ruleY + 18;
+  return ruleY + 14;
 }
 
 /* The lines that print: every one that is showing, plus any put-away one that still has a name or date */
@@ -1319,19 +1331,6 @@ function buildWitnessDoc(data) {
   const marginX = 40;
   const W = 532;
   let y = drawWitnessHeader(doc, marginX, W);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(...DC.ink);
-  const titleLines = doc.splitTextToSize(FORMS_CONFIG.witness.title, W);
-  titleLines.forEach((line, i) => doc.text(line, 306, y + i * 18, { align: 'center' }));
-  y += (titleLines.length - 1) * 18 + 14;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(...DC.labelSoft);
-  doc.text('For Local Union Use Only', 306, y, { align: 'center' });
-  y += 24;
 
   // ---- What it is about, and who was in the room ----
   y = sectionBar(doc, marginX, y, W, 'Statement', '');
@@ -1359,6 +1358,29 @@ function buildWitnessDoc(data) {
     if (y + SIG_ROW_H > PAGE_BOTTOM) { doc.addPage(); y = 40; }
     y = signatureLine(doc, marginX, y, W, row);
   });
+
+  /*
+   * A statement that runs over the page is initialled on every page but the one it is signed
+   * on, so no sheet can be swapped out later. Single sheets carry neither.
+   */
+  const total = doc.getNumberOfPages();
+  if (total > 1) {
+    for (let n = 1; n <= total; n++) {
+      doc.setPage(n);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...DC.labelSoft);
+      doc.text('Page ' + n + ' of ' + total, 306, 774, { align: 'center' });
+      if (n < total) {
+        setLabelStyle(doc, 7);
+        doc.text('WITNESS INITIALS', marginX + W - 170, 774);
+        clearLabelStyle(doc);
+        doc.setDrawColor(...DC.ink);
+        doc.setLineWidth(0.75);
+        doc.line(marginX + W - 90, 776, marginX + W, 776);
+      }
+    }
+  }
 
   embedFormData(doc, 'witness', data);
   return doc;
@@ -2158,6 +2180,7 @@ function showDrot() {
   workspace.hidden = true;
   builderView.hidden = true;
   drotView.hidden = false;
+  coverView.hidden = true;
   showVersion(false);
   showTools(false);
   drotShiftSelect.value = drotShift;
@@ -2231,8 +2254,111 @@ document.querySelector('[data-tool="drot"]').addEventListener('click', () => {
   showDrot();
 });
 
+/* ============ Tools: cover page ============
+ *
+ * A front sheet for a bundle: the matter and the people, centred on an otherwise blank page,
+ * the way a legal filing is covered. Not a form: nothing is read back out of it and there is
+ * no draft, but what was typed last is kept on this device so the next one starts from it.
+ */
+const COVER_KEY = 'local200forms:cover';
+const coverTitle = document.getElementById('coverTitle');
+const coverSub = document.getElementById('coverSub');
+const coverDate = document.getElementById('coverDate');
+
+function coverValues() {
+  return { title: coverTitle.value.trim(), sub: coverSub.value.trim(), date: coverDate.value.trim() };
+}
+
+function rememberCover() {
+  try { localStorage.setItem(COVER_KEY, JSON.stringify(coverValues())); } catch { /* not fatal */ }
+}
+
+function restoreCover() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(COVER_KEY) || 'null');
+    if (!saved) return;
+    coverTitle.value = saved.title || '';
+    coverSub.value = saved.sub || '';
+    coverDate.value = saved.date || '';
+  } catch { /* nothing to restore */ }
+}
+
+[coverTitle, coverSub, coverDate].forEach(field => {
+  field.addEventListener('input', () => { if (field.tagName === 'TEXTAREA') autoGrow(field); rememberCover(); });
+});
+restoreCover();
+
+function showCover() {
+  currentFormType = null;
+  tuckTextSize(false);
+  homeView.hidden = true;
+  workspace.hidden = true;
+  builderView.hidden = true;
+  drotView.hidden = true;
+  coverView.hidden = false;
+  showVersion(false);
+  showTools(false);
+  if (!coverDate.value) {
+    const today = new Date();
+    coverDate.value = MONTH_NAMES_FULL[today.getMonth()] + ' ' + today.getDate() + ', ' + today.getFullYear();
+  }
+  [coverTitle, coverSub].forEach(autoGrow);
+  coverTitle.focus();
+}
+
+function buildCoverDoc(values) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const cx = 306, W = 440;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(26);
+  doc.setTextColor(...DC.ink);
+  const titleLines = doc.splitTextToSize(values.title || '', W);
+  // Sits a little above centre, where the eye lands first on a blank sheet
+  let y = 320 - (titleLines.length - 1) * 16;
+  titleLines.forEach((line, i) => doc.text(line, cx, y + i * 32, { align: 'center' }));
+  y += (titleLines.length - 1) * 32 + 26;
+
+  doc.setDrawColor(...DC.primary);
+  doc.setLineWidth(1.5);
+  doc.line(cx - 90, y, cx + 90, y);
+  y += 36;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(13);
+  doc.setTextColor(...DC.inkSoft);
+  const subLines = doc.splitTextToSize(values.sub || '', W);
+  subLines.forEach((line, i) => doc.text(line, cx, y + i * 20, { align: 'center' }));
+  y += subLines.length * 20 + 18;
+
+  if (values.date) {
+    doc.setFontSize(11);
+    doc.setTextColor(...DC.labelSoft);
+    doc.text(values.date, cx, y, { align: 'center' });
+  }
+
+  doc.setFontSize(8);
+  doc.setTextColor(...DC.labelSoft);
+  doc.text('Unifor Local 200', cx, 760, { align: 'center' });
+  return doc;
+}
+
+document.getElementById('coverPrint').addEventListener('click', () => {
+  const values = coverValues();
+  const doc = buildCoverDoc(values);
+  const stem = (values.title || 'Cover').replace(/[\\/:*?"<>|]/g, '').trim() || 'Cover';
+  openPdfViewer(doc, stem + ' - Cover.pdf');
+});
+
+document.querySelector('[data-tool="cover"]').addEventListener('click', () => {
+  closeToolsMenu();
+  showCover();
+});
+
 /* ============ Home / fill-form view routing ============ */
 const homeView = document.getElementById('homeView');
+const coverView = document.getElementById('coverView');
 
 // The page opens on the form list without going through showHome(), so say so once here too
 showVersion(!homeView.hidden);
@@ -2248,11 +2374,13 @@ function showHome() {
   currentFormType = null;
   tuckTextSize(true);
   // A field left focused on the way out would swallow a paste meant for the Forms page
-  if (document.activeElement && workspace.contains(document.activeElement)) document.activeElement.blur();
+  const focused = document.activeElement;
+  if (focused && focused !== document.body && !homeView.contains(focused)) focused.blur();
   homeView.hidden = false;
   workspace.hidden = true;
   builderView.hidden = true;
   drotView.hidden = true;
+  coverView.hidden = true;
   showVersion(true);
   showTools(true);
   refreshClearAllButton();
@@ -2309,6 +2437,7 @@ function showForm(type, data) {
   homeView.hidden = true;
   builderView.hidden = true;
   drotView.hidden = true;
+  coverView.hidden = true;
   workspace.hidden = false;
   showVersion(false);
   showTools(false);
@@ -2653,6 +2782,7 @@ function showBuilder() {
   workspace.hidden = true;
   builderView.hidden = false;
   drotView.hidden = true;
+  coverView.hidden = true;
   showVersion(false);
   showTools(false);
   builderError.hidden = true;
@@ -3880,7 +4010,7 @@ const PX_PER_PT = 4 / 3;
 const PAGE_TOP_PX = 40 * PX_PER_PT;          // the builders' top margin
 const PAGE_USABLE_PX = (PAGE_BOTTOM - 40) * PX_PER_PT;
 
-function makeBreakMarker(pageNumber) {
+function makeBreakMarker(pageNumber, type) {
   const marker = document.createElement('div');
   marker.className = 'dc-break';
   marker.setAttribute('aria-hidden', 'true');
@@ -3888,9 +4018,25 @@ function makeBreakMarker(pageNumber) {
   tag.className = 'dc-break-tag';
   tag.textContent = 'Page ' + pageNumber;
   marker.appendChild(tag);
+  // The statement is initialled on every page it runs over; the line shows where that lands
+  if (type === 'witness') {
+    const initials = document.createElement('span');
+    initials.className = 'dc-break-initials';
+    initials.textContent = 'Witness initials';
+    marker.appendChild(initials);
+  }
   return marker;
 }
 
+/*
+ * Where the printed pages end, drawn across the sheet. A text box is cut where the page ends
+ * and carries on over it, the way flowTextBox draws it — unless less than its smallest size is
+ * left on the page, when the whole box moves down. Anything else moves down whole, and the
+ * line is drawn just above it.
+ *
+ * Everything is measured in the sheet's own pixels: getBoundingClientRect reports zoomed ones
+ * under large text, and the markers are placed with `top`, which the zoom scales again.
+ */
 function updatePageBreaks(type) {
   const entry = FORM_BUILDERS[type];
   if (!entry) return;
@@ -3900,22 +4046,34 @@ function updatePageBreaks(type) {
   // Multi-sheet forms draw their own page boundaries
   if (!form.classList.contains('dc-page')) return;
 
-  const sheetTop = form.getBoundingClientRect().top + parseFloat(getComputedStyle(form).paddingTop);
-  let pageStart = sheetTop;
+  const zoom = documentZoom();
+  const formTop = form.getBoundingClientRect().top;
+  const at = clientY => (clientY - formTop) / zoom;
+  let pageStart = parseFloat(getComputedStyle(form).paddingTop);
   let pages = 1;
   const marks = [];
 
-  // getBoundingClientRect reports zoomed pixels, so undo the zoom before comparing to the
-  // page height, which is in the document's own scale
-  const zoom = documentZoom();
   Array.from(form.children).forEach(block => {
     if (block.classList.contains('dc-ui')) return;
     const rect = block.getBoundingClientRect();
     if (!rect.height) return;
-    if ((rect.bottom - pageStart) / zoom > PAGE_USABLE_PX && rect.top > pageStart) {
-      pages += 1;
-      pageStart = rect.top;
-      marks.push({ block, page: pages });
+    const top = at(rect.top), bottom = at(rect.bottom);
+    const box = block.querySelector('.dc-box');
+    const minH = box ? (parseFloat(getComputedStyle(box).minHeight) || 0) : 0;
+    let guard = 0;
+    while (bottom - pageStart > PAGE_USABLE_PX && guard++ < 24) {
+      const boundary = pageStart + PAGE_USABLE_PX;
+      if (box && boundary - top >= minH + 26) {
+        pages += 1;
+        marks.push({ y: boundary, page: pages, inside: true });
+        pageStart = boundary;
+      } else if (top > pageStart) {
+        pages += 1;
+        marks.push({ y: top - 10, page: pages, inside: false });
+        pageStart = top;
+      } else {
+        break;                  // already at the top of a page and still too tall
+      }
     }
   });
 
@@ -3928,7 +4086,13 @@ function updatePageBreaks(type) {
   }
   if (actualPages !== pages) return;
 
-  marks.forEach(({ block, page }) => block.parentNode.insertBefore(makeBreakMarker(page), block));
+  const border = parseFloat(getComputedStyle(form).borderTopWidth) || 0;
+  marks.forEach(mark => {
+    const marker = makeBreakMarker(mark.page, type);
+    marker.classList.toggle('is-inside', mark.inside);
+    marker.style.top = (mark.y - border) + 'px';
+    form.appendChild(marker);
+  });
 }
 
 const refreshPageBreaks = debounce(() => {
