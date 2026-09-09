@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=78">
+<link rel="stylesheet" href="style.css?v=79">
 </head>
 <body>
 
@@ -77,6 +77,11 @@
       <button class="form-card" data-form="investigation">
         <span class="picker-index">04</span>
         <span class="picker-text"><span class="picker-label">4.01 Investigation Form</span><span class="picker-sub">Workplace incident intake</span></span>
+        <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+      <button class="form-card" data-form="witness">
+        <span class="picker-index">05</span>
+        <span class="picker-text"><span class="picker-label">Witness Statement</span><span class="picker-sub"></span></span>
         <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
     </div>
@@ -1074,6 +1079,211 @@
     <div class="dc-attachments" aria-label="Supporting documents"></div>
   </section>
 
+  <section class="form-panel" id="form-witness" aria-labelledby="form-witness-heading">
+    <div class="dc-toolbar">
+      <div class="dc-titlebar">
+        <button type="button" class="dc-back" data-back-to-forms>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+          Forms
+        </button>
+        <span class="dc-titlebar-sep" aria-hidden="true"></span>
+        <span class="dc-titlebar-app">Union Forms</span>
+        <span class="dc-titlebar-doc" data-form-title="witness">Witness Statement</span>
+        <span class="dc-titlebar-spacer"></span>
+        <span class="dc-saved" role="status"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Draft saved</span>
+        <button type="button" class="bar-text-size" data-text-size
+                aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span></button>
+      </div>
+      <div class="dc-ribbon">
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-word-out="witness"
+                    data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg>Send to Word</button>
+            <button type="button" class="dc-tool" data-word-in="witness"
+                    data-tip="Import from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Import from Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg>Import from Word</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Word</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-markup-form="witness"
+                    data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>Mark up</button>
+            <button type="button" class="dc-tool" id="witnessClear"
+                    data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>Clear form</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Document</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row dc-advanced">
+            <button type="button" class="dc-tool" data-advanced="witness" aria-expanded="false"
+                    data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>Advanced</button>
+            <div class="dc-advanced-menu" data-advanced-menu="witness" hidden>
+              <p class="dc-advanced-head">Advanced</p>
+              <button type="button" data-save-grv="witness">Save as .grv</button>
+            </div>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Other</span>
+        </div>
+        <span class="dc-ribbon-spacer"></span>
+        <button type="submit" class="dc-ribbon-print" form="witnessForm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print / Download PDF</button>
+      </div>
+    </div>
+
+    <form id="witnessForm" class="dc-page">
+      <div class="dc-page-head">
+        <span></span>
+        <img class="dc-logo" alt="Unifor" data-unifor-logo>
+      </div>
+      <div class="dc-doc-rule"></div>
+
+      <div class="dc-doc-title dc-centered" id="form-witness-heading">Witness Statement</div>
+      <p class="dc-doc-note">For Local Union Use Only</p>
+
+      <div class="dc-band dc-block"><span>Statement</span></div>
+      <div class="dc-field-grid dc-cols-31 dc-attached">
+        <label>
+          <span class="dc-field-label">Statement RE:</span>
+          <textarea class="dc-value" name="statementRe" rows="1" autocomplete="off"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Date Taken</span>
+          <input type="date" name="dateTaken">
+        </label>
+      </div>
+      <div class="dc-field-grid dc-cols-2 dc-standalone dc-block">
+        <label>
+          <span class="dc-field-label">Statement Given By</span>
+          <textarea class="dc-value" name="givenBy" rows="1" autocomplete="name"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Taken By</span>
+          <textarea class="dc-value" name="takenBy" rows="1" autocomplete="name"></textarea>
+        </label>
+      </div>
+
+      <div class="dc-block">
+        <div class="dc-field-label dc-box-label">Statement</div>
+        <div class="dc-box" style="min-height:320px">
+          <textarea class="dc-textarea" name="statement" style="min-height:306px"></textarea>
+        </div>
+      </div>
+
+      <div class="dc-band dc-block"><span>Signatures</span></div>
+      <!-- Six lines are here; sigLines says how many show. See the signature-line code in script.js. -->
+      <div class="dc-signatures">
+        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="1">
+          <label>
+            <input class="dc-field-label dc-role-input" name="sig1Role" value="Union Rep" autocomplete="off"
+                   aria-label="Who signs line 1" data-word-label="Line 1 signed by">
+            <textarea class="dc-value" name="sig1Name" rows="1" autocomplete="name" aria-label="Line 1 name"
+                      data-word-label="Line 1 name"></textarea>
+          </label>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <label>
+            <span class="dc-field-label">Date</span>
+            <input type="date" name="sig1Date" data-word-label="Line 1 date">
+          </label>
+          <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
+        </div>
+        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="2">
+          <label>
+            <input class="dc-field-label dc-role-input" name="sig2Role" value="Witness" autocomplete="off"
+                   aria-label="Who signs line 2" data-word-label="Line 2 signed by">
+            <textarea class="dc-value" name="sig2Name" rows="1" autocomplete="name" aria-label="Line 2 name"
+                      data-word-label="Line 2 name"></textarea>
+          </label>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <label>
+            <span class="dc-field-label">Date</span>
+            <input type="date" name="sig2Date" data-word-label="Line 2 date">
+          </label>
+          <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
+        </div>
+        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="3">
+          <label>
+            <input class="dc-field-label dc-role-input" name="sig3Role" value="Witness" autocomplete="off"
+                   aria-label="Who signs line 3" data-word-label="Line 3 signed by">
+            <textarea class="dc-value" name="sig3Name" rows="1" autocomplete="name" aria-label="Line 3 name"
+                      data-word-label="Line 3 name"></textarea>
+          </label>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <label>
+            <span class="dc-field-label">Date</span>
+            <input type="date" name="sig3Date" data-word-label="Line 3 date">
+          </label>
+          <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
+        </div>
+        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="4">
+          <label>
+            <input class="dc-field-label dc-role-input" name="sig4Role" value="Witness" autocomplete="off"
+                   aria-label="Who signs line 4" data-word-label="Line 4 signed by">
+            <textarea class="dc-value" name="sig4Name" rows="1" autocomplete="name" aria-label="Line 4 name"
+                      data-word-label="Line 4 name"></textarea>
+          </label>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <label>
+            <span class="dc-field-label">Date</span>
+            <input type="date" name="sig4Date" data-word-label="Line 4 date">
+          </label>
+          <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
+        </div>
+        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="5">
+          <label>
+            <input class="dc-field-label dc-role-input" name="sig5Role" value="Witness" autocomplete="off"
+                   aria-label="Who signs line 5" data-word-label="Line 5 signed by">
+            <textarea class="dc-value" name="sig5Name" rows="1" autocomplete="name" aria-label="Line 5 name"
+                      data-word-label="Line 5 name"></textarea>
+          </label>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <label>
+            <span class="dc-field-label">Date</span>
+            <input type="date" name="sig5Date" data-word-label="Line 5 date">
+          </label>
+          <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
+        </div>
+        <div class="dc-field-grid dc-cols-sig dc-standalone dc-sig-row" data-sig-row="6">
+          <label>
+            <input class="dc-field-label dc-role-input" name="sig6Role" value="Witness" autocomplete="off"
+                   aria-label="Who signs line 6" data-word-label="Line 6 signed by">
+            <textarea class="dc-value" name="sig6Name" rows="1" autocomplete="name" aria-label="Line 6 name"
+                      data-word-label="Line 6 name"></textarea>
+          </label>
+          <div class="dc-cell">
+            <span class="dc-field-label">Signature</span>
+            <div class="dc-value-blank"></div>
+          </div>
+          <label>
+            <span class="dc-field-label">Date</span>
+            <input type="date" name="sig6Date" data-word-label="Line 6 date">
+          </label>
+          <button type="button" class="dc-sig-remove dc-ui" data-sig-remove aria-label="Remove this line" title="Remove this line">&times;</button>
+        </div>
+        <input type="hidden" name="sigLines" value="2">
+      </div>
+      <button type="button" class="dc-sig-add dc-ui" data-sig-add>Add a signature line</button>
+    </form>
+
+    <!-- Outside the sheet: these are appended after the form, not printed on it -->
+    <div class="dc-attachments" aria-label="Supporting documents"></div>
+  </section>
+
 </main>
 
 
@@ -1376,9 +1586,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=78"></script>
+<script src="forms.config.js?v=79"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=78"></script>
-<script src="script.js?v=78"></script>
+<script src="annotate.js?v=79"></script>
+<script src="script.js?v=79"></script>
 </body>
 </html>

@@ -177,6 +177,7 @@ function run(win, doc) {
     { type: 'policy', build: 'buildPolicyDoc', form: 'policyForm', pages: 1, fields: 9 },
     { type: 'unifor', build: 'buildUniforDoc', form: 'uniforForm', pages: 5, fields: 37 },
     { type: 'investigation', build: 'buildInvestigationDoc', form: 'investigationForm', pages: 1, fields: 13 },
+    { type: 'witness', build: 'buildWitnessDoc', form: 'witnessForm', pages: 1, fields: 12 },
   ];
 
   const g1 = group('Loads');
@@ -186,9 +187,9 @@ function run(win, doc) {
     { detail: 'a script still points at an external host' });
   check(g1, 'Unifor logo is bundled', () => (win.UNIFOR_LOGO_PNG || '').length > 1000);
   check(g1, 'Form titles config loaded', () => !!win.FORMS_CONFIG_DATA);
-  check(g1, 'Four form panels present', () => {
+  check(g1, 'Five form panels present', () => {
     const n = doc.querySelectorAll('.form-panel').length;
-    return n === 4 || { detail: 'found ' + n };
+    return n === 5 || { detail: 'found ' + n };
   });
 
   const g2 = group('Every form builds');
@@ -388,6 +389,8 @@ function run(win, doc) {
              'submittedBy','shift','committeepersonComments','plantChairComments'],
     investigation: ['step','supervisorName','area','deptNum','dateInfraction','time','dateFiled',
                     'witnessNames','uniforRep','hrRep','investigation','supervisorRemarks','resolution'],
+    witness: ['statementRe','dateTaken','givenBy','takenBy','statement',
+              'sig1Role','sig1Name','sig1Date','sig2Role','sig2Name','sig2Date'],
   };
 
   function fieldNames(win, form) {
@@ -420,6 +423,7 @@ function run(win, doc) {
       const reachable = new Set(win.navigableFields(form));
       form.querySelectorAll('input[type=text], textarea').forEach(el => {
         if (el.closest('.datepicker')) return;          // represented by its trigger button
+        if (el.disabled || el.closest('[hidden]')) return;   // a signature line that is put away
         if (!reachable.has(el)) missed.push(f.type + '.' + (el.name || el.className));
       });
     });
@@ -1236,6 +1240,97 @@ function run(win, doc) {
     return (none && undoOff) || { detail: 'marks=' + page.annotations.length + ' undoDisabled=' + undoOff };
   });
 
+  const g9c = group('Witness statement');
+
+  check(g9c, 'A fresh statement is dated today, has two lines, and counts as empty', () => {
+    const form = doc.getElementById('witnessForm');
+    win.showForm('witness');
+    win.clearForm(form);
+    const today = win.dateKeyLocal(new Date());
+    const data = win.fd(form);
+    const dated = data.dateTaken === today && data.sig1Date === today && data.sig2Date === today;
+    const roles = data.sig1Role === 'Union Rep' && data.sig2Role === 'Witness';
+    const showing = form.querySelectorAll('[data-sig-row]:not([hidden])').length;
+    const empty = !win.formHasContent('witness');
+    win.showHome();
+    const flagged = !!doc.querySelector('.form-card[data-form=witness] .draft-flag');
+    return (dated && roles && showing === 2 && empty && !flagged) ||
+      { detail: 'dated=' + dated + ' roles=' + roles + ' showing=' + showing + ' empty=' + empty + ' flagged=' + flagged };
+  });
+
+  check(g9c, 'A date can be cleared and stays cleared in the draft', () => {
+    const form = doc.getElementById('witnessForm');
+    win.showForm('witness');
+    win.clearForm(form);
+    form.querySelector('[name="sig2Date"]').closest('.datepicker').setValue('');
+    form.elements.givenBy.value = 'Someone';
+    win.saveDraft('witness');
+    win.showHome();
+    win.showForm('witness');
+    const kept = win.fd(form).sig2Date === '' && win.fd(form).givenBy === 'Someone';
+    win.clearForm(form);
+    win.showHome();
+    return kept || { detail: 'sig2Date=' + JSON.stringify(win.fd(form).sig2Date) };
+  });
+
+  check(g9c, 'Lines are added, closed up when one is removed, and the count survives the file', () => {
+    const form = doc.getElementById('witnessForm');
+    win.showForm('witness');
+    win.clearForm(form);
+    form.querySelector('[data-sig-add]').click();
+    const three = form.querySelectorAll('[data-sig-row]:not([hidden])').length === 3 && win.fd(form).sigLines === '3';
+    form.elements.sig3Role.value = 'Chairperson';
+    form.elements.sig3Name.value = 'Third Person';
+    form.querySelectorAll('[data-sig-remove]')[1].click();     // take out the second line
+    const closed = win.fd(form).sigLines === '2' && win.fd(form).sig2Role === 'Chairperson' &&
+                   win.fd(form).sig2Name === 'Third Person' && win.fd(form).sig3Name === undefined;
+    form.querySelector('[data-sig-add]').click();
+    form.querySelector('[data-sig-add]').click();
+    const pdf = win.buildWitnessDoc(win.fd(form));
+    const payload = win.readEmbeddedFormData(new Uint8Array(pdf.output('arraybuffer')));
+    win.clearForm(form);
+    win.populateForm(form, payload.data);
+    const back = form.querySelectorAll('[data-sig-row]:not([hidden])').length === 4 &&
+                 form.elements.sig2Name.value === 'Third Person';
+    win.clearForm(form);
+    const reset = form.querySelectorAll('[data-sig-row]:not([hidden])').length === 2;
+    win.showHome();
+    return (three && closed && back && reset) ||
+      { detail: 'three=' + three + ' closed=' + closed + ' back=' + back + ' reset=' + reset };
+  });
+
+  check(g9c, 'Every showing line prints, with the role as its label, and a long statement flows on', () => {
+    const form = doc.getElementById('witnessForm');
+    win.showForm('witness');
+    win.clearForm(form);
+    form.elements.sig1Role.value = 'Steward';
+    form.elements.sig1Name.value = 'Pat Steward';
+    form.querySelector('[data-sig-add]').click();
+    form.elements.sig3Name.value = 'Third';
+    const short = win.buildWitnessDoc(win.fd(form));
+    const raw = atob(short.output('datauristring').split(',')[1]);
+    const printed = raw.indexOf('(STEWARD)') !== -1 && raw.indexOf('(Third)') !== -1 && raw.indexOf('(SIGNATURE)') !== -1;
+    const onePage = short.getNumberOfPages() === 1;
+    form.elements.statement.value = Array.from({ length: 45 }, (_, i) => 'Line ' + i + ' of what was seen.').join('\n');
+    const long = win.buildWitnessDoc(win.fd(form));
+    const flowed = long.getNumberOfPages() === 2;
+    win.clearForm(form);
+    win.showHome();
+    return (printed && onePage && flowed) || { detail: 'printed=' + printed + ' onePage=' + onePage + ' pages=' + long.getNumberOfPages() };
+  });
+
+  check(g9c, 'Word headings for the signature lines are distinct, and put-away lines stay out', () => {
+    const form = doc.getElementById('witnessForm');
+    win.showForm('witness');
+    win.clearForm(form);
+    const labels = win.wordFields('witness').map(f => f.label);
+    const distinct = new Set(labels).size === labels.length;
+    const lines = labels.filter(l => /^Line \d/.test(l)).length;
+    const noCount = !labels.some(l => /sigLines/i.test(l));
+    win.showHome();
+    return (distinct && lines === 6 && noCount) || { detail: labels.join(' | ') };
+  });
+
   const g10 = group('Filling a form from JSON');
   const asJson = (obj, name) =>
     new win.File([typeof obj === 'string' ? obj : JSON.stringify(obj)], name, { type: 'application/json' });
@@ -1354,9 +1449,9 @@ function run(win, doc) {
       { detail: 'dialog=' + offered + ' ' + JSON.stringify(back) };
   });
 
-  checkAsync(g11, 'A .grv names its form so all four can come home', async () => {
+  checkAsync(g11, 'A .grv names its form so all five can come home', async () => {
     const wrong = [];
-    for (const type of ['ford', 'policy', 'unifor', 'investigation']) {
+    for (const type of ['ford', 'policy', 'unifor', 'investigation', 'witness']) {
       const read = win.readGrievanceJson(JSON.stringify(win.buildGrv(type)));
       if (read.type !== type) wrong.push(type + ' came back as ' + read.type);
     }
@@ -1736,7 +1831,7 @@ function run(win, doc) {
   });
 
   check(g14, 'A form lays its pictures out one per page until told otherwise', () => {
-    const defaults = ['ford', 'policy', 'unifor', 'investigation']
+    const defaults = ['ford', 'policy', 'unifor', 'investigation', 'witness']
       .filter(t => win.attachmentFit[t] !== 'letter');
     return defaults.length === 0 || { detail: 'not one-per-page: ' + defaults.join(', ') };
   });

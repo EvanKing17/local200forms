@@ -17,6 +17,7 @@ const DEFAULT_FORMS_CONFIG = {
     homeLabel: '4.01 Investigation Form',
     homeSub: 'Work done by a supervisor or other salaried member',
   },
+  witness: { title: 'Witness Statement', homeLabel: 'Witness Statement', homeSub: '' },
 };
 const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };
 
@@ -1278,6 +1279,214 @@ document.getElementById('investigationClear').addEventListener('click', () => {
   confirmClear('investigation', () => clearForm(investigationForm));
 });
 
+/* ============ WITNESS STATEMENT ============ */
+/*
+ * A statement taken from a witness, on Local 200 paper. Who gave it, who took it, what it is
+ * about, the statement itself at whatever length it runs to, and a signature line for each
+ * person who signs off on it. Two lines to start, the rep's and the witness's, and more as
+ * needed: a second witness, a steward, a chairperson.
+ */
+const SIG_MAX = 6;
+const SIG_DEFAULT_ROWS = 2;
+const SIG_ROW_H = 44;            // pt: room for an actual signature
+
+function drawWitnessHeader(doc, marginX, W) {
+  const top = UNIFOR_HEADER_TOP;
+  const logoH = UNIFOR_LOGO_W / UNIFOR_LOGO_ASPECT;
+  drawUniforLogo(doc, marginX + W, top, UNIFOR_LOGO_W);
+  const ruleY = top + logoH + 10;
+  doc.setDrawColor(...DC.primary);
+  doc.setLineWidth(1.5);
+  doc.line(marginX, ruleY, marginX + W, ruleY);
+  return ruleY + 18;
+}
+
+/* The lines that print: every one that is showing, plus any put-away one that still has a name or date */
+function witnessSignatureRows(data) {
+  const count = Math.min(SIG_MAX, Math.max(1, parseInt(data.sigLines, 10) || SIG_DEFAULT_ROWS));
+  const rows = [];
+  for (let i = 1; i <= SIG_MAX; i++) {
+    const role = data['sig' + i + 'Role'], name = data['sig' + i + 'Name'], date = data['sig' + i + 'Date'];
+    if (i <= count || (name || '').trim() || (date || '').trim()) rows.push({ role, name, date });
+  }
+  return rows;
+}
+
+function buildWitnessDoc(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+  const marginX = 40;
+  const W = 532;
+  let y = drawWitnessHeader(doc, marginX, W);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(...DC.ink);
+  const titleLines = doc.splitTextToSize(FORMS_CONFIG.witness.title, W);
+  titleLines.forEach((line, i) => doc.text(line, 306, y + i * 18, { align: 'center' }));
+  y += (titleLines.length - 1) * 18 + 14;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...DC.labelSoft);
+  doc.text('For Local Union Use Only', 306, y, { align: 'center' });
+  y += 24;
+
+  // ---- What it is about, and who was in the room ----
+  y = sectionBar(doc, marginX, y, W, 'Statement', '');
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Statement RE', value: data.statementRe, width: W * 0.75 },
+    { label: 'Date Taken', value: fmtDateFit(doc, data.dateTaken, W * 0.25 - CELL_X * 2), width: W * 0.25 },
+  ], CELL_MIN_H, true);
+  y += 10;
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Statement Given By', value: data.givenBy, width: W / 2 },
+    { label: 'Taken By', value: data.takenBy, width: W / 2 },
+  ]);
+  y += 14;
+
+  // ---- The statement, at whatever length it runs to ----
+  y = flowTextBox(doc, marginX, y, W, 'Statement:', data.statement, 240);
+  y += 18;
+
+  // ---- Who signs it. The band and its first line stay together on a page ----
+  const rows = witnessSignatureRows(data);
+  if (y + 18 + 10 + SIG_ROW_H > PAGE_BOTTOM) { doc.addPage(); y = 40; }
+  y = sectionBar(doc, marginX, y, W, 'Signatures', '');
+  y += 10;
+  rows.forEach(row => {
+    if (y + SIG_ROW_H > PAGE_BOTTOM) { doc.addPage(); y = 40; }
+    y = boxedGrid(doc, marginX, y, W, [
+      { label: (row.role || '').trim() || 'Signed By', value: row.name, width: W * 0.4 },
+      { label: 'Signature', value: '', width: W * 0.35 },
+      { label: 'Date', value: fmtDateFit(doc, row.date, W * 0.25 - CELL_X * 2), width: W * 0.25 },
+    ], SIG_ROW_H);
+    y += 8;
+  });
+
+  embedFormData(doc, 'witness', data);
+  return doc;
+}
+
+const witnessForm = document.getElementById('witnessForm');
+
+witnessForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  confirmFlags('witness', () => {
+    const data = fd(witnessForm);
+    const doc = buildWitnessDoc(data);
+    openWithAttachments(doc, 'witness', buildFilename(data.givenBy, FORMS_CONFIG.witness.title, data.dateTaken));
+  });
+});
+
+document.getElementById('witnessClear').addEventListener('click', () => {
+  confirmClear('witness', () => clearForm(witnessForm));
+});
+
+/* ---------- Signature lines ----------
+ * Six lines are in the markup; a count says how many are showing. A line that is put away has
+ * its fields disabled, so it stays out of the data, the Word text and the Enter order, and
+ * comes back when a draft or a file that used it is loaded.
+ */
+function signatureRows(form) {
+  return Array.from(form.querySelectorAll('[data-sig-row]'));
+}
+
+function signatureRowHasData(row) {
+  const name = row.querySelector('.dc-value');
+  const date = row.querySelector('.datepicker input[type=hidden]');
+  return !!((name && name.value.trim()) || (date && date.value));
+}
+
+function syncSignatureRows(form) {
+  const rows = signatureRows(form);
+  if (!rows.length) return;
+  const counter = form.elements.sigLines;
+  let count = Math.min(SIG_MAX, Math.max(1, parseInt(counter.value, 10) || SIG_DEFAULT_ROWS));
+  rows.forEach((row, i) => { if (i >= count && signatureRowHasData(row)) count = i + 1; });
+  counter.value = String(count);
+  rows.forEach((row, i) => {
+    const on = i < count;
+    row.hidden = !on;
+    row.querySelectorAll('input, textarea, button').forEach(el => { el.disabled = !on; });
+  });
+  const add = form.querySelector('[data-sig-add]');
+  if (add) add.disabled = count >= SIG_MAX;
+}
+
+function setSignatureRow(row, values) {
+  row.querySelector('.dc-role-input').value = values.role;
+  const name = row.querySelector('.dc-value');
+  name.value = values.name;
+  autoGrow(name);
+  row.querySelector('.datepicker').setValue(values.date);
+}
+
+function readSignatureRow(row) {
+  return {
+    role: row.querySelector('.dc-role-input').value,
+    name: row.querySelector('.dc-value').value,
+    date: row.querySelector('.datepicker input[type=hidden]').value,
+  };
+}
+
+function addSignatureRow(form) {
+  const counter = form.elements.sigLines;
+  const count = parseInt(counter.value, 10) || SIG_DEFAULT_ROWS;
+  if (count >= SIG_MAX) return;
+  counter.value = String(count + 1);
+  syncSignatureRows(form);
+  const row = signatureRows(form)[count];
+  const role = row.querySelector('.dc-role-input');
+  if (!role.value.trim()) role.value = 'Witness';
+  role.focus();
+  role.select();
+  form.dispatchEvent(new Event('input', { bubbles: true }));    // the draft and the page breaks
+}
+
+/* The lines below close up, so there is never a gap in the middle */
+function removeSignatureRow(form, index) {
+  const rows = signatureRows(form);
+  const counter = form.elements.sigLines;
+  const count = parseInt(counter.value, 10) || SIG_DEFAULT_ROWS;
+  if (index >= count || count <= 1) return;
+  for (let i = index; i < count - 1; i++) setSignatureRow(rows[i], readSignatureRow(rows[i + 1]));
+  setSignatureRow(rows[count - 1], { role: 'Witness', name: '', date: '' });
+  counter.value = String(count - 1);
+  syncSignatureRows(form);
+  form.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+witnessForm.addEventListener('click', (e) => {
+  const remove = e.target.closest('[data-sig-remove]');
+  if (remove) { removeSignatureRow(witnessForm, signatureRows(witnessForm).indexOf(remove.closest('[data-sig-row]'))); return; }
+  if (e.target.closest('[data-sig-add]')) addSignatureRow(witnessForm);
+});
+
+/*
+ * What a fresh form starts with. The two lines are the rep's and the witness's, dated today
+ * along with the statement, because that is nearly always right and a wrong date is one click
+ * to clear. Only empty fields are filled, so a draft keeps whatever was chosen.
+ */
+function formDefaults(form) {
+  if (form !== witnessForm) return {};
+  const today = dateKeyLocal(new Date());
+  const defaults = { sigLines: String(SIG_DEFAULT_ROWS), dateTaken: today, sig1Date: today, sig2Date: today };
+  for (let i = 1; i <= SIG_MAX; i++) defaults['sig' + i + 'Role'] = i === 1 ? 'Union Rep' : 'Witness';
+  return defaults;
+}
+
+function applyFormDefaults(form) {
+  Object.entries(formDefaults(form)).forEach(([name, value]) => {
+    const el = form.elements[name];
+    if (!el || el.value) return;
+    if (el.type === 'hidden' && el.closest('.datepicker')) el.closest('.datepicker').setValue(value);
+    else el.value = value;
+  });
+  syncSignatureRows(form);
+}
+
 
 /* ============ Unsaved-changes guard ============ */
 /*
@@ -1288,10 +1497,14 @@ document.getElementById('investigationClear').addEventListener('click', () => {
 const NOT_CONTENT = ['submittedBy'];
 
 function formHasData(form) {
+  // A field still holding what a fresh form starts with is not work in progress
+  const defaults = formDefaults(form);
   return Array.from(form.elements).some(el => {
     if (!el.name || NOT_CONTENT.includes(el.name)) return false;
     if (el.type === 'radio' || el.type === 'checkbox') return false;
-    return (el.value || '').toString().trim() !== '';
+    const value = (el.value || '').toString().trim();
+    if (value === '') return false;
+    return !(el.name in defaults) || value !== defaults[el.name];
   });
 }
 
@@ -1303,7 +1516,7 @@ function formHasData(form) {
  */
 window.addEventListener('beforeunload', (e) => {
   if (draftsAvailable()) return;
-  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm)) {
+  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm) || formHasData(witnessForm)) {
     e.preventDefault();
     e.returnValue = '';
   }
@@ -1315,6 +1528,7 @@ const FORM_BUILDERS = {
   policy: { form: policyForm, build: buildPolicyDoc, label: 'Policy Grievance' },
   unifor: { form: uniforForm, build: buildUniforDoc, label: 'Fact Sheet' },
   investigation: { form: investigationForm, build: buildInvestigationDoc, label: 'Investigation Form' },
+  witness: { form: witnessForm, build: buildWitnessDoc, label: 'Witness Statement' },
 };
 
 let currentFormType = null;
@@ -1386,6 +1600,7 @@ document.querySelectorAll('[name="submittedBy"]').forEach(field => {
 const WORD_LABEL_OVERRIDES = { spNumber: 'SP Number', resolution: 'Resolution' };
 
 function wordLabelFor(el) {
+  if (el.dataset && el.dataset.wordLabel) return el.dataset.wordLabel;
   if (WORD_LABEL_OVERRIDES[el.name]) return WORD_LABEL_OVERRIDES[el.name];
   const own = el.closest('label');
   let cap = own && own.querySelector('.dc-field-label, .dc-inline-label');
@@ -1401,6 +1616,8 @@ function wordFields(type) {
   const seen = [];
   form.querySelectorAll('[name]').forEach(el => {
     if (seen.indexOf(el.name) !== -1) return;
+    // A signature line that is put away, and the count that says so, are not dictated into
+    if (el.disabled || (el.type === 'hidden' && !el.closest('.datepicker'))) return;
     seen.push(el.name);
     const group = form.elements[el.name];
     const choices = (typeof RadioNodeList !== 'undefined' && group instanceof RadioNodeList)
@@ -2004,6 +2221,8 @@ function tuckTextSize(tucked) {
 function showHome() {
   currentFormType = null;
   tuckTextSize(true);
+  // A field left focused on the way out would swallow a paste meant for the Forms page
+  if (document.activeElement && workspace.contains(document.activeElement)) document.activeElement.blur();
   homeView.hidden = false;
   workspace.hidden = true;
   builderView.hidden = true;
@@ -2023,6 +2242,7 @@ function clearForm(form) {
   Array.from(form.elements).forEach(el => {
     if (el.type === 'radio' || el.type === 'checkbox') el.checked = false;
     else if (el.type === 'hidden' && el.closest('.datepicker')) el.closest('.datepicker').setValue('');
+    else if (el.type === 'hidden' && el.name in formDefaults(form)) el.value = '';
     else if (el.tagName === 'TEXTAREA' || el.type === 'text' || el.type === 'date') el.value = '';
   });
   form.querySelectorAll('.is-flagged').forEach(box => {
@@ -2032,6 +2252,7 @@ function clearForm(form) {
   form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   // Clearing starts the next grievance, and it's still you filing it
   applyRememberedSubmitter(form);
+  applyFormDefaults(form);
   form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
   if (currentFormType) {
     discardDraft(currentFormType);
@@ -2053,6 +2274,7 @@ function populateForm(form, data) {
       el.value = value;
     }
   });
+  syncSignatureRows(form);
 }
 
 function showForm(type, data) {
@@ -2074,6 +2296,7 @@ function showForm(type, data) {
     // Hand back whatever was last typed into this form on this device
     const draft = readDraft(type);
     if (draft) populateForm(entry.form, draft.data);
+    else applyFormDefaults(entry.form);
   }
   document.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
   // scrollHeight reads 0 while the panel is hidden, so size the textareas now that it's visible
@@ -2929,6 +3152,7 @@ function setupDatePicker(originalInput, options = {}) {
   hidden.name = name;
   hidden.defaultValue = originalInput.value || '';
   hidden.value = originalInput.value || '';
+  if (originalInput.dataset.wordLabel) hidden.dataset.wordLabel = originalInput.dataset.wordLabel;
 
   const wrapper = document.createElement('div');
   wrapper.className = 'datepicker';
@@ -3208,7 +3432,7 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
 
 // Native form.reset() restores the hidden inputs' default values without firing input/change,
 // so each date picker's visible trigger label needs an explicit nudge afterward.
-[fordForm, policyForm, uniforForm, investigationForm].forEach(form => {
+[fordForm, policyForm, uniforForm, investigationForm, witnessForm].forEach(form => {
   form.addEventListener('reset', () => {
     setTimeout(() => {
       form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
@@ -3246,6 +3470,7 @@ document.querySelectorAll(DC_AUTOGROW).forEach(el => {
  * because someone hit Enter out of habit is exactly the surprise this is meant to remove.
  */
 const FIELD_ORDER = [
+  '.dc-role-input',
   '.dc-value',
   '.dc-textarea',
   '.dc-value-input',
@@ -3341,6 +3566,7 @@ const ADMIN_FORM_NAMES = {
   policy: 'Policy Grievance',
   unifor: 'Plant Committee Fact Sheet',
   investigation: '4.01 Investigation',
+  witness: 'Witness Statement',
 };
 
 const adminOverlay = document.getElementById('adminOverlay');
@@ -3657,6 +3883,7 @@ function updatePageBreaks(type) {
   // page height, which is in the document's own scale
   const zoom = documentZoom();
   Array.from(form.children).forEach(block => {
+    if (block.classList.contains('dc-ui')) return;
     const rect = block.getBoundingClientRect();
     if (!rect.height) return;
     if ((rect.bottom - pageStart) / zoom > PAGE_USABLE_PX && rect.top > pageStart) {
@@ -3682,7 +3909,7 @@ const refreshPageBreaks = debounce(() => {
   if (currentFormType) updatePageBreaks(currentFormType);
 }, 400);
 
-[fordForm, policyForm, uniforForm, investigationForm].forEach(form => {
+[fordForm, policyForm, uniforForm, investigationForm, witnessForm].forEach(form => {
   form.addEventListener('input', refreshPageBreaks);
   form.addEventListener('change', refreshPageBreaks);
 });
@@ -3864,6 +4091,7 @@ const KEY_FIELD = {
   policy: { name: 'employeeName', label: 'Employee Name' },
   unifor: { name: 'grievorName', label: "Grievor's Name" },
   investigation: { name: 'supervisorName', label: 'Name of Supervisor' },
+  witness: { name: 'givenBy', label: 'Statement Given By' },
 };
 
 function noticeFor(type) {
@@ -4148,14 +4376,14 @@ const FREEHAND_TOOLS = ['pen', 'highlight'];
 const DRAG_TOOLS = ['rect', 'ellipse', 'pixelate', 'arrow'];
 const NOTE_TOOLS = ['text', 'select'];
 
-const attachments = { ford: [], policy: [], unifor: [], investigation: [] };
+const attachments = { ford: [], policy: [], unifor: [], investigation: [], witness: [] };
 
 /*
  * How each form lays its pictures out. One page per picture by default: a grievance is a paper
  * document that gets printed and handed over, so its pages should be paper-sized. The page turns
  * sideways for a wide picture rather than shrinking it into a strip across an empty sheet.
  */
-const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter' };
+const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter', witness: 'letter' };
 
 const editor = document.getElementById('editor');
 const editorStage = document.getElementById('editorStage');
@@ -5249,6 +5477,7 @@ const FORM_MARKUP_NAMES = {
   policy: ['employeeName', 'Policy Grievance', 'dateIncident'],
   unifor: ['grievorName', 'Fact Sheet', 'uniforDateIncident'],
   investigation: ['supervisorName', 'Investigation Form', 'dateInfraction'],
+  witness: ['givenBy', 'Witness Statement', 'dateTaken'],
 };
 
 async function markUpForm(type) {
@@ -5387,7 +5616,7 @@ const IMPORT_LABELS = {
 
 const IMPORT_FORM_NAMES = {
   ford: 'Grievance Investigation & Claim', policy: 'Policy Grievance',
-  unifor: 'Fact Sheet', investigation: 'Investigation Form',
+  unifor: 'Fact Sheet', investigation: 'Investigation Form', witness: 'Witness Statement',
 };
 
 function normaliseKey(key) {
@@ -5404,6 +5633,7 @@ function importFormType(raw) {
   if (['policy', 'policygrievance'].includes(word)) return 'policy';
   if (['unifor', 'factsheet', 'fact'].includes(word)) return 'unifor';
   if (['investigation', 'investigationform', '401', 'step401'].includes(word)) return 'investigation';
+  if (['witness', 'witnessstatement', 'statement'].includes(word)) return 'witness';
   return null;
 }
 

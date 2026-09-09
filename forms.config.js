@@ -19,5 +19,10 @@ window.FORMS_CONFIG_DATA = {
     "title": "4.01 Investigation Form",
     "homeLabel": "4.01 Investigation Form",
     "homeSub": "Work done by a supervisor or other salaried member"
+  },
+  "witness": {
+    "title": "Witness Statement",
+    "homeLabel": "Witness Statement",
+    "homeSub": ""
   }
 };
