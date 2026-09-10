@@ -314,71 +314,20 @@ document.getElementById('pdfViewerBack').addEventListener('click', () => {
   if (back) back();
 });
 
-/*
- * What to download. A grievance can go out as the PDF alone — which is the thing the company
- * receives — or with a .grv copy beside it for the rep's own records. The PDF is chosen when
- * the dialog opens, so the quick answer is always the safe one, and the .grv carries a warning
- * because a file the company can't open is a filing that didn't happen.
- *
- * Only offered on a preview that came from a form. A marked-up document or a pile of pictures
- * has no form behind it, so there is nothing a .grv could hold.
- */
-const downloadOverlay = document.getElementById('downloadOverlay');
-let downloadAnswer = null;
-
-function askDownload() {
-  return new Promise(resolve => {
-    downloadAnswer = resolve;
-    document.querySelector('input[name="downloadWhat"][value="pdf"]').checked = true;
-    downloadOverlay.hidden = false;
-    document.body.style.overflow = 'hidden';
-    document.getElementById('downloadGo').focus();
-  });
-}
-
-function closeDownloadDialog(choice) {
-  if (downloadOverlay.hidden) return;
-  downloadOverlay.hidden = true;
-  document.body.style.overflow = 'hidden';      // the preview underneath is still covering the page
-  const answer = downloadAnswer;
-  downloadAnswer = null;
-  if (answer) answer(choice || null);
-}
-
-document.getElementById('downloadCancel').addEventListener('click', () => closeDownloadDialog(null));
-document.getElementById('downloadGo').addEventListener('click', () => {
-  const picked = document.querySelector('input[name="downloadWhat"]:checked');
-  closeDownloadDialog(picked ? picked.value : 'pdf');
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !downloadOverlay.hidden) { e.preventDefault(); closeDownloadDialog(null); }
-});
-
 document.getElementById('pdfViewerDownload').addEventListener('click', async () => {
   const blob = viewerDoc ? viewerDoc.output('blob') : viewerBlob;
   if (!blob) return;
-  const type = viewerFormType;
-  const choice = type ? await askDownload() : 'pdf';
-  if (!choice) return;                          // backed out of the dialog
-
+  /*
+   * The PDF, and only the PDF. A .grv is a backup for the rep and is not a grievance, so it
+   * stays under Advanced where it has to be gone looking for — offering it beside the download
+   * put a file the company can't open one careless click from being sent as the filing.
+   */
   const button = document.getElementById('pdfViewerDownload');
   button.disabled = true;
   try {
     const result = await saveFile(blob, viewerName());
     // Nothing is said when the dialog was closed without saving: that answer was deliberate
-    if (!result.saved) return;
-    let said = savedMessage(result);
-    if (choice === 'both') {
-      /*
-       * The second dialog needs a fresh click to open in some browsers, and this one is a
-       * click old. saveFile falls back to an ordinary download when it can't ask, so the
-       * backup still gets written — the wording just says where it went.
-       */
-      const backup = new Blob([JSON.stringify(buildGrv(type), null, 2)], { type: 'application/grievance+json' });
-      const grv = await saveFile(backup, viewerName().replace(/\.pdf$/i, '') + '.grv');
-      if (grv.saved) said += ' Backup: ' + savedMessage(grv).replace(/^Saved /, '');
-    }
-    setViewerStatus(said, true);
+    if (result.saved) setViewerStatus(savedMessage(result), true);
   } finally {
     button.disabled = false;
   }
@@ -2228,9 +2177,8 @@ function readWordText(text) {
     if (!body) { missing.push(field); return; }
 
     if (field.date) {
-      const iso = importDate(body);
-      if (!iso) { missing.push(field); return; }
-      values[field.name] = iso;
+      // A date field can hold words — "Ongoing" — so anything unreadable as a date is kept
+      values[field.name] = importDate(body) || body;
     } else if (field.choices) {
       // Dictation tends to leave "Yes." or "no" — the key drops case and the full stop, so
       // those match. Anything more than the choice word ("Yes please") is left for the rep to
@@ -3900,27 +3848,26 @@ function setupDatePicker(originalInput, options = {}) {
     return Math.floor(year / 12) * 12;
   }
 
-  function selectedDate() { return parseDateKey(hidden.value); }
+  function selectedDate() { return parseDateKey(hidden.value); }   // null when the field holds words
 
   function updateTriggerLabel() {
     const sel = selectedDate();
-    // Spelled out to match what the PDF prints (see dateVariants)
-    trigger.value = sel ? `${MONTH_NAMES_FULL[sel.getMonth()]} ${sel.getDate()} ${sel.getFullYear()}` : '';
-    trigger.classList.remove('is-bad');
+    // A real date is spelled out to match what the PDF prints (see dateVariants); anything
+    // else is whatever was written, kept as written
+    trigger.value = sel ? `${MONTH_NAMES_FULL[sel.getMonth()]} ${sel.getDate()} ${sel.getFullYear()}`
+                        : (hidden.value || '');
   }
 
   /*
-   * What was typed, read back. Anything that can't be read is put back to the date the field
-   * already held rather than left showing one thing and printing another, and the field says
-   * so for a moment. Empty clears the date, which is how a date meant for later gets left out.
+   * What was typed, read back. A date in any of the usual spellings is stored as a date, so it
+   * prints and sorts like one. Anything else is kept exactly as written: "Ongoing", "Not yet
+   * filed" and "see attached" are all real answers on a grievance, and a field that refused
+   * them would send someone hunting for a date that does not exist.
    */
   function commitTyped() {
     const typed = trigger.value.trim();
     if (!typed) { if (hidden.value) setValue(null); else updateTriggerLabel(); return; }
-    const iso = parseTypedDate(typed);
-    if (iso) { setValue(iso); return; }
-    updateTriggerLabel();
-    trigger.classList.add('is-bad');
+    setValue(parseTypedDate(typed) || typed);
   }
 
   function setValue(key) {
@@ -6492,11 +6439,8 @@ function readGrievanceJson(text) {
     const alias = namesFor(field).find(name => lookup[name] !== undefined && lookup[name] !== null && lookup[name] !== '');
     if (!alias) return;
     let value = lookup[alias];
-    if (isDateField(type, field)) {
-      const iso = importDate(value);
-      if (!iso) { ignored.push(importLabel(type, field) + ' (couldn’t read the date)'); return; }
-      value = iso;
-    }
+    // A date field may hold words rather than a date, and those come across as they are
+    if (isDateField(type, field)) value = importDate(value) || value;
     values[field] = String(value);
   });
 

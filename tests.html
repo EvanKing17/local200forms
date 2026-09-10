@@ -1531,84 +1531,6 @@ function run(win, doc) {
       { detail: JSON.stringify(first) + ' then ' + JSON.stringify(second) };
   });
 
-  checkAsync(g9e, 'Downloading a grievance asks what to save, and says which file the company gets', async () => {
-    const form = doc.getElementById('policyForm');
-    win.showForm('policy');
-    win.clearForm(form);
-    form.elements.employeeName.value = 'Choice Person';
-    const built = win.buildPolicyDoc(win.fd(form));
-    await win.showPdf(built.output('blob'), 'Choice Person - Policy Grievance.pdf', built, null, 'policy');
-
-    const saved = [];
-    const realSave = win.saveFile;
-    win.saveFile = (blob, name) => { saved.push(name); return Promise.resolve({ saved: true, picked: true, name }); };
-    try {
-      doc.getElementById('pdfViewerDownload').click();
-      await new Promise(r => win.setTimeout(r, 50));
-      const asked = !doc.getElementById('downloadOverlay').hidden;
-      const pdfFirst = doc.querySelector('input[name="downloadWhat"][value="pdf"]').checked;
-      const warns = /never send a \.grv to the company/i.test(doc.getElementById('downloadOverlay').textContent);
-
-      // the backup as well, which is the deliberate answer
-      doc.querySelector('input[name="downloadWhat"][value="both"]').checked = true;
-      doc.getElementById('downloadGo').click();
-      await new Promise(r => win.setTimeout(r, 80));
-      const both = saved.length === 2 && /\.pdf$/.test(saved[0]) && /\.grv$/.test(saved[1]) &&
-                   saved[1].replace(/\.grv$/, '') === saved[0].replace(/\.pdf$/, '');
-      return (asked && pdfFirst && warns && both) ||
-        { detail: 'asked=' + asked + ' pdfPreselected=' + pdfFirst + ' warns=' + warns + ' saved=' + saved.join(', ') };
-    } finally {
-      win.saveFile = realSave;
-      if (!doc.getElementById('downloadOverlay').hidden) doc.getElementById('downloadCancel').click();
-      doc.getElementById('pdfViewerClose').click();
-      win.clearForm(form);
-      win.showHome();
-    }
-  });
-
-  checkAsync(g9e, 'Backing out of that question saves nothing', async () => {
-    const form = doc.getElementById('policyForm');
-    win.showForm('policy');
-    win.clearForm(form);
-    form.elements.employeeName.value = 'Cancel Person';
-    const built = win.buildPolicyDoc(win.fd(form));
-    await win.showPdf(built.output('blob'), 'Cancel.pdf', built, null, 'policy');
-    let saves = 0;
-    const realSave = win.saveFile;
-    win.saveFile = (blob, name) => { saves++; return Promise.resolve({ saved: true, picked: true, name }); };
-    try {
-      doc.getElementById('pdfViewerDownload').click();
-      await new Promise(r => win.setTimeout(r, 50));
-      doc.getElementById('downloadCancel').click();
-      await new Promise(r => win.setTimeout(r, 50));
-      return saves === 0 || { detail: saves + ' files were saved anyway' };
-    } finally {
-      win.saveFile = realSave;
-      doc.getElementById('pdfViewerClose').click();
-      win.clearForm(form);
-      win.showHome();
-    }
-  });
-
-  checkAsync(g9e, 'A document with no form behind it is not asked about', async () => {
-    // A marked-up PDF or a pile of pictures has nothing a .grv could hold
-    const foreign = new win.Blob([new win.Uint8Array([37, 80, 68, 70])], { type: 'application/pdf' });
-    await win.showPdf(foreign, 'Someone elses.pdf', null);
-    const saved = [];
-    const realSave = win.saveFile;
-    win.saveFile = (blob, name) => { saved.push(name); return Promise.resolve({ saved: true, picked: true, name }); };
-    try {
-      doc.getElementById('pdfViewerDownload').click();
-      await new Promise(r => win.setTimeout(r, 60));
-      const quiet = doc.getElementById('downloadOverlay').hidden;
-      return (quiet && saved.length === 1) || { detail: 'asked=' + !quiet + ' saved=' + saved.join(', ') };
-    } finally {
-      win.saveFile = realSave;
-      doc.getElementById('pdfViewerClose').click();
-      win.showHome();
-    }
-  });
-
   const g9f = group('Typing a date');
 
   check(g9f, 'Dates are read the way people write them', () => {
@@ -1651,27 +1573,62 @@ function run(win, doc) {
       { detail: 'shutOnFocus=' + shutOnFocus + ' stored=' + stored + ' shown=' + shown + ' icon=' + openedByIcon };
   });
 
-  check(g9f, 'Something that is not a date is put back rather than printed', () => {
+  check(g9f, 'A date field takes words like Ongoing, and prints them', () => {
     const form = doc.getElementById('fordForm');
     win.showForm('ford');
     win.clearForm(form);
     const picker = form.querySelector('[name="dateIncident"]').closest('.datepicker');
     const field = picker.querySelector('.datepicker-text');
-    picker.setValue('2026-08-26');
 
-    field.value = 'sometime next week';
+    field.value = 'Ongoing';
     field.dispatchEvent(new win.Event('blur', { bubbles: false }));
-    const kept = form.elements.dateIncident.value === '2026-08-26' && field.value === 'August 26 2026';
-    const flagged = field.classList.contains('is-bad');
+    const stored = form.elements.dateIncident.value === 'Ongoing' && field.value === 'Ongoing';
+    const printed = atob(win.buildFordDoc(win.fd(form)).output('datauristring').split(',')[1]).indexOf('(Ongoing)') !== -1;
 
-    // and emptying it really does clear the date, for one to be written in later
+    // and it still reads a real date as a date, so that one prints spelled out
+    field.value = '8/26/2026';
+    field.dispatchEvent(new win.Event('blur', { bubbles: false }));
+    const asDate = form.elements.dateIncident.value === '2026-08-26' && field.value === 'August 26 2026';
+
+    // emptying it really does clear it, for one to be written in later
     field.value = '';
     field.dispatchEvent(new win.Event('blur', { bubbles: false }));
     const cleared = form.elements.dateIncident.value === '';
 
     win.clearForm(form);
     win.showHome();
-    return (kept && flagged && cleared) || { detail: 'kept=' + kept + ' flagged=' + flagged + ' cleared=' + cleared };
+    return (stored && printed && asDate && cleared) ||
+      { detail: 'stored=' + stored + ' printed=' + printed + ' asDate=' + asDate + ' cleared=' + cleared };
+  });
+
+  check(g9f, 'Words in a date field survive a .grv and a trip through Word', () => {
+    const form = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Ongoing Person';
+    form.querySelector('[name="dateIncident"]').closest('.datepicker').setValue('Ongoing');
+
+    const back = win.readGrievanceJson(JSON.stringify(win.buildGrv('ford')));
+    const inGrv = back.values.dateIncident === 'Ongoing';
+    const fromWord = win.readWordText(win.wordTextFor('ford'));
+    const inWord = fromWord.values.dateIncident === 'Ongoing';
+
+    win.clearForm(form);
+    win.showHome();
+    return (inGrv && inWord) || { detail: 'grv=' + JSON.stringify(back.values.dateIncident) +
+                                          ' word=' + JSON.stringify(fromWord.values.dateIncident) };
+  });
+
+  check(g9e, 'A .grv is only offered under Advanced, and says what it is', () => {
+    // Not beside the download: a file the company cannot open must not be one careless click
+    // from being sent as the filing
+    const loose = doc.querySelectorAll('.dc-tools [data-save-grv], .pdf-viewer [data-save-grv]').length;
+    const menus = doc.querySelectorAll('.dc-advanced-menu [data-save-grv]').length;
+    const notes = [].map.call(doc.querySelectorAll('.dc-advanced-note'), n => n.textContent);
+    const warns = notes.length === 5 && notes.every(t => /never send a \.grv to the company/i.test(t));
+    const noDialog = !doc.getElementById('downloadOverlay');
+    return (loose === 0 && menus === 5 && warns && noDialog) ||
+      { detail: 'loose=' + loose + ' menus=' + menus + ' notes=' + notes.length + ' noDialog=' + noDialog };
   });
 
   const g10 = group('Filling a form from JSON');
