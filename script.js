@@ -40,8 +40,7 @@ function applyFormsConfig() {
     }
     const heading = document.getElementById(`form-${type}-heading`);
     if (heading && cfg.title != null) heading.textContent = cfg.title;
-    const bar = document.querySelector(`[data-form-title="${type}"]`);
-    if (bar && cfg.title != null) bar.textContent = cfg.title;
+    // The title bar shows the file's name rather than the form's; see refreshFormName
   });
 }
 
@@ -224,6 +223,7 @@ let viewerBack = null;
 let viewerFilename = '';
 let viewerUrl = null;
 let viewerToken = 0;
+let viewerFormType = null;      // set when the preview came from a form, so a .grv can be offered too
 
 function openPdfViewer(doc, filename) {
   showPdf(doc.output('blob'), filename, doc);
@@ -238,8 +238,9 @@ function openPdfViewer(doc, filename) {
  * fall back to it on their own — and what you get then is a card with an Open button instead
  * of the document. Drawing it means there is always something on screen.
  */
-async function showPdf(blob, filename, doc, onBack) {
+async function showPdf(blob, filename, doc, onBack, formType) {
   const token = ++viewerToken;
+  viewerFormType = formType || null;
   viewerDoc = doc || null;
   viewerBlob = blob;
   viewerFilename = filename;
@@ -303,6 +304,7 @@ function closePdfViewer() {
   viewerDoc = null;
   viewerBlob = null;
   viewerBack = null;
+  viewerFormType = null;
 }
 
 document.getElementById('pdfViewerClose').addEventListener('click', closePdfViewer);
@@ -312,15 +314,71 @@ document.getElementById('pdfViewerBack').addEventListener('click', () => {
   if (back) back();
 });
 
+/*
+ * What to download. A grievance can go out as the PDF alone — which is the thing the company
+ * receives — or with a .grv copy beside it for the rep's own records. The PDF is chosen when
+ * the dialog opens, so the quick answer is always the safe one, and the .grv carries a warning
+ * because a file the company can't open is a filing that didn't happen.
+ *
+ * Only offered on a preview that came from a form. A marked-up document or a pile of pictures
+ * has no form behind it, so there is nothing a .grv could hold.
+ */
+const downloadOverlay = document.getElementById('downloadOverlay');
+let downloadAnswer = null;
+
+function askDownload() {
+  return new Promise(resolve => {
+    downloadAnswer = resolve;
+    document.querySelector('input[name="downloadWhat"][value="pdf"]').checked = true;
+    downloadOverlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+    document.getElementById('downloadGo').focus();
+  });
+}
+
+function closeDownloadDialog(choice) {
+  if (downloadOverlay.hidden) return;
+  downloadOverlay.hidden = true;
+  document.body.style.overflow = 'hidden';      // the preview underneath is still covering the page
+  const answer = downloadAnswer;
+  downloadAnswer = null;
+  if (answer) answer(choice || null);
+}
+
+document.getElementById('downloadCancel').addEventListener('click', () => closeDownloadDialog(null));
+document.getElementById('downloadGo').addEventListener('click', () => {
+  const picked = document.querySelector('input[name="downloadWhat"]:checked');
+  closeDownloadDialog(picked ? picked.value : 'pdf');
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !downloadOverlay.hidden) { e.preventDefault(); closeDownloadDialog(null); }
+});
+
 document.getElementById('pdfViewerDownload').addEventListener('click', async () => {
   const blob = viewerDoc ? viewerDoc.output('blob') : viewerBlob;
   if (!blob) return;
+  const type = viewerFormType;
+  const choice = type ? await askDownload() : 'pdf';
+  if (!choice) return;                          // backed out of the dialog
+
   const button = document.getElementById('pdfViewerDownload');
   button.disabled = true;
   try {
     const result = await saveFile(blob, viewerName());
     // Nothing is said when the dialog was closed without saving: that answer was deliberate
-    if (result.saved) setViewerStatus(savedMessage(result), true);
+    if (!result.saved) return;
+    let said = savedMessage(result);
+    if (choice === 'both') {
+      /*
+       * The second dialog needs a fresh click to open in some browsers, and this one is a
+       * click old. saveFile falls back to an ordinary download when it can't ask, so the
+       * backup still gets written — the wording just says where it went.
+       */
+      const backup = new Blob([JSON.stringify(buildGrv(type), null, 2)], { type: 'application/grievance+json' });
+      const grv = await saveFile(backup, viewerName().replace(/\.pdf$/i, '') + '.grv');
+      if (grv.saved) said += ' Backup: ' + savedMessage(grv).replace(/^Saved /, '');
+    }
+    setViewerStatus(said, true);
   } finally {
     button.disabled = false;
   }
@@ -2868,6 +2926,7 @@ function showForm(type, data) {
   entry.form.querySelectorAll(DC_AUTOGROW).forEach(autoGrow);
   applyRememberedSubmitter(entry.form);
   updatePageBreaks(type);
+  refreshFormName(type);
   if (entry.syncSheet) entry.syncSheet();
   renderAttachmentList(type);
 }
@@ -3694,6 +3753,48 @@ applyFormsConfig();
 showHome();
 
 /* ============ Custom date picker ============ */
+
+/*
+ * A typed date, read the way people write them: 8/26/2026, 2026-08-26, "August 26 2026",
+ * "aug 26" for this year. Slashes are month first, matching the handover files this app
+ * already reads and the spelled-out date it writes straight back into the field, so a wrong
+ * reading shows itself immediately.
+ */
+function parseTypedDate(text) {
+  const clean = String(text).trim().replace(/,/g, ' ').replace(/\s+/g, ' ');
+  if (!clean) return null;
+  const thisYear = new Date().getFullYear();
+
+  const fullYear = (y) => {
+    const n = Number(y);
+    if (String(y).length === 4) return n;
+    return n + (n <= 68 ? 2000 : 1900);        // 26 is this century, 95 is the last one
+  };
+  const build = (y, m, d) => {
+    if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return null;
+    const date = new Date(y, m - 1, d);
+    // Rejects the 31st of a 30-day month rather than rolling it into the next one
+    return (date.getMonth() === m - 1 && date.getDate() === d) ? dateKeyLocal(date) : null;
+  };
+
+  let m = clean.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (m) return build(Number(m[1]), Number(m[2]), Number(m[3]));
+
+  m = clean.match(/^(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{2,4}))?$/);
+  if (m) return build(m[3] ? fullYear(m[3]) : thisYear, Number(m[1]), Number(m[2]));
+
+  // A month by name, either side of the day
+  const named = clean.match(/^([A-Za-z]{3,})\s+(\d{1,2})(?:\s+(\d{2,4}))?$/) ||
+                clean.match(/^(\d{1,2})\s+([A-Za-z]{3,})(?:\s+(\d{2,4}))?$/);
+  if (named) {
+    const word = (/^[A-Za-z]/.test(named[1]) ? named[1] : named[2]).toLowerCase();
+    const day = Number(/^[A-Za-z]/.test(named[1]) ? named[2] : named[1]);
+    const month = MONTH_NAMES_FULL.findIndex(name => name.toLowerCase().startsWith(word.slice(0, 3)));
+    if (month === -1) return null;
+    return build(named[3] ? fullYear(named[3]) : thisYear, month + 1, day);
+  }
+  return null;
+}
 function dateKeyLocal(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -3747,14 +3848,29 @@ function setupDatePicker(originalInput, options = {}) {
   const wrapper = document.createElement('div');
   wrapper.className = 'datepicker';
 
+  /*
+   * The date is typed into an ordinary field and the calendar sits behind the icon beside it.
+   * It used to be one button: clicking anywhere opened the calendar, so a date you already
+   * knew took three clicks through a grid instead of the six keystrokes it is.
+   */
   const triggerId = originalId || `dp-${name}`;
-  const trigger = document.createElement('button');
-  trigger.type = 'button';
+  const trigger = document.createElement('input');
+  trigger.type = 'text';
   trigger.id = triggerId;
-  trigger.className = 'datepicker-trigger';
-  trigger.setAttribute('aria-haspopup', 'dialog');
-  trigger.setAttribute('aria-expanded', 'false');
-  trigger.innerHTML = '<span class="datepicker-value"></span>' +
+  trigger.className = 'datepicker-trigger datepicker-text';
+  trigger.autocomplete = 'off';
+  trigger.spellcheck = false;
+  trigger.placeholder = placeholder;
+  trigger.setAttribute('inputmode', 'numeric');
+
+  const openBtn = document.createElement('button');
+  openBtn.type = 'button';
+  openBtn.className = 'datepicker-open';
+  openBtn.setAttribute('aria-haspopup', 'dialog');
+  openBtn.setAttribute('aria-expanded', 'false');
+  openBtn.setAttribute('aria-label', 'Choose a date');
+  openBtn.setAttribute('tabindex', '-1');      // the field beside it is the tab stop
+  openBtn.innerHTML =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
     '<rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M3 10h18M8 2v4M16 2v4"></path></svg>';
 
@@ -3767,6 +3883,7 @@ function setupDatePicker(originalInput, options = {}) {
 
   wrapper.appendChild(hidden);
   wrapper.appendChild(trigger);
+  wrapper.appendChild(openBtn);
   wrapper.appendChild(panel);
 
   const parentLabel = originalInput.closest('label');
@@ -3787,15 +3904,23 @@ function setupDatePicker(originalInput, options = {}) {
 
   function updateTriggerLabel() {
     const sel = selectedDate();
-    const span = trigger.querySelector('.datepicker-value');
-    if (sel) {
-      // Spelled out to match what the PDF prints (see dateVariants)
-      span.textContent = `${MONTH_NAMES_FULL[sel.getMonth()]} ${sel.getDate()} ${sel.getFullYear()}`;
-      span.classList.remove('is-placeholder');
-    } else {
-      span.textContent = placeholder;
-      span.classList.add('is-placeholder');
-    }
+    // Spelled out to match what the PDF prints (see dateVariants)
+    trigger.value = sel ? `${MONTH_NAMES_FULL[sel.getMonth()]} ${sel.getDate()} ${sel.getFullYear()}` : '';
+    trigger.classList.remove('is-bad');
+  }
+
+  /*
+   * What was typed, read back. Anything that can't be read is put back to the date the field
+   * already held rather than left showing one thing and printing another, and the field says
+   * so for a moment. Empty clears the date, which is how a date meant for later gets left out.
+   */
+  function commitTyped() {
+    const typed = trigger.value.trim();
+    if (!typed) { if (hidden.value) setValue(null); else updateTriggerLabel(); return; }
+    const iso = parseTypedDate(typed);
+    if (iso) { setValue(iso); return; }
+    updateTriggerLabel();
+    trigger.classList.add('is-bad');
   }
 
   function setValue(key) {
@@ -3990,7 +4115,7 @@ function setupDatePicker(originalInput, options = {}) {
     if (view === 'years') yearRangeStart = alignDecade(viewMonth.getFullYear());
     previouslyFocused = document.activeElement;
     panel.hidden = false;
-    trigger.setAttribute('aria-expanded', 'true');
+    openBtn.setAttribute('aria-expanded', 'true');
     renderPanel();
     const focusable = panel.querySelector(DATEPICKER_FOCUSABLE);
     if (focusable) focusable.focus();
@@ -4002,13 +4127,20 @@ function setupDatePicker(originalInput, options = {}) {
     if (!open) return;
     open = false;
     panel.hidden = true;
-    trigger.setAttribute('aria-expanded', 'false');
+    openBtn.setAttribute('aria-expanded', 'false');
     document.removeEventListener('mousedown', handleOutsideClick);
     document.removeEventListener('keydown', handleKeyDown);
     if (previouslyFocused && previouslyFocused.focus) previouslyFocused.focus();
   }
 
-  trigger.addEventListener('click', () => (open ? close() : openPanel()));
+  openBtn.addEventListener('click', () => (open ? close() : openPanel()));
+  trigger.addEventListener('input', () => trigger.classList.remove('is-bad'));
+  trigger.addEventListener('blur', commitTyped);
+  trigger.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { commitTyped(); return; }          // then the form's own Enter moves on
+    // Down opens the calendar, the way a combo box does
+    if (e.key === 'ArrowDown' && !open) { e.preventDefault(); openPanel(); }
+  });
 
   wrapper.refreshDisplay = updateTriggerLabel;
   wrapper.setValue = setValue;
@@ -4069,7 +4201,7 @@ const FIELD_ORDER = [
   '.dc-sp-value input',
   '.dc-step input',
   '.dc-inline-field input',
-  '.datepicker-trigger',
+  '.datepicker-text',
   '.dc-radio input',
 ].join(',');
 
@@ -4558,6 +4690,10 @@ const refreshPageBreaks = debounce(() => {
 [fordForm, policyForm, uniforForm, investigationForm, witnessForm].forEach(form => {
   form.addEventListener('input', refreshPageBreaks);
   form.addEventListener('change', refreshPageBreaks);
+  // A new name or date is a new filename, and the title bar says so as it is typed
+  const named = () => { if (currentFormType) refreshFormName(currentFormType); };
+  form.addEventListener('input', named);
+  form.addEventListener('change', named);
 });
 
 /* ============ Installable / offline ============
@@ -4895,10 +5031,9 @@ function buildFormToc(type) {
   inner.appendChild(head);
   nav.appendChild(inner);
 
-  // The title alone: the "Section A:" letter is on the band itself, a click away
+  // The whole band, letter and all: "Section A: Grievor" is how the form is talked about
   function bandLabel(band) {
-    const sub = band.querySelector('.dc-band-sub');
-    return (sub || band).textContent.trim();
+    return band.textContent.replace(/\s+/g, ' ').trim();
   }
 
   function addBand(band, container, sheet) {
@@ -6080,16 +6215,16 @@ async function addAttachment(type, file) {
  */
 async function openWithAttachments(doc, type, filename) {
   const docs = attachmentsFor(type);
-  if (!docs.length) { openPdfViewer(doc, filename); return; }
+  if (!docs.length) { showPdf(doc.output('blob'), filename, doc, null, type); return; }
 
   const button = document.querySelector('#form-' + type + ' .dc-toolbar button[type=submit]');
   const wording = button ? button.textContent : null;
   if (button) { button.disabled = true; button.textContent = 'Building…'; }
   try {
     const bytes = await window.Annotator.appendTo(doc.output('arraybuffer'), docs, attachmentFit[type], attachmentOrient[type]);
-    showPdf(new Blob([bytes], { type: 'application/pdf' }), filename, null);
+    showPdf(new Blob([bytes], { type: 'application/pdf' }), filename, null, null, type);
   } catch (err) {
-    showPdf(doc.output('blob'), filename, doc);
+    showPdf(doc.output('blob'), filename, doc, null, type);
     console.error('Attachments could not be added:', err);
   } finally {
     if (button) { button.disabled = false; button.textContent = wording; }
@@ -6132,6 +6267,15 @@ const FORM_NAME_FIELDS = {
   investigation: ['supervisorName', 'dateInfraction'],
   witness: ['givenBy', 'dateTaken'],
 };
+
+/*
+ * The name the file will be saved under, shown in the title bar so it is known before the
+ * download dialog rather than after. It follows the fields it is built from as they are typed.
+ */
+function refreshFormName(type) {
+  const bar = document.querySelector('[data-form-title="' + type + '"]');
+  if (bar) bar.textContent = formStem(type) + '.pdf';
+}
 
 /* The name without an extension, so the PDF and the .grv are the same name twice */
 function formStem(type, data) {

@@ -619,7 +619,7 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 
 /* ---------- Custom date picker ---------- */
-.datepicker { position: relative; }
+.datepicker { position: relative; display: flex; align-items: center; gap: 2px; }
 
 .datepicker-trigger {
   display: flex;
@@ -645,7 +645,33 @@ input[type="radio"] { width: 15px; height: 15px; }
   border-color: var(--c-accent);
 }
 
-.datepicker-value.is-placeholder { color: var(--c-text-faint); }
+/* The field takes the typing; the icon beside it opens the calendar */
+.datepicker-text {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  text-overflow: ellipsis;
+}
+.datepicker-text::placeholder { color: var(--c-text-faint); }
+.datepicker-text.is-bad { color: #b91c1c; }
+
+.datepicker-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+.datepicker-open:hover { background: var(--c-surface-alt); color: var(--c-accent); }
+.datepicker-open:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 1px; }
 
 .datepicker-trigger svg { flex-shrink: 0; color: var(--c-text-faint); }
 
@@ -890,7 +916,7 @@ input[type="radio"] { width: 15px; height: 15px; }
   color: var(--dc-ink);
 }
 .dc-sigline-write .datepicker-trigger:focus-visible { outline: none; background: var(--dc-field-bg); }
-.dc-sigline-write .datepicker-trigger svg { width: 13px; height: 13px; }
+
 .dc-sigline > .dc-field-label { margin-top: 5px; }
 .dc-role-input {
   display: block;
@@ -1187,7 +1213,10 @@ input[type="radio"] { width: 15px; height: 15px; }
   outline: none;
   background: var(--dc-field-bg);
 }
-.dc-field-grid .datepicker-trigger svg { width: 13px; height: 13px; }
+.dc-field-grid .datepicker-open svg,
+.dc-sigline-write .datepicker-open svg { width: 13px; height: 13px; }
+.dc-field-grid .datepicker-open,
+.dc-sigline-write .datepicker-open { width: 20px; height: 20px; color: var(--dc-label); }
 
 /* ---- labelled text box (Details of Incident, Comments) ---- */
 .dc-block { margin-top: var(--dc-gap); }
@@ -3214,31 +3243,67 @@ body.has-bar-text-size .text-size-toggle { display: none; }
 }
 
 /* The file name is editable in the preview, so it can be set before it's saved */
-.pdf-viewer-name {
+/*
+ * The file's name, written on the bar rather than sitting in a box on it. A white field read
+ * as somewhere to type before you knew what it was for; underlined on hover it reads as the
+ * name of the thing you are looking at, which happens to be editable.
+ */
+.pdf-viewer-bar input.pdf-viewer-name {
   min-width: 0;
-  flex: 0 1 360px;
+  flex: 0 1 420px;
   font-family: var(--font-sans);
   font-size: 13.5px;
   font-weight: 600;
   color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 7px 10px;
+  padding: 7px 8px;
+  cursor: text;
+  text-overflow: ellipsis;
 }
-.pdf-viewer-name:hover { background: rgba(255, 255, 255, 0.16); }
-.pdf-viewer-name:focus {
+.pdf-viewer-bar input.pdf-viewer-name:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.pdf-viewer-bar input.pdf-viewer-name:focus {
   outline: none;
-  background: #fff;
-  color: var(--dc-ink);
-  border-color: #fff;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.7);
 }
+.pdf-viewer-name::selection { background: rgba(255, 255, 255, 0.35); color: #fff; }
 
 .editor-bar-actions .btn-secondary:disabled,
 .editor-bar-actions .btn-secondary[disabled] {
   opacity: 0.4;
   cursor: default;
   background: transparent;
+}
+
+/* ---------- Which files to take away ---------- */
+.file-choices { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+
+.file-choice {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.file-choice:hover { border-color: var(--c-accent); background: var(--c-surface-alt); }
+.file-choice:has(input:checked) { border-color: var(--c-accent); background: #eef3fd; }
+.file-choice input { margin: 2px 0 0; flex-shrink: 0; }
+.file-choice-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.file-choice-name { font-size: 13.5px; font-weight: 700; color: var(--c-text); }
+.file-choice-note { font-size: 12.5px; line-height: 1.5; color: var(--c-text-muted); }
+.file-choice-warn {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #b91c1c;
 }
 
 /* ---------- Filling a form from a handover file ---------- */

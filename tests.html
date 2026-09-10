@@ -608,7 +608,9 @@ function run(win, doc) {
       doc.getElementById(f.form).querySelectorAll('.dc-band').length);
     const ford = [].map.call(doc.querySelectorAll('#form-ford .dc-toc-band'), b => b.textContent);
     const inv = [].map.call(doc.querySelectorAll('#form-investigation .dc-toc-band'), b => b.textContent).join(' / ');
-    return (matched && ford.length === 4 && ford[1] === 'Department Response' && /Payroll/.test(ford[3]) &&
+    // The whole band, so a section is called what the form calls it
+    return (matched && ford.length === 4 && ford[0] === 'Section A: Employee Details & Grievance Summary' &&
+            ford[1] === 'Section B: Department Response' && /Payroll/.test(ford[3]) &&
             inv === 'Details / Investigation / Resolution') ||
       { detail: counts.join(' ') + '; ford: ' + ford.join(' / ') + '; investigation: ' + inv };
   });
@@ -618,7 +620,7 @@ function run(win, doc) {
     const perGroup = [].map.call(groups, g => g.querySelectorAll('.dc-toc-band').length).join(',');
     const second = groups[1] ? groups[1].querySelector('.dc-toc-band').textContent : '';
     return (heads.join(',') === 'Sheet 1,Sheet 2,Sheet 3,Sheet 4,Sheet 5' && groups.length === 5 &&
-            perGroup === '3,1,1,1,1' && second === 'Statements') ||
+            perGroup === '3,1,1,1,1' && second === 'Section D: Statements') ||
       { detail: 'heads=' + heads.join(',') + ' groups=' + groups.length + ' bands=' + perGroup + ' second=' + second };
   });
   check(g6d, 'Entries are buttons, and exactly one is current', () => {
@@ -631,7 +633,7 @@ function run(win, doc) {
     const current = doc.querySelectorAll('#form-ford [aria-current="true"]');
     const text = current[0] ? current[0].textContent : '';
     return (links === 0 && notButtons === 0 && current.length === 1 &&
-            text === 'Employee Details & Grievance Summary') ||
+            text === 'Section A: Employee Details & Grievance Summary') ||
       { detail: 'links=' + links + ' notButtons=' + notButtons + ' current=' + current.length + ' read ' + text };
   });
   check(g6d, 'The highlight follows the scroll position', () => {
@@ -652,8 +654,9 @@ function run(win, doc) {
     win.scrollTo(0, 0);
     win.__app.FORM_BUILDERS.unifor.syncSheet();
     const atTop = cur();
-    return (atSheet4 === 'Assessment & Submission / Sheet 4' && atE === 'Investigation / Sheet 3' &&
-            atTop === 'Grievor / Sheet 1') ||
+    return (atSheet4 === 'Section F: Assessment & Submission / Sheet 4' &&
+            atE === 'Section E: Investigation / Sheet 3' &&
+            atTop === 'Section A: Grievor / Sheet 1') ||
       { detail: 'sheet 4: ' + atSheet4 + '; band E: ' + atE + '; top: ' + atTop };
   });
   check(g6d, 'The last section lights up at the foot of the page', () => {
@@ -1507,6 +1510,168 @@ function run(win, doc) {
     return (heading === 'Local 200 Plant Committee Fact Sheet' && card === 'Plant Committee Fact Sheet' &&
             raw.indexOf('(Local 200 Plant Committee Fact Sheet)') !== -1) ||
       { detail: 'heading=' + heading + ' card=' + card };
+  });
+
+  check(g9e, 'The title bar shows the file name, and follows what is typed', () => {
+    const form = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'First Name';
+    form.elements.dateIncident.value = '2026-07-22';
+    form.dispatchEvent(new win.Event('input', { bubbles: true }));
+    const bar = doc.querySelector('[data-form-title="ford"]');
+    const first = bar.textContent;
+    form.elements.employeeName.value = 'Second Name';
+    form.dispatchEvent(new win.Event('input', { bubbles: true }));
+    const second = bar.textContent;
+    win.clearForm(form);
+    win.showHome();
+    return (first === 'First Name - Monetary Grievance July 22 2026.pdf' &&
+            second === 'Second Name - Monetary Grievance July 22 2026.pdf') ||
+      { detail: JSON.stringify(first) + ' then ' + JSON.stringify(second) };
+  });
+
+  checkAsync(g9e, 'Downloading a grievance asks what to save, and says which file the company gets', async () => {
+    const form = doc.getElementById('policyForm');
+    win.showForm('policy');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Choice Person';
+    const built = win.buildPolicyDoc(win.fd(form));
+    await win.showPdf(built.output('blob'), 'Choice Person - Policy Grievance.pdf', built, null, 'policy');
+
+    const saved = [];
+    const realSave = win.saveFile;
+    win.saveFile = (blob, name) => { saved.push(name); return Promise.resolve({ saved: true, picked: true, name }); };
+    try {
+      doc.getElementById('pdfViewerDownload').click();
+      await new Promise(r => win.setTimeout(r, 50));
+      const asked = !doc.getElementById('downloadOverlay').hidden;
+      const pdfFirst = doc.querySelector('input[name="downloadWhat"][value="pdf"]').checked;
+      const warns = /never send a \.grv to the company/i.test(doc.getElementById('downloadOverlay').textContent);
+
+      // the backup as well, which is the deliberate answer
+      doc.querySelector('input[name="downloadWhat"][value="both"]').checked = true;
+      doc.getElementById('downloadGo').click();
+      await new Promise(r => win.setTimeout(r, 80));
+      const both = saved.length === 2 && /\.pdf$/.test(saved[0]) && /\.grv$/.test(saved[1]) &&
+                   saved[1].replace(/\.grv$/, '') === saved[0].replace(/\.pdf$/, '');
+      return (asked && pdfFirst && warns && both) ||
+        { detail: 'asked=' + asked + ' pdfPreselected=' + pdfFirst + ' warns=' + warns + ' saved=' + saved.join(', ') };
+    } finally {
+      win.saveFile = realSave;
+      if (!doc.getElementById('downloadOverlay').hidden) doc.getElementById('downloadCancel').click();
+      doc.getElementById('pdfViewerClose').click();
+      win.clearForm(form);
+      win.showHome();
+    }
+  });
+
+  checkAsync(g9e, 'Backing out of that question saves nothing', async () => {
+    const form = doc.getElementById('policyForm');
+    win.showForm('policy');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Cancel Person';
+    const built = win.buildPolicyDoc(win.fd(form));
+    await win.showPdf(built.output('blob'), 'Cancel.pdf', built, null, 'policy');
+    let saves = 0;
+    const realSave = win.saveFile;
+    win.saveFile = (blob, name) => { saves++; return Promise.resolve({ saved: true, picked: true, name }); };
+    try {
+      doc.getElementById('pdfViewerDownload').click();
+      await new Promise(r => win.setTimeout(r, 50));
+      doc.getElementById('downloadCancel').click();
+      await new Promise(r => win.setTimeout(r, 50));
+      return saves === 0 || { detail: saves + ' files were saved anyway' };
+    } finally {
+      win.saveFile = realSave;
+      doc.getElementById('pdfViewerClose').click();
+      win.clearForm(form);
+      win.showHome();
+    }
+  });
+
+  checkAsync(g9e, 'A document with no form behind it is not asked about', async () => {
+    // A marked-up PDF or a pile of pictures has nothing a .grv could hold
+    const foreign = new win.Blob([new win.Uint8Array([37, 80, 68, 70])], { type: 'application/pdf' });
+    await win.showPdf(foreign, 'Someone elses.pdf', null);
+    const saved = [];
+    const realSave = win.saveFile;
+    win.saveFile = (blob, name) => { saved.push(name); return Promise.resolve({ saved: true, picked: true, name }); };
+    try {
+      doc.getElementById('pdfViewerDownload').click();
+      await new Promise(r => win.setTimeout(r, 60));
+      const quiet = doc.getElementById('downloadOverlay').hidden;
+      return (quiet && saved.length === 1) || { detail: 'asked=' + !quiet + ' saved=' + saved.join(', ') };
+    } finally {
+      win.saveFile = realSave;
+      doc.getElementById('pdfViewerClose').click();
+      win.showHome();
+    }
+  });
+
+  const g9f = group('Typing a date');
+
+  check(g9f, 'Dates are read the way people write them', () => {
+    const year = new Date().getFullYear();
+    const cases = [
+      ['2026-08-26', '2026-08-26'], ['8/26/2026', '2026-08-26'], ['08/26/26', '2026-08-26'],
+      ['August 26 2026', '2026-08-26'], ['aug 26 2026', '2026-08-26'], ['26 August 2026', '2026-08-26'],
+      ['Aug 26, 2026', '2026-08-26'], ['8-26-2026', '2026-08-26'],
+      ['aug 26', year + '-08-26'], ['8/26', year + '-08-26'],
+      ['', null], ['tomorrow', null], ['13/40/2026', null], ['February 31 2026', null],
+    ];
+    const wrong = cases.filter(([text, want]) => win.parseTypedDate(text) !== want)
+                       .map(([text, want]) => JSON.stringify(text) + ' gave ' + win.parseTypedDate(text) + ', wanted ' + want);
+    return wrong.length === 0 || { detail: wrong.join(' | ') };
+  });
+
+  check(g9f, 'Typing a date fills the field, and the calendar stays shut until its icon is clicked', () => {
+    const form = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(form);
+    const picker = form.querySelector('[name="dateIncident"]').closest('.datepicker');
+    const field = picker.querySelector('.datepicker-text');
+    const panel = picker.querySelector('.datepicker-panel');
+
+    field.focus();
+    const shutOnFocus = panel.hidden;
+    field.value = '8/26/2026';
+    field.dispatchEvent(new win.Event('input', { bubbles: true }));
+    field.dispatchEvent(new win.Event('blur', { bubbles: false }));
+    const stored = form.elements.dateIncident.value;
+    const shown = field.value;
+
+    picker.querySelector('.datepicker-open').click();
+    const openedByIcon = !panel.hidden;
+    doc.body.click();
+
+    win.clearForm(form);
+    win.showHome();
+    return (shutOnFocus && stored === '2026-08-26' && shown === 'August 26 2026' && openedByIcon) ||
+      { detail: 'shutOnFocus=' + shutOnFocus + ' stored=' + stored + ' shown=' + shown + ' icon=' + openedByIcon };
+  });
+
+  check(g9f, 'Something that is not a date is put back rather than printed', () => {
+    const form = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(form);
+    const picker = form.querySelector('[name="dateIncident"]').closest('.datepicker');
+    const field = picker.querySelector('.datepicker-text');
+    picker.setValue('2026-08-26');
+
+    field.value = 'sometime next week';
+    field.dispatchEvent(new win.Event('blur', { bubbles: false }));
+    const kept = form.elements.dateIncident.value === '2026-08-26' && field.value === 'August 26 2026';
+    const flagged = field.classList.contains('is-bad');
+
+    // and emptying it really does clear the date, for one to be written in later
+    field.value = '';
+    field.dispatchEvent(new win.Event('blur', { bubbles: false }));
+    const cleared = form.elements.dateIncident.value === '';
+
+    win.clearForm(form);
+    win.showHome();
+    return (kept && flagged && cleared) || { detail: 'kept=' + kept + ' flagged=' + flagged + ' cleared=' + cleared };
   });
 
   const g10 = group('Filling a form from JSON');

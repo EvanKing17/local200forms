@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=87">
+<link rel="stylesheet" href="style.css?v=89">
 </head>
 <body>
 
@@ -1532,6 +1532,38 @@
   </div>
 </div>
 
+<!-- Which files to take away. The PDF is the grievance; the .grv is the rep's own copy, and
+     saying so plainly matters more than saving a line of text. -->
+<div class="admin-overlay" id="downloadOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="downloadTitle">
+  <div class="admin-modal">
+    <h2 class="admin-title" id="downloadTitle">What would you like to save?</h2>
+    <div class="file-choices">
+      <label class="file-choice">
+        <input type="radio" name="downloadWhat" value="pdf" checked>
+        <span class="file-choice-text">
+          <span class="file-choice-name">The PDF only</span>
+          <span class="file-choice-note">The grievance itself. This is the file that goes to the company.</span>
+        </span>
+      </label>
+      <label class="file-choice">
+        <input type="radio" name="downloadWhat" value="both">
+        <span class="file-choice-text">
+          <span class="file-choice-name">The PDF, and a .grv backup for yourself</span>
+          <span class="file-choice-note">
+            A .grv is your own copy. Drop it back on this page any time and the form fills itself
+            in again, so a grievance can be picked up where you left it or filed again next year.
+          </span>
+          <span class="file-choice-warn">Never send a .grv to the company. It is not a grievance and they cannot open it.</span>
+        </span>
+      </label>
+    </div>
+    <div class="admin-actions">
+      <button type="button" class="btn-secondary" id="downloadCancel">Cancel</button>
+      <button type="button" class="btn-primary" id="downloadGo">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="admin-overlay" id="importOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="importTitle">
   <div class="admin-modal">
     <h2 class="admin-title" id="importTitle">Fill a form from this file</h2>
@@ -1618,9 +1650,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=87"></script>
+<script src="forms.config.js?v=89"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=87"></script>
-<script src="script.js?v=87"></script>
+<script src="annotate.js?v=89"></script>
+<script src="script.js?v=89"></script>
 </body>
 </html>
