@@ -11,7 +11,7 @@ const panels = document.querySelectorAll('.form-panel');
 const DEFAULT_FORMS_CONFIG = {
   ford: { title: 'Monetary Grievance', homeLabel: 'Monetary Grievance', homeSub: '' },
   policy: { title: 'Policy Grievance', homeLabel: 'Policy Grievance', homeSub: '' },
-  unifor: { title: 'Plant Committee Fact Sheet', homeLabel: 'Plant Committee Fact Sheet', homeSub: '' },
+  unifor: { title: 'Local 200 Plant Committee Fact Sheet', homeLabel: 'Plant Committee Fact Sheet', homeSub: '' },
   investigation: {
     title: '4.01 Investigation Form',
     homeLabel: '4.01 Investigation Form',
@@ -113,8 +113,105 @@ document.querySelectorAll('.currency-input').forEach(el => {
 });
 
 function download(doc, filename) {
-  doc.save(filename);
+  return saveFile(doc.output('blob'), filename);
 }
+
+/* ============ Saving a file ============
+ *
+ * Every save asks where to put it and starts in the folder used last, rather than dropping the
+ * file into Downloads without a word. The folder is remembered as a handle to the file written
+ * there — a live permission object, not a path, so it goes in IndexedDB rather than
+ * localStorage, and the browser opens its folder next time.
+ *
+ * Firefox and iOS have no picker. There the file goes to Downloads the old way, which is why
+ * what is said afterwards depends on which route was taken.
+ */
+const SAVE_DB = 'local200forms', SAVE_STORE = 'places', SAVE_KEY = 'lastSave';
+let lastSavePlace = null;
+
+function saveStore(mode) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open(SAVE_DB, 1);
+    open.onupgradeneeded = () => { open.result.createObjectStore(SAVE_STORE); };
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => resolve(open.result.transaction(SAVE_STORE, mode).objectStore(SAVE_STORE));
+  });
+}
+
+async function rememberSavePlace(handle) {
+  lastSavePlace = handle;
+  try {
+    const store = await saveStore('readwrite');
+    store.put(handle, SAVE_KEY);
+  } catch { /* private browsing, or no room: the picker just starts at Downloads next time */ }
+}
+
+(async () => {
+  try {
+    const store = await saveStore('readonly');
+    const got = store.get(SAVE_KEY);
+    got.onsuccess = () => { lastSavePlace = got.result || null; };
+  } catch { /* nothing remembered */ }
+})();
+
+function canPickSave() {
+  return typeof window.showSaveFilePicker === 'function' && window.isSecureContext;
+}
+
+const SAVE_KINDS = {
+  pdf: { description: 'PDF document', mime: 'application/pdf' },
+  grv: { description: 'Grievance file', mime: 'application/grievance+json' },
+};
+
+/* The plain route: hand the browser a link and let it land in Downloads */
+function linkDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/*
+ * Returns what happened, because the caller says it out loud: `picked` when the person chose
+ * the place, `cancelled` when they backed out of the dialog and nothing was written.
+ */
+async function saveFile(blob, filename) {
+  const ext = (filename.match(/\.([a-z0-9]+)$/i) || [])[1] || 'pdf';
+  const kind = SAVE_KINDS[ext.toLowerCase()] || { description: 'File', mime: blob.type || 'application/octet-stream' };
+  if (canPickSave()) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        // A file handle is allowed here: the dialog opens in the folder that file is in
+        startIn: lastSavePlace || 'downloads',
+        id: 'local200forms',
+        types: [{ description: kind.description, accept: { [kind.mime]: ['.' + ext] } }],
+      });
+      const stream = await handle.createWritable();
+      await stream.write(blob);
+      await stream.close();
+      rememberSavePlace(handle);
+      return { saved: true, picked: true, name: handle.name || filename };
+    } catch (err) {
+      if (err && err.name === 'AbortError') return { saved: false, cancelled: true, name: filename };
+      // Anything else — a folder that can't be written to, a browser that only half has this —
+      // falls back rather than leaving someone with no file
+    }
+  }
+  linkDownload(blob, filename);
+  return { saved: true, picked: false, name: filename };
+}
+
+/* What to say once it is written, in the words that match where it went */
+function savedMessage(result) {
+  if (!result.saved) return '';
+  return result.picked ? 'Saved “' + result.name + '”.' : 'Saved “' + result.name + '” to your downloads.';
+}
+
 
 /* ============ Full-screen PDF preview ============ */
 const pdfViewer = document.getElementById('pdfViewer');
@@ -215,23 +312,18 @@ document.getElementById('pdfViewerBack').addEventListener('click', () => {
   if (back) back();
 });
 
-document.getElementById('pdfViewerDownload').addEventListener('click', () => {
-  const name = viewerName();
-  if (viewerDoc) {
-    download(viewerDoc, name);
-  } else if (viewerBlob) {
-    // No jsPDF document behind it, so the blob is saved directly
-    const link = document.createElement('a');
-    link.href = viewerUrl;
-    link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  } else {
-    return;
+document.getElementById('pdfViewerDownload').addEventListener('click', async () => {
+  const blob = viewerDoc ? viewerDoc.output('blob') : viewerBlob;
+  if (!blob) return;
+  const button = document.getElementById('pdfViewerDownload');
+  button.disabled = true;
+  try {
+    const result = await saveFile(blob, viewerName());
+    // Nothing is said when the dialog was closed without saving: that answer was deliberate
+    if (result.saved) setViewerStatus(savedMessage(result), true);
+  } finally {
+    button.disabled = false;
   }
-  // Downloads land silently in a folder, so say where it went
-  setViewerStatus('Saved “' + name + '” to your downloads.', true);
 });
 
 document.getElementById('pdfViewerPrint').addEventListener('click', () => {
@@ -287,20 +379,52 @@ function embedFormData(doc, formType, data) {
   doc.setProperties({ subject: FORM_SIGNATURE, keywords: encoded });
 }
 
-/* Reverses embedFormData from a raw PDF file's bytes. Returns null if unrecognized. */
+function decodeFormPayload(encoded) {
+  try {
+    const payload = JSON.parse(decodeURIComponent(escape(atob(String(encoded).replace(/\s+/g, '')))));
+    return payload && payload.formType && payload.data ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+/*
+ * Reverses embedFormData from a raw PDF file's bytes. Reads the strings in either of the forms
+ * a PDF writer may use — a literal (…) or hex <…> — because the file may have been through
+ * another tool on its way back.
+ */
+function pdfString(text, key) {
+  const literal = text.match(new RegExp('\\/' + key + '\\s*\\(([^)]*)\\)'));
+  if (literal) return literal[1];
+  const hex = text.match(new RegExp('\\/' + key + '\\s*<([0-9A-Fa-f\\s]*)>'));
+  if (!hex) return null;
+  const digits = hex[1].replace(/\s+/g, '');
+  let out = '';
+  for (let i = 0; i + 1 < digits.length; i += 2) out += String.fromCharCode(parseInt(digits.substr(i, 2), 16));
+  return out.replace(/^\u00fe\u00ff/, '');       // a UTF-16 byte-order mark, if one is there
+}
+
 function readEmbeddedFormData(bytes) {
   const text = new TextDecoder('latin1').decode(bytes);
-  const subjectMatch = text.match(/\/Subject\s*\(([^)]*)\)/);
-  if (!subjectMatch || subjectMatch[1] !== FORM_SIGNATURE) return null;
+  if (pdfString(text, 'Subject') !== FORM_SIGNATURE) return null;
+  const keywords = pdfString(text, 'Keywords');
+  return keywords ? decodeFormPayload(keywords) : null;
+}
 
-  const keywordsMatch = text.match(/\/Keywords\s*\(([^)]*)\)/);
-  if (!keywordsMatch) return null;
-
+/*
+ * The same question asked properly. A PDF written with its metadata inside a compressed object
+ * stream has nothing to find in the raw bytes, so this opens it with the PDF library and asks
+ * it — which is slower and pulls in that library, hence only when the quick look finds nothing.
+ */
+async function readEmbeddedFormDataDeep(bytes) {
+  const quick = readEmbeddedFormData(bytes);
+  if (quick) return quick;
   try {
-    const json = decodeURIComponent(escape(atob(keywordsMatch[1])));
-    const payload = JSON.parse(json);
-    if (!payload || !payload.formType || !payload.data) return null;
-    return payload;
+    const PDFLib = await window.Annotator.loadPdfLib();
+    const own = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const pdf = await PDFLib.PDFDocument.load(own, { ignoreEncryption: true, updateMetadata: false });
+    if (pdf.getSubject() !== FORM_SIGNATURE) return null;
+    return decodeFormPayload(pdf.getKeywords() || '');
   } catch {
     return null;
   }
@@ -893,7 +1017,7 @@ fordForm.addEventListener('submit', (e) => {
   confirmFlags('ford', () => {
     const data = fd(e.target);
     const doc = buildFordDoc(data);
-    openWithAttachments(doc, 'ford', buildFilename(data.employeeName, FORMS_CONFIG.ford.title, data.dateIncident));
+    openWithAttachments(doc, 'ford', formStem('ford', data) + '.pdf');
   });
 });
 
@@ -974,7 +1098,7 @@ policyForm.addEventListener('submit', (e) => {
   confirmFlags('policy', () => {
     const data = fd(e.target);
     const doc = buildPolicyDoc(data);
-    openWithAttachments(doc, 'policy', buildFilename(data.employeeName, FORMS_CONFIG.policy.title, data.dateIncident));
+    openWithAttachments(doc, 'policy', formStem('policy', data) + '.pdf');
   });
 });
 
@@ -1206,7 +1330,7 @@ uniforForm.addEventListener('submit', (e) => {
   confirmFlags('unifor', () => {
     const data = fd(e.target);
     const doc = buildUniforDoc(data);
-    openWithAttachments(doc, 'unifor', buildFilename(data.grievorName, FORMS_CONFIG.unifor.title, data.uniforDateIncident));
+    openWithAttachments(doc, 'unifor', formStem('unifor', data) + '.pdf');
   });
 });
 
@@ -1271,7 +1395,7 @@ investigationForm.addEventListener('submit', (e) => {
   confirmFlags('investigation', () => {
     const data = fd(e.target);
     const doc = buildInvestigationDoc(data);
-    openWithAttachments(doc, 'investigation', buildFilename(data.supervisorName, FORMS_CONFIG.investigation.title, data.dateInfraction));
+    openWithAttachments(doc, 'investigation', formStem('investigation', data) + '.pdf');
   });
 });
 
@@ -1681,7 +1805,7 @@ witnessForm.addEventListener('submit', (e) => {
   confirmFlags('witness', () => {
     const data = fd(witnessForm);
     const doc = buildWitnessDoc(data);
-    openWithAttachments(doc, 'witness', buildFilename(data.givenBy, FORMS_CONFIG.witness.title, data.dateTaken));
+    openWithAttachments(doc, 'witness', formStem('witness', data) + '.pdf');
   });
 });
 
@@ -2355,12 +2479,15 @@ document.getElementById('clearGo').addEventListener('click', () => {
 document.getElementById('clearSave').addEventListener('click', () => {
   if (!clearSaveType) return;
   const button = document.getElementById('clearSave');
-  const name = saveGrv(clearSaveType);
-  // Same reasoning as the .grv button: the file lands in a folder without a word otherwise
-  button.textContent = 'Saved ' + name;
+  const said = button.textContent;
   button.disabled = true;
-  // Saved is the answer: the copy exists and the form is left as it was
-  clearSaveTimer = setTimeout(closeClearDialog, CLEAR_SAVED_LINGER);
+  Promise.resolve(saveGrv(clearSaveType)).then(result => {
+    // Backing out of the dialog is an answer too: the form is left alone and so is this one
+    if (!result || !result.saved) { button.disabled = false; return; }
+    button.textContent = 'Saved ' + result.name;
+    // Saved is the answer: the copy exists and the form is left as it was
+    clearSaveTimer = setTimeout(closeClearDialog, CLEAR_SAVED_LINGER);
+  });
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !clearOverlay.hidden) { e.preventDefault(); closeClearDialog(); }
@@ -2821,7 +2948,7 @@ async function handleIncomingFile(file) {
    * perfect text it still wouldn't know which words belong in which field.
    */
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const payload = readEmbeddedFormData(bytes);
+  const payload = await readEmbeddedFormDataDeep(bytes);
   if (!payload) {
     showUploadError('This PDF wasn’t made here, so its fields can’t be filled in.', file);
     return;
@@ -2849,24 +2976,19 @@ function buildGrv(type) {
   return { app: 'local200forms', form: type, saved: new Date().toISOString(), fields };
 }
 
-function saveGrv(type) {
-  const form = FORM_BUILDERS[type].form;
-  const payload = buildGrv(type);
-  const who = (form.elements[KEY_FIELD] && form.elements[KEY_FIELD].value.trim()) || 'Grievance';
-  // Named the same way as the PDF, less the date: a draft has no filing date yet
-  const title = String(FORMS_CONFIG[type].title || FORM_BUILDERS[type].label).replace(/[\/:*?"<>|]/g, '').trim();
-  const name = who.replace(/[\/:*?"<>|]/g, '').trim() + ' - ' + title + '.grv';
+/*
+ * The same name as the PDF with a different extension, so a grievance and the file that
+ * reopens it sit together in a folder. It used to look the key field up with the whole table
+ * rather than this form's entry, so every .grv came out called "Grievance".
+ */
+function grvName(type) {
+  return formStem(type) + '.grv';
+}
 
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/grievance+json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return name;
+function saveGrv(type) {
+  const name = grvName(type);
+  const blob = new Blob([JSON.stringify(buildGrv(type), null, 2)], { type: 'application/grievance+json' });
+  return saveFile(blob, name);
 }
 
 /* ---------- Advanced, beside each form's tools ----------
@@ -2964,12 +3086,17 @@ document.querySelectorAll('[data-save-grv]').forEach(button => {
       showUploadError('Nothing to save yet.');
       return;
     }
-    const name = saveGrv(type);
-    // Same reasoning as the PDF download: it lands in a folder without a word otherwise
+    // The dialog is open until it is answered, so the button says so afterwards, not before
     const said = button.textContent;
-    button.textContent = 'Saved ' + name;
     button.disabled = true;
-    setTimeout(() => { button.textContent = said; button.disabled = false; }, 3000);
+    Promise.resolve(saveGrv(type)).then(result => {
+      if (result && result.saved) {
+        button.textContent = 'Saved ' + result.name;
+        setTimeout(() => { button.textContent = said; button.disabled = false; }, 3000);
+      } else {
+        button.disabled = false;
+      }
+    });
   });
 });
 
@@ -3016,19 +3143,28 @@ const PAGE_LAYOUTS = [
   { value: 'pair', label: 'Letter paper, two per page' },
 ];
 
-function layoutPicker(current, onChange) {
-  const wrap = document.createElement('div');
-  wrap.className = 'layout-picker';
+/*
+ * Which way up the paper goes. Portrait for everything by default: these are printed and
+ * stacked, and a pile that turns the same way is the point. "Match each picture" turns each
+ * sheet to suit what is on it, which wastes less paper but reads as a jumble in the hand.
+ */
+const PAGE_ORIENTS = [
+  { value: 'portrait', label: 'Portrait' },
+  { value: 'landscape', label: 'Landscape' },
+  { value: 'auto', label: 'Match each picture' },
+];
+const DEFAULT_ORIENT = 'portrait';
 
+function pickerRow(className, caption, options, current, onChange) {
   const row = document.createElement('label');
   row.className = 'layout-row';
-  const caption = document.createElement('span');
-  caption.className = 'layout-caption';
-  caption.textContent = 'Page layout';
+  const label = document.createElement('span');
+  label.className = 'layout-caption';
+  label.textContent = caption;
 
   const select = document.createElement('select');
-  select.className = 'layout-select';
-  PAGE_LAYOUTS.forEach(option => {
+  select.className = className;
+  options.forEach(option => {
     const el = document.createElement('option');
     el.value = option.value;
     el.textContent = option.label;
@@ -3037,8 +3173,21 @@ function layoutPicker(current, onChange) {
   select.value = current;
   select.addEventListener('change', () => onChange(select.value));
 
-  row.append(caption, select);
-  wrap.appendChild(row);
+  row.append(label, select);
+  return row;
+}
+
+/*
+ * The layout and which way up the paper is. A picture given a page its own size has no paper to
+ * turn, so the second row is only offered when there is a sheet involved.
+ */
+function layoutPicker(current, onChange, orient, onOrient) {
+  const wrap = document.createElement('div');
+  wrap.className = 'layout-picker';
+  wrap.appendChild(pickerRow('layout-select', 'Page layout', PAGE_LAYOUTS, current, onChange));
+  if (onOrient && current !== 'image') {
+    wrap.appendChild(pickerRow('orient-select', 'Paper', PAGE_ORIENTS, orient || DEFAULT_ORIENT, onOrient));
+  }
   return wrap;
 }
 
@@ -3057,6 +3206,7 @@ const builderError = document.getElementById('builderError');
 let builderItems = [];
 const DEFAULT_BUILDER_FIT = 'letter';   // ordinary paper, one picture to a sheet
 let builderFit = DEFAULT_BUILDER_FIT;
+let builderOrient = DEFAULT_ORIENT;
 
 function showBuilder() {
   currentFormType = null;
@@ -3155,7 +3305,8 @@ function renderBuilder() {
   layoutHost.hidden = !hasPicture;
   if (hasPicture) {
     // Re-render: the layout decides which sheet each picture lands on, so the labels change too
-    layoutHost.appendChild(layoutPicker(builderFit, value => { builderFit = value; renderBuilder(); }));
+    layoutHost.appendChild(layoutPicker(builderFit, value => { builderFit = value; renderBuilder(); },
+                                       builderOrient, value => { builderOrient = value; renderBuilder(); }));
   }
 
   builderPages.innerHTML = '';
@@ -4879,6 +5030,7 @@ const attachments = { ford: [], policy: [], unifor: [], investigation: [], witne
  * sideways for a wide picture rather than shrinking it into a strip across an empty sheet.
  */
 const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter', witness: 'letter' };
+const attachmentOrient = { ford: DEFAULT_ORIENT, policy: DEFAULT_ORIENT, unifor: DEFAULT_ORIENT, investigation: DEFAULT_ORIENT, witness: DEFAULT_ORIENT };
 
 const editor = document.getElementById('editor');
 const editorStage = document.getElementById('editorStage');
@@ -5849,7 +6001,8 @@ function renderAttachmentList(type) {
   // Same control, same words as the builder — but only once a picture has been added, since a
   // stack of PDFs keeps its own pages whatever is chosen here
   if (docs.some(d => d.kind !== 'pdf')) {
-    host.appendChild(layoutPicker(attachmentFit[type], value => { attachmentFit[type] = value; }));
+    host.appendChild(layoutPicker(attachmentFit[type], value => { attachmentFit[type] = value; renderAttachmentList(type); },
+                                 attachmentOrient[type], value => { attachmentOrient[type] = value; }));
   }
 
   docs.forEach((doc, i) => {
@@ -5933,7 +6086,7 @@ async function openWithAttachments(doc, type, filename) {
   const wording = button ? button.textContent : null;
   if (button) { button.disabled = true; button.textContent = 'Building…'; }
   try {
-    const bytes = await window.Annotator.appendTo(doc.output('arraybuffer'), docs, attachmentFit[type]);
+    const bytes = await window.Annotator.appendTo(doc.output('arraybuffer'), docs, attachmentFit[type], attachmentOrient[type]);
     showPdf(new Blob([bytes], { type: 'application/pdf' }), filename, null);
   } catch (err) {
     showPdf(doc.output('blob'), filename, doc);
@@ -5967,13 +6120,29 @@ async function openForMarkup(file) {
  * as one scrolling document. Marking a single attachment on its own is still there, but this is
  * the usual want — an arrow on the form pointing at the photo three pages later.
  */
-const FORM_MARKUP_NAMES = {
-  ford: ['employeeName', 'Grievance Claim', 'dateIncident'],
-  policy: ['employeeName', 'Policy Grievance', 'dateIncident'],
-  unifor: ['grievorName', 'Fact Sheet', 'uniforDateIncident'],
-  investigation: ['supervisorName', 'Investigation Form', 'dateInfraction'],
-  witness: ['givenBy', 'Witness Statement', 'dateTaken'],
+/*
+ * One name per form, wherever it is saved from — the PDF, the same PDF opened for mark-up, and
+ * the .grv beside it. Which field holds the person and which holds the date; the form's own
+ * name comes from the config, so renaming a form renames its files too.
+ */
+const FORM_NAME_FIELDS = {
+  ford: ['employeeName', 'dateIncident'],
+  policy: ['employeeName', 'dateIncident'],
+  unifor: ['grievorName', 'uniforDateIncident'],
+  investigation: ['supervisorName', 'dateInfraction'],
+  witness: ['givenBy', 'dateTaken'],
 };
+
+/* The name without an extension, so the PDF and the .grv are the same name twice */
+function formStem(type, data) {
+  const entry = FORM_BUILDERS[type];
+  const values = data || fd(entry.form);
+  const cfg = FORMS_CONFIG[type] || {};
+  const [nameField, dateField] = FORM_NAME_FIELDS[type];
+  // The card's label, not the sheet's heading: the heading can carry more than a filename wants
+  const label = cfg.homeLabel || cfg.title || entry.label;
+  return buildFilename(values[nameField], label, values[dateField]).replace(/\.pdf$/i, '');
+}
 
 async function markUpForm(type) {
   const button = document.querySelector('[data-markup-form="' + type + '"]');
@@ -5985,11 +6154,10 @@ async function markUpForm(type) {
     const doc = entry.build(data);
     const docs = attachmentsFor(type);
     const bytes = docs.length
-      ? await window.Annotator.appendTo(doc.output('arraybuffer'), docs, attachmentFit[type])
+      ? await window.Annotator.appendTo(doc.output('arraybuffer'), docs, attachmentFit[type], attachmentOrient[type])
       : new Uint8Array(doc.output('arraybuffer'));
 
-    const [nameField, label, dateField] = FORM_MARKUP_NAMES[type];
-    const filename = buildFilename(data[nameField], label, data[dateField]);
+    const filename = formStem(type, data) + '.pdf';
     markUp(await window.Annotator.readFile(new File([bytes], filename, { type: 'application/pdf' })));
   } catch (err) {
     showUploadError('Couldn’t open that for mark-up: ' + err.message);
@@ -6019,6 +6187,7 @@ function markUp(item) {
 // reference would go on pointing at the old array
 Object.defineProperty(window, 'builderItems', { get: () => builderItems });
 window.attachmentFit = attachmentFit;
+window.attachmentOrient = attachmentOrient;
 Object.defineProperty(window, 'builderFit', { get: () => builderFit });
 
 window.__app = { FORM_BUILDERS, KEY_FIELD, DRAFT_PREFIX, defaultBuilderFit: DEFAULT_BUILDER_FIT,

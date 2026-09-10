@@ -529,11 +529,13 @@ function run(win, doc) {
     form.elements.employeeName.value = 'Saved Person';
     const realSave = win.saveGrv;
     let savedType = null;
-    win.saveGrv = (type) => { savedType = type; return 'Saved Person - Grievance Claim.grv'; };
+    win.saveGrv = (type) => { savedType = type;
+      return Promise.resolve({ saved: true, picked: true, name: 'Saved Person - Monetary Grievance September 9 2026.grv' }); };
     try {
       doc.getElementById('fordClear').click();
       const save = doc.getElementById('clearSave');
       save.click();
+      await new Promise(r => setTimeout(r, 50));        // the button waits for the dialog's answer
       const said = save.textContent;
       const openStill = !doc.getElementById('clearOverlay').hidden;
       await new Promise(r => setTimeout(r, 1800));
@@ -1073,16 +1075,17 @@ function run(win, doc) {
     await win.showPdf(built.output('blob'), 'Feedback.pdf', built);
     doc.getElementById('pdfViewerName').value = 'Told you so';
 
-    // Saving for real opens the browser's save dialog, which stops the run dead and drops a
-    // file in someone's Downloads every time this suite is opened. Only the message is under
-    // test, so the save itself is held back and the name it was called with is checked instead.
-    const realDownload = win.download;
+    // Saving for real opens the save dialog, which stops the run dead and drops a file in
+    // someone's Downloads every time this suite is opened. Only the name and the message are
+    // under test, so the save itself is held back.
+    const realSave = win.saveFile;
     let savedAs = null;
-    win.download = (d, name) => { savedAs = name; };
+    win.saveFile = (blob, name) => { savedAs = name; return Promise.resolve({ saved: true, picked: true, name }); };
     try {
       doc.getElementById('pdfViewerDownload').click();
+      await new Promise(r => win.setTimeout(r, 50));      // the handler awaits the dialog
     } finally {
-      win.download = realDownload;
+      win.saveFile = realSave;
     }
 
     const said = doc.getElementById('pdfViewerStatus').textContent;
@@ -1410,6 +1413,100 @@ function run(win, doc) {
     const closed = doc.getElementById('coverView').hidden;
     return (opened && dated && onPage && closed) ||
       { detail: 'opened=' + opened + ' dated=' + dated + ' onPage=' + onPage + ' closed=' + closed };
+  });
+
+  const g9e = group('Naming and saving');
+
+  check(g9e, 'A form has one name, whether it is a PDF, a mark-up or a .grv', () => {
+    const form = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Pat Doe';
+    form.elements.dateIncident.value = '2026-07-22';
+    const stem = win.formStem('ford');
+    const grv = win.grvName('ford');
+    win.clearForm(form);
+    win.showHome();
+    return (stem === 'Pat Doe - Monetary Grievance July 22 2026' && grv === stem + '.grv') ||
+      { detail: 'stem=' + JSON.stringify(stem) + ' grv=' + JSON.stringify(grv) };
+  });
+
+  check(g9e, 'Every form names its .grv after the person, not "Grievance"', () => {
+    const wrong = [];
+    ['ford', 'policy', 'unifor', 'investigation', 'witness'].forEach(type => {
+      const form = doc.getElementById(win.__app.FORM_BUILDERS[type].form.id);
+      win.showForm(type);
+      win.clearForm(form);
+      form.elements[win.__app.KEY_FIELD[type].name].value = 'Sam Person';
+      const name = win.grvName(type);
+      if (!/^Sam Person - /.test(name) || !/\.grv$/.test(name)) wrong.push(type + ': ' + name);
+      win.clearForm(form);
+    });
+    win.showHome();
+    return wrong.length === 0 || { detail: wrong.join(' | ') };
+  });
+
+  checkAsync(g9e, 'A grievance with photos on the end can still be re-opened', async () => {
+    // pdf-lib packs the metadata into a compressed stream unless told not to, which is what
+    // made a form with attachments unrecognisable when it was uploaded again
+    const form = doc.getElementById('fordForm');
+    win.showForm('ford');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Photo Person';
+    const built = win.buildFordDoc(win.fd(form));
+    const shot = await win.Annotator.readFile(await madeImage(600, 400));
+    const bytes = new win.Uint8Array(await win.Annotator.appendTo(built.output('arraybuffer'), [shot], 'letter'));
+    const quick = win.readEmbeddedFormData(bytes);
+    const deep = await win.readEmbeddedFormDataDeep(bytes);
+    win.clearForm(form);
+    win.showHome();
+    return (quick && quick.data.employeeName === 'Photo Person' && deep && deep.formType === 'ford') ||
+      { detail: 'quick=' + (quick ? 'read' : 'lost') + ' deep=' + (deep ? 'read' : 'lost') };
+  });
+
+  checkAsync(g9e, 'Metadata hidden inside a compressed stream is still found', async () => {
+    const form = doc.getElementById('policyForm');
+    win.showForm('policy');
+    win.clearForm(form);
+    form.elements.employeeName.value = 'Compressed Person';
+    const built = win.buildPolicyDoc(win.fd(form));
+    const PDFLib = await win.Annotator.loadPdfLib();
+    const packed = await PDFLib.PDFDocument.load(built.output('arraybuffer'));
+    const bytes = new win.Uint8Array(await packed.save({ useObjectStreams: true }));
+    const quick = win.readEmbeddedFormData(bytes);          // nothing to find in the raw bytes
+    const deep = await win.readEmbeddedFormDataDeep(bytes); // asked properly
+    win.clearForm(form);
+    win.showHome();
+    return (!quick && deep && deep.data.employeeName === 'Compressed Person') ||
+      { detail: 'quick=' + (quick ? 'found' : 'none') + ' deep=' + (deep ? 'found' : 'none') };
+  });
+
+  checkAsync(g9e, 'Pictures go on portrait paper unless told otherwise', async () => {
+    const wide = await win.Annotator.readFile(await madeImage(1600, 900));
+    const sizes = async (orient) => {
+      const bytes = await win.Annotator.compile([wide], 'letter', orient);
+      const PDFLib = await win.Annotator.loadPdfLib();
+      const pdf = await PDFLib.PDFDocument.load(bytes);
+      const s = pdf.getPage(0).getSize();
+      return Math.round(s.width) + 'x' + Math.round(s.height);
+    };
+    const byDefault = await sizes(undefined);
+    const landscape = await sizes('landscape');
+    const auto = await sizes('auto');
+    const defaults = ['ford', 'policy', 'unifor', 'investigation', 'witness']
+      .filter(t => win.attachmentOrient[t] !== 'portrait');
+    return (byDefault === '612x792' && landscape === '792x612' && auto === '792x612' && !defaults.length) ||
+      { detail: 'default=' + byDefault + ' landscape=' + landscape + ' auto=' + auto + ' notPortrait=' + defaults.join(',') };
+  });
+
+  check(g9e, 'The Fact Sheet is titled Local 200 Plant Committee Fact Sheet', () => {
+    const heading = doc.getElementById('form-unifor-heading').textContent.trim();
+    const raw = atob(win.buildUniforDoc(win.fd(doc.getElementById('uniforForm'))).output('datauristring').split(',')[1]);
+    // the card and the filenames keep the shorter name
+    const card = doc.querySelector('.form-card[data-form=unifor] .picker-label').textContent.trim();
+    return (heading === 'Local 200 Plant Committee Fact Sheet' && card === 'Plant Committee Fact Sheet' &&
+            raw.indexOf('(Local 200 Plant Committee Fact Sheet)') !== -1) ||
+      { detail: 'heading=' + heading + ' card=' + card };
   });
 
   const g10 = group('Filling a form from JSON');
@@ -1802,11 +1899,14 @@ function run(win, doc) {
     return (sizes.join(' ') === '300x150 72x72') || { detail: sizes.join(' ') };
   });
 
-  checkAsync(g14, 'A wide picture turns the paper landscape', async () => {
+  checkAsync(g14, 'The paper stays portrait until it is asked to turn', async () => {
+    // A stack that all turns the same way is what gets printed and handed over
     const items = [await win.Annotator.readFile(await madeImage(1600, 900)),
                    await win.Annotator.readFile(await madeImage(600, 1000))];
-    const sizes = await sizesOf(await win.Annotator.compile(items, 'letter'));
-    return (sizes.join(' ') === '792x612 612x792') || { detail: sizes.join(' ') };
+    const asIs = await sizesOf(await win.Annotator.compile(items, 'letter'));
+    const turned = await sizesOf(await win.Annotator.compile(items, 'letter', 'auto'));
+    return (asIs.join(' ') === '612x792 612x792' && turned.join(' ') === '792x612 612x792') ||
+      { detail: 'default ' + asIs.join(' ') + '; auto ' + turned.join(' ') };
   });
 
   checkAsync(g14, 'Two pictures share one sheet', async () => {

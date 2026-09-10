@@ -11,7 +11,7 @@ window.FORMS_CONFIG_DATA = {
     "homeSub": ""
   },
   "unifor": {
-    "title": "Plant Committee Fact Sheet",
+    "title": "Local 200 Plant Committee Fact Sheet",
     "homeLabel": "Plant Committee Fact Sheet",
     "homeSub": ""
   },

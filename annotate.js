@@ -438,7 +438,7 @@
    * Appends each attached document to `formBytes`, keeping the original pages as they are and
    * putting the marks on top of them. Returns the finished PDF as bytes.
    */
-  async function appendInto(PDFLib, out, docs, fit) {
+  async function appendInto(PDFLib, out, docs, fit, orient) {
     for (let i = 0; i < docs.length; i++) {
       const item = docs[i];
 
@@ -462,7 +462,7 @@
         const partner = next && next.kind !== 'pdf' ? next : null;
         const first = await embedImage(out, item);
         const second = partner ? await embedImage(out, partner) : null;
-        const layout = pairBoxes(naturalSize(item), partner ? naturalSize(partner) : null);
+        const layout = pairBoxes(naturalSize(item), partner ? naturalSize(partner) : null, orient);
         const sheet = out.addPage(layout.page);
 
         sheet.drawImage(first, layout.top);
@@ -476,7 +476,7 @@
       }
 
       const image = await embedImage(out, item);
-      const box = imageBox(naturalSize(item), fit);
+      const box = imageBox(naturalSize(item), fit, orient);
       const sheet = out.addPage(box.page);
       sheet.drawImage(image, box);
       // The marks were placed against the image, so they are drawn in that same box
@@ -540,11 +540,20 @@
     };
   }
 
-  async function appendTo(formBytes, docs, fit) {
+  /*
+   * Written without object streams. pdf-lib keeps the form's own metadata across a load and
+   * save, but packs the Info dictionary into a compressed stream, and the reader that fills a
+   * form back in from its PDF looks for it in the raw bytes — so a grievance with photos on
+   * the end could not be re-opened. Uncompressed, it reads back the way it went in, at the
+   * cost of a few hundred bytes.
+   */
+  const SAVE = { useObjectStreams: false };
+
+  async function appendTo(formBytes, docs, fit, orient) {
     const PDFLib = await loadPdfLib();
     const out = await PDFLib.PDFDocument.load(formBytes);
-    await appendInto(PDFLib, out, docs, fit || 'letter');
-    return out.save();
+    await appendInto(PDFLib, out, docs, fit || 'letter', orient);
+    return out.save(SAVE);
   }
 
   /*
@@ -560,24 +569,40 @@
   const PT_PER_PX = 72 / 96;
   const SHEET = 612, SHEET_LONG = 792, MARGIN = 24, PAIR_GAP = 24;
 
-  function imageBox(image, fit) {
+  /*
+   * Which way up the paper is. 'portrait' and 'landscape' are the answer whatever the picture
+   * looks like, because a stack of pages that all turn the same way is what gets printed and
+   * handed over; 'auto' turns each sheet to match its picture, which wastes less of it.
+   */
+  function isLandscape(image, orient) {
+    if (orient === 'landscape') return true;
+    if (orient === 'auto') return image.width > image.height;
+    return false;                       // portrait, the default
+  }
+
+  function imageBox(image, fit, orient) {
     if (fit === 'image') {
       const width = Math.max(1, Math.round(image.width * PT_PER_PX));
       const height = Math.max(1, Math.round(image.height * PT_PER_PX));
       return { page: [width, height], x: 0, y: 0, width, height };
     }
-    /*
-     * The paper turns to match the picture. A screenshot is nearly always wider than it is tall,
-     * and on portrait paper it came out as a strip across the middle with half the sheet empty.
-     */
-    const landscape = image.width > image.height;
+    const landscape = isLandscape(image, orient);
     const pw = landscape ? SHEET_LONG : SHEET;
     const ph = landscape ? SHEET : SHEET_LONG;
     return { page: [pw, ph], ...fitInside(image, MARGIN, MARGIN, pw - MARGIN * 2, ph - MARGIN * 2) };
   }
 
-  /* Two on a portrait sheet, one above the other, each centred in its half */
-  function pairBoxes(first, second) {
+  /* Two to a sheet: stacked on portrait paper, side by side on landscape */
+  function pairBoxes(first, second, orient) {
+    if (isLandscape(first, orient)) {
+      const slotW = (SHEET_LONG - MARGIN * 2 - PAIR_GAP) / 2;
+      const slotH = SHEET - MARGIN * 2;
+      return {
+        page: [SHEET_LONG, SHEET],
+        top: fitInside(first, MARGIN, MARGIN, slotW, slotH),
+        bottom: second ? fitInside(second, MARGIN + slotW + PAIR_GAP, MARGIN, slotW, slotH) : null,
+      };
+    }
     const slotH = (SHEET_LONG - MARGIN * 2 - PAIR_GAP) / 2;
     const slotW = SHEET - MARGIN * 2;
     return {
@@ -599,12 +624,12 @@
    * PDFs contributing their pages as they are. Used by the builder on the Forms page, where a
    * dozen screenshots get compiled into one thing to send off.
    */
-  async function compile(items, fit) {
+  async function compile(items, fit, orient) {
     const PDFLib = await loadPdfLib();
     const out = await PDFLib.PDFDocument.create();
-    await appendInto(PDFLib, out, items, fit || 'image');
+    await appendInto(PDFLib, out, items, fit || 'image', orient);
     if (out.getPageCount() === 0) throw new Error('there are no pages to save');
-    return out.save();
+    return out.save(SAVE);
   }
 
   /* Moves a drawing call into the box an image was placed in */
@@ -622,11 +647,11 @@
    * document rather than saved empty and reloaded — that round trip was leaving a blank A4
    * sheet in front of the pages.
    */
-  async function standalone(item) {
+  async function standalone(item, orient) {
     const PDFLib = await loadPdfLib();
     const out = await PDFLib.PDFDocument.create();
-    await appendInto(PDFLib, out, [item], 'letter');
-    return out.save();
+    await appendInto(PDFLib, out, [item], 'letter', orient);
+    return out.save(SAVE);
   }
 
   /*

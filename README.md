@@ -8,7 +8,7 @@ Fill in Unifor Local 200 grievance forms on screen and get a print-ready PDF.
 |---|---|
 | Grievance Investigation & Claim | monetary grievance |
 | Policy Grievance | policy only, no monetary section |
-| Plant Committee Fact Sheet | five pages, first stage appeal |
+| Local 200 Plant Committee Fact Sheet | five pages, first stage appeal |
 | 4.01 Investigation | supervisor / salaried investigation |
 | Witness Statement | a statement taken from a witness, with signature lines; the statement keeps bold, italic and paragraphs pasted from Word or Google Docs |
 
