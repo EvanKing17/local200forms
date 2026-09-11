@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=91">
+<link rel="stylesheet" href="style.css?v=92">
 </head>
 <body>
 
@@ -1566,45 +1566,6 @@
   <span class="drop-overlay-text">Drop a PDF to open it</span>
 </div>
 
-<!-- Admin mode. Reached by typing the unlock word on the Forms page; see ADMIN in script.js.
-     There's no password check here on purpose — a static page has nowhere to verify one, so
-     anything hardcoded would just be readable in the source. The GitHub token is the real
-     credential: it's supplied at the time, never stored, and GitHub does the verifying. -->
-<div class="admin-overlay" id="adminOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="adminTitle">
-  <div class="admin-modal">
-    <h2 class="admin-title" id="adminTitle">Rename forms</h2>
-
-    <div id="adminAuth">
-      <p class="admin-lede">
-        Renaming commits <code>forms.config.js</code> to the repository. The new names appear
-        once the site rebuilds.
-      </p>
-      <label class="admin-field">
-        <span>GitHub token</span>
-        <input type="password" id="adminToken" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
-      </label>
-      <p class="admin-hint">
-        Fine-grained token, <strong>Contents: Read and write</strong>, this repository only.
-        Not saved — paste it again next time.
-      </p>
-      <div class="admin-actions">
-        <button type="button" class="btn-secondary" data-admin-close>Cancel</button>
-        <button type="button" class="btn-primary" id="adminUnlock">Continue</button>
-      </div>
-    </div>
-
-    <div id="adminPanel" hidden>
-      <div id="adminFields"></div>
-      <div class="admin-actions">
-        <button type="button" class="btn-secondary" data-admin-close>Close</button>
-        <button type="button" class="btn-primary" id="adminPublish">Publish for everyone</button>
-      </div>
-    </div>
-
-    <p class="admin-status" id="adminStatus" role="status"></p>
-  </div>
-</div>
-
 <!-- Full-screen PDF preview. The iframe is the browser's own PDF viewer, so its toolbar
      handles zoom and page navigation; Download is ours because the native one would name the
      file after the blob URL rather than the grievance. -->
@@ -1633,9 +1594,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=91"></script>
+<script src="forms.config.js?v=92"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=91"></script>
-<script src="script.js?v=91"></script>
+<script src="annotate.js?v=92"></script>
+<script src="script.js?v=92"></script>
 </body>
 </html>

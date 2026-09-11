@@ -220,17 +220,18 @@ airplane mode. Open it once on a connection first, so it can cache itself.
 
 ## Renaming forms
 
-Type `rename` on the Forms page. Paste a GitHub fine-grained token with
-**Contents: Read and write** on this repository, edit the names, and publish —
-it commits `forms.config.js` and the site rebuilds in about a minute, so
-everyone sees the change.
+The names live in `forms.config.js`, one entry per form: the `title` printed at the top
+of the sheet and in the PDF, the `homeLabel` on the form list, and the `homeSub` under it.
+The label is also what filenames are built from.
 
-There is no password, on purpose: a static page has nowhere to check one, so any
-password would sit in the source where anyone could read it. The token is the
-real credential, it is never stored, and GitHub is what verifies it.
+Editing that file and committing it is the whole job. `admin.html`, opened from disk, is a
+small editor for it that writes the file out for you to commit by hand; it needs no
+credentials and never talks to anything.
 
-`admin.html` does the same job offline, producing the file for you to commit by
-hand. It is the fallback if the token route ever gives trouble.
+There used to be a rename panel inside the app, reached by typing an unlock word, that
+committed the file through the GitHub API with a token pasted in at the time. It was removed
+in build 92: a token typed into a page served from the public internet is the only real
+credential this app ever handled, and renaming a form is rare enough not to be worth it.
 
 ## Building a PDF out of images
 
