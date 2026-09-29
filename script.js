@@ -1293,15 +1293,6 @@ function buildUniforDoc(data) {
     { label: 'Submitted By', value: data.submittedBy, width: W * 0.65 },
     { label: 'Shift', value: data.shift, width: W * 0.35 },
   ]);
-  y += 24;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(...DC.ink);
-  doc.text("Grievor's Signature:", marginX, y);
-  doc.setDrawColor(...DC.ink);
-  doc.setLineWidth(0.75);
-  doc.line(marginX + 110, y + 2, marginX + 400, y + 2);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
