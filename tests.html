@@ -178,6 +178,7 @@ function run(win, doc) {
     { type: 'unifor', build: 'buildUniforDoc', form: 'uniforForm', pages: 5, fields: 37 },
     { type: 'investigation', build: 'buildInvestigationDoc', form: 'investigationForm', pages: 1, fields: 13 },
     { type: 'witness', build: 'buildWitnessDoc', form: 'witnessForm', pages: 1, fields: 12 },
+    { type: 'timeline', build: 'buildTimelineDoc', form: 'timelineForm', pages: 1, fields: 14 },
   ];
 
   const g1 = group('Loads');
@@ -187,9 +188,9 @@ function run(win, doc) {
     { detail: 'a script still points at an external host' });
   check(g1, 'Unifor logo is bundled', () => (win.UNIFOR_LOGO_PNG || '').length > 1000);
   check(g1, 'Form titles config loaded', () => !!win.FORMS_CONFIG_DATA);
-  check(g1, 'Five form panels present', () => {
+  check(g1, 'Six form panels present', () => {
     const n = doc.querySelectorAll('.form-panel').length;
-    return n === 5 || { detail: 'found ' + n };
+    return n === 6 || { detail: 'found ' + n };
   });
 
   const g2 = group('Every form builds');
@@ -391,6 +392,8 @@ function run(win, doc) {
                     'witnessNames','uniforRep','hrRep','investigation','supervisorRemarks','resolution'],
     witness: ['statementRe','dateTaken','givenBy','takenBy','statement',
               'sig1Name','sig1Role','sig1Date','sig2Name','sig2Role','sig2Date'],
+    timeline: ['subject','submittedBy','datePrepared','tl1Date','tl1Title','tl1Notes',
+               'tl2Date','tl2Title','tl2Notes','tl3Date','tl3Title','tl3Notes'],
   };
 
   function fieldNames(win, form) {
@@ -1436,7 +1439,7 @@ function run(win, doc) {
 
   check(g9e, 'Every form names its .grv after the person, not "Grievance"', () => {
     const wrong = [];
-    ['ford', 'policy', 'unifor', 'investigation', 'witness'].forEach(type => {
+    ['ford', 'policy', 'unifor', 'investigation', 'witness', 'timeline'].forEach(type => {
       const form = doc.getElementById(win.__app.FORM_BUILDERS[type].form.id);
       win.showForm(type);
       win.clearForm(form);
@@ -1496,7 +1499,7 @@ function run(win, doc) {
     const byDefault = await sizes(undefined);
     const landscape = await sizes('landscape');
     const auto = await sizes('auto');
-    const defaults = ['ford', 'policy', 'unifor', 'investigation', 'witness']
+    const defaults = ['ford', 'policy', 'unifor', 'investigation', 'witness', 'timeline']
       .filter(t => win.attachmentOrient[t] !== 'portrait');
     return (byDefault === '612x792' && landscape === '792x612' && auto === '792x612' && !defaults.length) ||
       { detail: 'default=' + byDefault + ' landscape=' + landscape + ' auto=' + auto + ' notPortrait=' + defaults.join(',') };
@@ -1625,10 +1628,117 @@ function run(win, doc) {
     const loose = doc.querySelectorAll('.dc-tools [data-save-grv], .pdf-viewer [data-save-grv]').length;
     const menus = doc.querySelectorAll('.dc-advanced-menu [data-save-grv]').length;
     const notes = [].map.call(doc.querySelectorAll('.dc-advanced-note'), n => n.textContent);
-    const warns = notes.length === 5 && notes.every(t => /never send a \.grv to the company/i.test(t));
+    const warns = notes.length === FORMS.length && notes.every(t => /never send a \.grv to the company/i.test(t));
     const noDialog = !doc.getElementById('downloadOverlay');
-    return (loose === 0 && menus === 5 && warns && noDialog) ||
+    return (loose === 0 && menus === FORMS.length && warns && noDialog) ||
       { detail: 'loose=' + loose + ' menus=' + menus + ' notes=' + notes.length + ' noDialog=' + noDialog };
+  });
+
+  const g9g = group('Timeline');
+
+  const tlDate = (form, i, key) => form.querySelector('[name="tl' + i + 'Date"]').closest('.datepicker').setValue(key);
+  const tlLabels = (form) => [].map.call(form.querySelectorAll('[data-tl-row]:not([hidden]) .dc-tl-gap'), g => g.textContent);
+  const tlShowing = (form) => form.querySelectorAll('[data-tl-row]:not([hidden])').length;
+
+  check(g9g, 'A fresh timeline has three entries dated today, and counts as empty', () => {
+    const form = doc.getElementById('timelineForm');
+    win.showForm('timeline');
+    win.clearForm(form);
+    const today = win.dateKeyLocal(new Date());
+    const data = win.fd(form);
+    const dated = ['tl1Date', 'tl2Date', 'tl3Date'].every(k => data[k] === today);
+    const showing = tlShowing(form);
+    const empty = !win.formHasContent('timeline');
+    const ends = form.querySelector('[data-tl-row="1"]').classList.contains('is-first') &&
+                 form.querySelector('[data-tl-row="3"]').classList.contains('is-last');
+    win.showHome();
+    const flagged = !!doc.querySelector('.form-card[data-form=timeline] .draft-flag');
+    return (showing === 3 && dated && empty && data.showGaps === 'yes' && ends && !flagged) ||
+      { detail: 'showing=' + showing + ' dated=' + dated + ' empty=' + empty + ' gaps=' + data.showGaps + ' ends=' + ends + ' flagged=' + flagged };
+  });
+
+  check(g9g, 'The days between entries are worked out and worded', () => {
+    const form = doc.getElementById('timelineForm');
+    win.showForm('timeline');
+    win.clearForm(form);
+    tlDate(form, 1, '2026-08-01'); tlDate(form, 2, '2026-08-13'); tlDate(form, 3, '2026-08-13');
+    const spaced = tlLabels(form).join('|') === '|12 days later|Same day';
+    tlDate(form, 3, '2026-08-12');
+    const backwards = tlLabels(form)[2] === '1 day earlier';
+    tlDate(form, 3, 'Ongoing');
+    const words = tlLabels(form)[2] === '';
+    const toggle = form.querySelector('[data-tl-gaps]');
+    toggle.checked = false;
+    toggle.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const off = tlLabels(form).join('') === '' && win.fd(form).showGaps === 'no';
+    win.clearForm(form);
+    const back = win.fd(form).showGaps === 'yes' && toggle.checked;
+    win.showHome();
+    return (spaced && backwards && words && off && back) ||
+      { detail: 'labels=' + JSON.stringify(tlLabels(form)) + ' spaced=' + spaced + ' backwards=' + backwards + ' words=' + words + ' off=' + off + ' back=' + back };
+  });
+
+  check(g9g, 'Entries are added, removed with the rest closing up, and sorted by date', () => {
+    const form = doc.getElementById('timelineForm');
+    win.showForm('timeline');
+    win.clearForm(form);
+    tlDate(form, 3, '2026-08-20');
+    form.querySelector('[data-tl-add]').click();                     // the new one starts where the last left off
+    const four = tlShowing(form) === 4 && win.fd(form).tlCount === '4' && win.fd(form).tl4Date === '2026-08-20';
+    [['A', '2026-08-10'], ['B', '2026-08-01'], ['C', '2026-08-20'], ['D', '2026-08-05']].forEach(([t, d], i) => {
+      form.elements['tl' + (i + 1) + 'Title'].value = t;
+      tlDate(form, i + 1, d);
+    });
+    form.querySelectorAll('[data-tl-remove]')[1].click();           // B goes
+    let data = win.fd(form);
+    const closed = data.tlCount === '3' && data.tl1Title === 'A' && data.tl2Title === 'C' && data.tl3Title === 'D' && data.tl4Title === undefined;
+    form.querySelector('[data-tl-sort]').click();                    // D (5th), A (10th), C (20th)
+    data = win.fd(form);
+    const sorted = data.tl1Title === 'D' && data.tl2Title === 'A' && data.tl3Title === 'C' && data.tl1Date === '2026-08-05';
+    const gaps = tlLabels(form).join('|') === '|5 days later|10 days later';
+    win.clearForm(form);
+    const reset = tlShowing(form) === 3;
+    win.showHome();
+    return (four && closed && sorted && gaps && reset) ||
+      { detail: 'four=' + four + ' closed=' + closed + ' sorted=' + sorted + ' gaps=' + gaps + ' reset=' + reset };
+  });
+
+  check(g9g, 'The timeline prints its entries with the days between, and runs over pages', () => {
+    const form = doc.getElementById('timelineForm');
+    win.showForm('timeline');
+    win.clearForm(form);
+    form.elements.subject.value = 'Overtime on line 3';
+    tlDate(form, 1, '2026-08-01'); form.elements.tl1Title.value = 'Written warning issued';
+    tlDate(form, 2, '2026-08-13'); form.elements.tl2Title.value = 'Step 1 filed'; form.elements.tl2Notes.value = 'Filed by hand.';
+    form.querySelectorAll('[data-tl-remove]')[2].click();
+    const one = win.buildTimelineDoc(win.fd(form));
+    const raw = atob(one.output('datauristring').split(',')[1]);
+    const printed = ['(Written warning issued)', '(12 days later)', '(Filed by hand.)', '(August 1 2026)', '(Overtime on line 3)']
+      .every(t => raw.indexOf(t) !== -1);
+    const onePage = one.getNumberOfPages() === 1 && raw.indexOf('(Page 1 of') === -1;
+
+    while (tlShowing(form) < 20) form.querySelector('[data-tl-add]').click();
+    for (let i = 1; i <= 20; i++) form.elements['tl' + i + 'Notes'].value = 'What was said and who was there, at some length. '.repeat(6);
+    const many = win.buildTimelineDoc(win.fd(form));
+    const rawMany = atob(many.output('datauristring').split(',')[1]);
+    const flowed = many.getNumberOfPages() >= 2 && /\(Page 1 of \d+\)/.test(rawMany);
+    const capped = form.querySelector('[data-tl-add]').disabled;
+    win.clearForm(form);
+    win.showHome();
+    return (printed && onePage && flowed && capped) ||
+      { detail: 'printed=' + printed + ' onePage=' + onePage + ' pages=' + many.getNumberOfPages() + ' capped=' + capped };
+  });
+
+  check(g9g, 'Word headings for the entries are distinct, and put-away entries stay out', () => {
+    const form = doc.getElementById('timelineForm');
+    win.showForm('timeline');
+    win.clearForm(form);
+    const labels = win.wordFields('timeline').map(f => f.label);
+    const distinct = new Set(labels).size === labels.length;
+    const entries = labels.filter(l => /^Entry \d/.test(l)).length;
+    const noPlumbing = !labels.some(l => /tlCount|showGaps/i.test(l));
+    win.showHome();
+    return (distinct && entries === 9 && noPlumbing) || { detail: labels.join(' | ') };
   });
 
   const g10 = group('Filling a form from JSON');
@@ -1749,9 +1859,9 @@ function run(win, doc) {
       { detail: 'dialog=' + offered + ' ' + JSON.stringify(back) };
   });
 
-  checkAsync(g11, 'A .grv names its form so all five can come home', async () => {
+  checkAsync(g11, 'A .grv names its form so all six can come home', async () => {
     const wrong = [];
-    for (const type of ['ford', 'policy', 'unifor', 'investigation', 'witness']) {
+    for (const type of ['ford', 'policy', 'unifor', 'investigation', 'witness', 'timeline']) {
       const read = win.readGrievanceJson(JSON.stringify(win.buildGrv(type)));
       if (read.type !== type) wrong.push(type + ' came back as ' + read.type);
     }
@@ -2134,7 +2244,7 @@ function run(win, doc) {
   });
 
   check(g14, 'A form lays its pictures out one per page until told otherwise', () => {
-    const defaults = ['ford', 'policy', 'unifor', 'investigation', 'witness']
+    const defaults = ['ford', 'policy', 'unifor', 'investigation', 'witness', 'timeline']
       .filter(t => win.attachmentFit[t] !== 'letter');
     return defaults.length === 0 || { detail: 'not one-per-page: ' + defaults.join(', ') };
   });

@@ -24,5 +24,10 @@ window.FORMS_CONFIG_DATA = {
     "title": "Witness Statement",
     "homeLabel": "Witness Statement",
     "homeSub": ""
+  },
+  "timeline": {
+    "title": "Timeline",
+    "homeLabel": "Timeline",
+    "homeSub": ""
   }
 };

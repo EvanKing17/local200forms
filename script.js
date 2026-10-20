@@ -18,6 +18,7 @@ const DEFAULT_FORMS_CONFIG = {
     homeSub: 'Work done by a supervisor or other salaried member',
   },
   witness: { title: 'Witness Statement', homeLabel: 'Witness Statement', homeSub: '' },
+  timeline: { title: 'Timeline', homeLabel: 'Timeline', homeSub: '' },
 };
 const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };
 
@@ -1417,13 +1418,17 @@ const SIG_ROW_H = 52;            // pt: room to sign above the line, and the cap
 const WITNESS_LOGO_W = 64;
 
 function drawWitnessHeader(doc, marginX, W) {
+  return drawCompactHeader(doc, marginX, W, FORMS_CONFIG.witness.title);
+}
+
+function drawCompactHeader(doc, marginX, W, title) {
   const top = 40;
   const logoH = WITNESS_LOGO_W / UNIFOR_LOGO_ASPECT;
   drawUniforLogo(doc, marginX + W, top, WITNESS_LOGO_W);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(...DC.ink);
-  doc.text(FORMS_CONFIG.witness.title, marginX, top + 13);
+  doc.text(title, marginX, top + 13);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(...DC.labelSoft);
@@ -1811,6 +1816,284 @@ document.getElementById('witnessClear').addEventListener('click', () => {
   confirmClear('witness', () => clearForm(witnessForm));
 });
 
+/* ============ TIMELINE ============ */
+/*
+ * Dates in order, what happened on each, and the days between. A grievance that has run for
+ * months comes down to "how long did they take at each step", and this answers it on one
+ * sheet. Twenty entries are in the markup and a count says how many show, the same way the
+ * signature lines work; a row that is put away has its fields disabled so it stays out of the
+ * data, the Word text and the Enter order.
+ */
+const TL_MAX = 20;
+const TL_DEFAULT_ROWS = 3;
+const TL_GAP_W = 84;            // pt: the column to the left of the rail, for "12 days later"
+const TL_RAIL_PAD = 14;         // pt: from that column to the rail, and from the rail to the text
+
+const timelineForm = document.getElementById('timelineForm');
+
+/* The entries that print: every one showing, plus any put-away one that still has words in it */
+function timelineEntries(data) {
+  const count = Math.min(TL_MAX, Math.max(1, parseInt(data.tlCount, 10) || TL_DEFAULT_ROWS));
+  const rows = [];
+  for (let i = 1; i <= TL_MAX; i++) {
+    const title = data['tl' + i + 'Title'] || '', notes = data['tl' + i + 'Notes'] || '';
+    if (i <= count || title.trim() || notes.trim()) rows.push({ date: data['tl' + i + 'Date'] || '', title, notes });
+  }
+  return rows;
+}
+
+/* "12 days later", "Same day", "3 days earlier". Nothing when either side is words, not a date. */
+function daysBetweenLabel(fromKey, toKey) {
+  const from = parseDateKey(fromKey), to = parseDateKey(toKey);
+  if (!from || !to) return '';
+  const days = Math.round((to - from) / 86400000);     // rounded, so a clock change does not make 29.96
+  if (days === 0) return 'Same day';
+  const n = Math.abs(days);
+  return n + (n === 1 ? ' day ' : ' days ') + (days > 0 ? 'later' : 'earlier');
+}
+
+function buildTimelineDoc(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const marginX = 40;
+  const W = 532;
+  let y = drawCompactHeader(doc, marginX, W, FORMS_CONFIG.timeline.title);
+
+  y = sectionBar(doc, marginX, y, W, 'Details', '');
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Regarding', value: data.subject, width: W * 0.5 },
+    { label: 'Prepared By', value: data.submittedBy, width: W * 0.25 },
+    { label: 'Date Prepared', value: fmtDateFit(doc, data.datePrepared, W * 0.25 - CELL_X * 2), width: W * 0.25 },
+  ], CELL_MIN_H, true);
+  y += 14;
+
+  y = sectionBar(doc, marginX, y, W, 'Timeline', '');
+  y += 12;
+
+  /*
+   * The rail runs down the sheet with a dot for each entry; the days since the entry before
+   * sit to its left, the date and what happened to its right. An entry never splits across a
+   * page: if it will not fit, the rail runs to the foot of the page and picks up at the top of
+   * the next, so the line reads as one line.
+   */
+  const showGaps = data.showGaps === 'yes';
+  const railX = marginX + TL_GAP_W + TL_RAIL_PAD;
+  const textX = railX + TL_RAIL_PAD;
+  const textW = marginX + W - textX;
+  let prevDot = null;         // y of the last dot drawn on this page
+  let prevDate = null;
+  let carried = false;        // the rail arrives from the page before
+
+  timelineEntries(data).forEach((entry, i) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    const titleLines = entry.title.trim() ? doc.splitTextToSize(entry.title.trim(), textW) : [];
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const noteLines = entry.notes.trim() ? doc.splitTextToSize(entry.notes.trim(), textW) : [];
+    const h = 14 + titleLines.length * 12 + noteLines.length * 11 + 8;
+
+    if (y + h > PAGE_BOTTOM) {
+      doc.setDrawColor(...DC.primary);
+      doc.setLineWidth(1.2);
+      if (prevDot !== null) doc.line(railX, prevDot, railX, PAGE_BOTTOM);
+      doc.addPage();
+      y = 40;
+      prevDot = null;
+      carried = true;
+    }
+
+    const dotY = y + 7;
+    doc.setDrawColor(...DC.primary);
+    doc.setLineWidth(1.2);
+    if (prevDot !== null) doc.line(railX, prevDot, railX, dotY);
+    else if (carried) doc.line(railX, 40, railX, dotY);
+    doc.setFillColor(...DC.primary);
+    doc.circle(railX, dotY, 2.6, 'F');
+
+    if (showGaps && i > 0) {
+      const label = daysBetweenLabel(prevDate, entry.date);
+      if (label) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...DC.label);
+        doc.text(label, railX - TL_RAIL_PAD, y + 10, { align: 'right' });
+      }
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...DC.ink);
+    doc.text(fmtDate(entry.date) || '', textX, y + 10);
+    let ty = y + 10;
+    if (titleLines.length) {
+      doc.setFontSize(9.5);
+      doc.text(titleLines, textX, ty + 12);
+      ty += titleLines.length * 12;
+    }
+    if (noteLines.length) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...DC.inkSoft);
+      doc.text(noteLines, textX, ty + 11);
+    }
+
+    prevDot = dotY;
+    prevDate = entry.date;
+    y += h;
+  });
+
+  const total = doc.getNumberOfPages();
+  if (total > 1) {
+    for (let n = 1; n <= total; n++) {
+      doc.setPage(n);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...DC.labelSoft);
+      doc.text('Page ' + n + ' of ' + total, 306, 774, { align: 'center' });
+    }
+  }
+
+  embedFormData(doc, 'timeline', data);
+  return doc;
+}
+
+timelineForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  confirmFlags('timeline', () => {
+    const data = fd(timelineForm);
+    const doc = buildTimelineDoc(data);
+    openWithAttachments(doc, 'timeline', formStem('timeline', data) + '.pdf');
+  });
+});
+
+document.getElementById('timelineClear').addEventListener('click', () => {
+  confirmClear('timeline', () => clearForm(timelineForm));
+});
+
+/* ---------- Timeline entries on screen ---------- */
+function timelineRows(form) {
+  return Array.from(form.querySelectorAll('[data-tl-row]'));
+}
+
+/* The date is not data: every row starts with today's, so a row counts only for what was written */
+function timelineRowHasData(row) {
+  return Array.from(row.querySelectorAll('textarea')).some(el => el.value.trim());
+}
+
+function readTimelineRow(row) {
+  return {
+    date: row.querySelector('.datepicker input[type=hidden]').value,
+    title: row.querySelector('.dc-tl-title').value,
+    notes: row.querySelector('.dc-tl-notes').value,
+  };
+}
+
+function setTimelineRow(row, values) {
+  row.querySelector('.datepicker').setValue(values.date);
+  const title = row.querySelector('.dc-tl-title');
+  const notes = row.querySelector('.dc-tl-notes');
+  title.value = values.title;
+  notes.value = values.notes;
+  autoGrow(title);
+  autoGrow(notes);
+}
+
+/*
+ * Shows the rows that are in play, works out the days beside each, and marks the ends of the
+ * rail. Run on every input, because a date typed into one entry changes the label on the next.
+ */
+function syncTimelineRows(form) {
+  if (form !== timelineForm) return;
+  const rows = timelineRows(form);
+  const counter = form.elements.tlCount;
+  let count = Math.min(TL_MAX, Math.max(1, parseInt(counter.value, 10) || TL_DEFAULT_ROWS));
+  rows.forEach((row, i) => { if (i >= count && timelineRowHasData(row)) count = i + 1; });
+  counter.value = String(count);
+  const showGaps = form.elements.showGaps.value === 'yes';
+  let previous = null;
+  rows.forEach((row, i) => {
+    const on = i < count;
+    row.hidden = !on;
+    row.querySelectorAll('input, textarea, button').forEach(el => { el.disabled = !on; });
+    row.classList.toggle('is-first', i === 0);
+    row.classList.toggle('is-last', i === count - 1);
+    const date = row.querySelector('.datepicker input[type=hidden]').value;
+    row.querySelector('.dc-tl-gap').textContent = on && showGaps && previous !== null ? daysBetweenLabel(previous, date) : '';
+    if (on) previous = date;
+  });
+  const add = form.querySelector('[data-tl-add]');
+  if (add) add.disabled = count >= TL_MAX;
+  const toggle = form.querySelector('[data-tl-gaps]');
+  if (toggle) toggle.checked = showGaps;
+}
+
+/*
+ * What a new entry starts on. The first is today; each one after starts on the date of the
+ * entry before it, since the next thing usually happened soon after the last and a date one
+ * click from right beats one a month away. An entry whose date is words ("Ongoing") hands
+ * down today instead.
+ */
+function nextEntryDate(form, index) {
+  if (index <= 0) return dateKeyLocal(new Date());
+  const before = readTimelineRow(timelineRows(form)[index - 1]).date;
+  return parseDateKey(before) ? before : dateKeyLocal(new Date());
+}
+
+function addTimelineRow(form) {
+  const counter = form.elements.tlCount;
+  const count = parseInt(counter.value, 10) || TL_DEFAULT_ROWS;
+  if (count >= TL_MAX) return;
+  counter.value = String(count + 1);
+  const row = timelineRows(form)[count];
+  row.querySelector('.datepicker').setValue(nextEntryDate(form, count));
+  syncTimelineRows(form);
+  row.querySelector('.dc-tl-title').focus();
+  form.dispatchEvent(new Event('input', { bubbles: true }));    // the draft and the page breaks
+}
+
+/* The entries below close up, so there is never a gap in the middle */
+function removeTimelineRow(form, index) {
+  const rows = timelineRows(form);
+  const counter = form.elements.tlCount;
+  const count = parseInt(counter.value, 10) || TL_DEFAULT_ROWS;
+  if (index >= count || count <= 1) return;
+  for (let i = index; i < count - 1; i++) setTimelineRow(rows[i], readTimelineRow(rows[i + 1]));
+  setTimelineRow(rows[count - 1], { date: nextEntryDate(form, count - 1), title: '', notes: '' });
+  counter.value = String(count - 1);
+  syncTimelineRows(form);
+  form.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/* Oldest first. An entry whose date is words rather than a date keeps to the end, in its order. */
+function sortTimelineRows(form) {
+  const rows = timelineRows(form);
+  const count = parseInt(form.elements.tlCount.value, 10) || TL_DEFAULT_ROWS;
+  const entries = rows.slice(0, count).map(readTimelineRow);
+  const dated = entries.filter(e => parseDateKey(e.date));
+  const undated = entries.filter(e => !parseDateKey(e.date));
+  dated.sort((a, b) => parseDateKey(a.date) - parseDateKey(b.date));
+  dated.concat(undated).forEach((e, i) => setTimelineRow(rows[i], e));
+  syncTimelineRows(form);
+  form.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+timelineForm.addEventListener('click', (e) => {
+  const remove = e.target.closest('[data-tl-remove]');
+  if (remove) { removeTimelineRow(timelineForm, timelineRows(timelineForm).indexOf(remove.closest('[data-tl-row]'))); return; }
+  if (e.target.closest('[data-tl-add]')) addTimelineRow(timelineForm);
+  if (e.target.closest('[data-tl-sort]')) sortTimelineRows(timelineForm);
+});
+
+// The toggle is screen furniture over a hidden field, so the draft and the .grv carry the choice
+timelineForm.querySelector('[data-tl-gaps]').addEventListener('change', (e) => {
+  timelineForm.elements.showGaps.value = e.target.checked ? 'yes' : 'no';
+  syncTimelineRows(timelineForm);
+  timelineForm.dispatchEvent(new Event('input', { bubbles: true }));
+});
+
+['input', 'change'].forEach(type => timelineForm.addEventListener(type, () => syncTimelineRows(timelineForm)));
+
 /* ---------- Signature lines ----------
  * Six lines are in the markup; a count says how many are showing. A line that is put away has
  * its fields disabled, so it stays out of the data, the Word text and the Enter order, and
@@ -1897,8 +2180,13 @@ witnessForm.addEventListener('click', (e) => {
  * to clear. Only empty fields are filled, so a draft keeps whatever was chosen.
  */
 function formDefaults(form) {
-  if (form !== witnessForm) return {};
   const today = dateKeyLocal(new Date());
+  if (form === timelineForm) {
+    const defaults = { tlCount: String(TL_DEFAULT_ROWS), datePrepared: today, showGaps: 'yes' };
+    for (let i = 1; i <= TL_MAX; i++) defaults['tl' + i + 'Date'] = today;
+    return defaults;
+  }
+  if (form !== witnessForm) return {};
   const defaults = { sigLines: String(SIG_DEFAULT_ROWS), dateTaken: today, sig1Date: today, sig2Date: today };
   for (let i = 1; i <= SIG_MAX; i++) defaults['sig' + i + 'Role'] = i === 2 ? 'Union Rep' : 'Witness';
   const name = rememberedSubmitter();
@@ -1914,6 +2202,7 @@ function applyFormDefaults(form) {
     else el.value = value;
   });
   syncSignatureRows(form);
+  syncTimelineRows(form);
 }
 
 
@@ -1945,7 +2234,7 @@ function formHasData(form) {
  */
 window.addEventListener('beforeunload', (e) => {
   if (draftsAvailable()) return;
-  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm) || formHasData(witnessForm)) {
+  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm) || formHasData(witnessForm) || formHasData(timelineForm)) {
     e.preventDefault();
     e.returnValue = '';
   }
@@ -1958,6 +2247,7 @@ const FORM_BUILDERS = {
   unifor: { form: uniforForm, build: buildUniforDoc, label: 'Fact Sheet' },
   investigation: { form: investigationForm, build: buildInvestigationDoc, label: 'Investigation Form' },
   witness: { form: witnessForm, build: buildWitnessDoc, label: 'Witness Statement' },
+  timeline: { form: timelineForm, build: buildTimelineDoc, label: 'Timeline' },
 };
 
 let currentFormType = null;
@@ -2835,6 +3125,7 @@ function populateForm(form, data) {
     }
   });
   syncSignatureRows(form);
+  syncTimelineRows(form);
   syncRichFields(form);
 }
 
@@ -4097,7 +4388,7 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
 
 // Native form.reset() restores the hidden inputs' default values without firing input/change,
 // so each date picker's visible trigger label needs an explicit nudge afterward.
-[fordForm, policyForm, uniforForm, investigationForm, witnessForm].forEach(form => {
+[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm].forEach(form => {
   form.addEventListener('reset', () => {
     setTimeout(() => {
       form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
@@ -4402,7 +4693,7 @@ const refreshPageBreaks = debounce(() => {
   if (currentFormType) updatePageBreaks(currentFormType);
 }, 400);
 
-[fordForm, policyForm, uniforForm, investigationForm, witnessForm].forEach(form => {
+[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm].forEach(form => {
   form.addEventListener('input', refreshPageBreaks);
   form.addEventListener('change', refreshPageBreaks);
   // A new name or date is a new filename, and the title bar says so as it is typed
@@ -4589,6 +4880,7 @@ const KEY_FIELD = {
   unifor: { name: 'grievorName', label: "Grievor's Name" },
   investigation: { name: 'supervisorName', label: 'Name of Supervisor' },
   witness: { name: 'givenBy', label: 'Statement Given By' },
+  timeline: { name: 'subject', label: 'Regarding' },
 };
 
 function noticeFor(type) {
@@ -4872,15 +5164,15 @@ const FREEHAND_TOOLS = ['pen', 'highlight'];
 const DRAG_TOOLS = ['rect', 'ellipse', 'pixelate', 'arrow'];
 const NOTE_TOOLS = ['text', 'select'];
 
-const attachments = { ford: [], policy: [], unifor: [], investigation: [], witness: [] };
+const attachments = { ford: [], policy: [], unifor: [], investigation: [], witness: [], timeline: [] };
 
 /*
  * How each form lays its pictures out. One page per picture by default: a grievance is a paper
  * document that gets printed and handed over, so its pages should be paper-sized. The page turns
  * sideways for a wide picture rather than shrinking it into a strip across an empty sheet.
  */
-const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter', witness: 'letter' };
-const attachmentOrient = { ford: DEFAULT_ORIENT, policy: DEFAULT_ORIENT, unifor: DEFAULT_ORIENT, investigation: DEFAULT_ORIENT, witness: DEFAULT_ORIENT };
+const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter', witness: 'letter', timeline: 'letter' };
+const attachmentOrient = { ford: DEFAULT_ORIENT, policy: DEFAULT_ORIENT, unifor: DEFAULT_ORIENT, investigation: DEFAULT_ORIENT, witness: DEFAULT_ORIENT, timeline: DEFAULT_ORIENT };
 
 const editor = document.getElementById('editor');
 const editorStage = document.getElementById('editorStage');
@@ -5981,6 +6273,7 @@ const FORM_NAME_FIELDS = {
   unifor: ['grievorName', 'uniforDateIncident'],
   investigation: ['supervisorName', 'dateInfraction'],
   witness: ['givenBy', 'dateTaken'],
+  timeline: ['subject', 'datePrepared'],
 };
 
 /*
@@ -6140,6 +6433,7 @@ const IMPORT_LABELS = {
 const IMPORT_FORM_NAMES = {
   ford: 'Grievance Investigation & Claim', policy: 'Policy Grievance',
   unifor: 'Fact Sheet', investigation: 'Investigation Form', witness: 'Witness Statement',
+  timeline: 'Timeline',
 };
 
 function normaliseKey(key) {
@@ -6157,6 +6451,7 @@ function importFormType(raw) {
   if (['unifor', 'factsheet', 'fact'].includes(word)) return 'unifor';
   if (['investigation', 'investigationform', '401', 'step401'].includes(word)) return 'investigation';
   if (['witness', 'witnessstatement', 'statement'].includes(word)) return 'witness';
+  if (['timeline', 'chronology'].includes(word)) return 'timeline';
   return null;
 }
 

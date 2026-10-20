@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=93">
+<link rel="stylesheet" href="style.css?v=94">
 </head>
 <body>
 
@@ -83,6 +83,11 @@
       <button class="form-card" data-form="witness">
         <span class="picker-index">05</span>
         <span class="picker-text"><span class="picker-label">Witness Statement</span><span class="picker-sub"></span></span>
+        <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+      <button class="form-card" data-form="timeline">
+        <span class="picker-index">06</span>
+        <span class="picker-text"><span class="picker-label">Timeline</span><span class="picker-sub"></span></span>
         <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
     </div>
@@ -1326,6 +1331,343 @@
     <div class="dc-attachments" aria-label="Supporting documents"></div>
   </section>
 
+  <section class="form-panel" id="form-timeline" aria-labelledby="form-timeline-heading">
+    <div class="dc-toolbar">
+      <div class="dc-titlebar">
+        <button type="button" class="dc-back" data-back-to-forms>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+          Forms
+        </button>
+        <span class="dc-titlebar-sep" aria-hidden="true"></span>
+        <span class="dc-titlebar-app">Union Forms</span>
+        <span class="dc-titlebar-doc" data-form-title="timeline">Timeline</span>
+        <span class="dc-titlebar-spacer"></span>
+        <span class="dc-saved" role="status"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Draft saved</span>
+        <button type="button" class="bar-text-size" data-text-size
+                aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span></button>
+      </div>
+      <div class="dc-ribbon">
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-word-out="timeline"
+                    data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg>Send to Word</button>
+            <button type="button" class="dc-tool" data-word-in="timeline"
+                    data-tip="Import from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Import from Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg>Import from Word</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Word</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-markup-form="timeline"
+                    data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>Mark up</button>
+            <button type="button" class="dc-tool" id="timelineClear"
+                    data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>Clear form</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Document</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row dc-advanced">
+            <button type="button" class="dc-tool" data-advanced="timeline" aria-expanded="false"
+                    data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>Advanced</button>
+            <div class="dc-advanced-menu" data-advanced-menu="timeline" hidden>
+              <p class="dc-advanced-head">Advanced</p>
+              <button type="button" data-save-grv="timeline">Save as .grv</button>
+              <p class="dc-advanced-note">Your own backup copy: drop it back on this page later and the
+                form fills itself in again. <b>Never send a .grv to the company.</b> It is not a
+                grievance and they cannot open it.</p>
+            </div>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Other</span>
+        </div>
+        <span class="dc-ribbon-spacer"></span>
+        <button type="submit" class="dc-ribbon-print" form="timelineForm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print / Download PDF</button>
+      </div>
+    </div>
+
+    <form id="timelineForm" class="dc-page">
+      <div class="dc-page-head dc-compact-head">
+        <div class="dc-head-text">
+          <div class="dc-doc-title" id="form-timeline-heading">Timeline</div>
+          <p class="dc-doc-note">For Local Union Use Only</p>
+        </div>
+        <img class="dc-logo" alt="Unifor" data-unifor-logo>
+      </div>
+      <div class="dc-doc-rule"></div>
+
+      <div class="dc-band"><span>Details</span></div>
+      <div class="dc-field-grid dc-cols-211 dc-attached">
+        <label>
+          <span class="dc-field-label">Regarding</span>
+          <textarea class="dc-value" name="subject" rows="1" autocomplete="off"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Prepared By</span>
+          <textarea class="dc-value" name="submittedBy" rows="1" autocomplete="name"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Date Prepared</span>
+          <input type="date" name="datePrepared">
+        </label>
+      </div>
+
+      <div class="dc-band dc-block"><span>Timeline</span></div>
+      <!-- Each entry is its own block on the sheet, so a page breaks between entries the way the
+           PDF does. Twenty are here; tlCount says how many show. See the timeline code in script.js. -->
+      <div class="dc-tl-entry" data-tl-row="1">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl1Date" aria-label="Entry 1 date" data-word-label="Entry 1 date">
+          <textarea class="dc-value dc-tl-title" name="tl1Title" rows="1" autocomplete="off" aria-label="Entry 1 title"
+                    data-word-label="Entry 1 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl1Notes" rows="1" aria-label="Entry 1 notes"
+                    data-word-label="Entry 1 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="2">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl2Date" aria-label="Entry 2 date" data-word-label="Entry 2 date">
+          <textarea class="dc-value dc-tl-title" name="tl2Title" rows="1" autocomplete="off" aria-label="Entry 2 title"
+                    data-word-label="Entry 2 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl2Notes" rows="1" aria-label="Entry 2 notes"
+                    data-word-label="Entry 2 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="3">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl3Date" aria-label="Entry 3 date" data-word-label="Entry 3 date">
+          <textarea class="dc-value dc-tl-title" name="tl3Title" rows="1" autocomplete="off" aria-label="Entry 3 title"
+                    data-word-label="Entry 3 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl3Notes" rows="1" aria-label="Entry 3 notes"
+                    data-word-label="Entry 3 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="4">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl4Date" aria-label="Entry 4 date" data-word-label="Entry 4 date">
+          <textarea class="dc-value dc-tl-title" name="tl4Title" rows="1" autocomplete="off" aria-label="Entry 4 title"
+                    data-word-label="Entry 4 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl4Notes" rows="1" aria-label="Entry 4 notes"
+                    data-word-label="Entry 4 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="5">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl5Date" aria-label="Entry 5 date" data-word-label="Entry 5 date">
+          <textarea class="dc-value dc-tl-title" name="tl5Title" rows="1" autocomplete="off" aria-label="Entry 5 title"
+                    data-word-label="Entry 5 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl5Notes" rows="1" aria-label="Entry 5 notes"
+                    data-word-label="Entry 5 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="6">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl6Date" aria-label="Entry 6 date" data-word-label="Entry 6 date">
+          <textarea class="dc-value dc-tl-title" name="tl6Title" rows="1" autocomplete="off" aria-label="Entry 6 title"
+                    data-word-label="Entry 6 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl6Notes" rows="1" aria-label="Entry 6 notes"
+                    data-word-label="Entry 6 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="7">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl7Date" aria-label="Entry 7 date" data-word-label="Entry 7 date">
+          <textarea class="dc-value dc-tl-title" name="tl7Title" rows="1" autocomplete="off" aria-label="Entry 7 title"
+                    data-word-label="Entry 7 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl7Notes" rows="1" aria-label="Entry 7 notes"
+                    data-word-label="Entry 7 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="8">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl8Date" aria-label="Entry 8 date" data-word-label="Entry 8 date">
+          <textarea class="dc-value dc-tl-title" name="tl8Title" rows="1" autocomplete="off" aria-label="Entry 8 title"
+                    data-word-label="Entry 8 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl8Notes" rows="1" aria-label="Entry 8 notes"
+                    data-word-label="Entry 8 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="9">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl9Date" aria-label="Entry 9 date" data-word-label="Entry 9 date">
+          <textarea class="dc-value dc-tl-title" name="tl9Title" rows="1" autocomplete="off" aria-label="Entry 9 title"
+                    data-word-label="Entry 9 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl9Notes" rows="1" aria-label="Entry 9 notes"
+                    data-word-label="Entry 9 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="10">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl10Date" aria-label="Entry 10 date" data-word-label="Entry 10 date">
+          <textarea class="dc-value dc-tl-title" name="tl10Title" rows="1" autocomplete="off" aria-label="Entry 10 title"
+                    data-word-label="Entry 10 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl10Notes" rows="1" aria-label="Entry 10 notes"
+                    data-word-label="Entry 10 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="11">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl11Date" aria-label="Entry 11 date" data-word-label="Entry 11 date">
+          <textarea class="dc-value dc-tl-title" name="tl11Title" rows="1" autocomplete="off" aria-label="Entry 11 title"
+                    data-word-label="Entry 11 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl11Notes" rows="1" aria-label="Entry 11 notes"
+                    data-word-label="Entry 11 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="12">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl12Date" aria-label="Entry 12 date" data-word-label="Entry 12 date">
+          <textarea class="dc-value dc-tl-title" name="tl12Title" rows="1" autocomplete="off" aria-label="Entry 12 title"
+                    data-word-label="Entry 12 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl12Notes" rows="1" aria-label="Entry 12 notes"
+                    data-word-label="Entry 12 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="13">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl13Date" aria-label="Entry 13 date" data-word-label="Entry 13 date">
+          <textarea class="dc-value dc-tl-title" name="tl13Title" rows="1" autocomplete="off" aria-label="Entry 13 title"
+                    data-word-label="Entry 13 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl13Notes" rows="1" aria-label="Entry 13 notes"
+                    data-word-label="Entry 13 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="14">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl14Date" aria-label="Entry 14 date" data-word-label="Entry 14 date">
+          <textarea class="dc-value dc-tl-title" name="tl14Title" rows="1" autocomplete="off" aria-label="Entry 14 title"
+                    data-word-label="Entry 14 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl14Notes" rows="1" aria-label="Entry 14 notes"
+                    data-word-label="Entry 14 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="15">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl15Date" aria-label="Entry 15 date" data-word-label="Entry 15 date">
+          <textarea class="dc-value dc-tl-title" name="tl15Title" rows="1" autocomplete="off" aria-label="Entry 15 title"
+                    data-word-label="Entry 15 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl15Notes" rows="1" aria-label="Entry 15 notes"
+                    data-word-label="Entry 15 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="16">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl16Date" aria-label="Entry 16 date" data-word-label="Entry 16 date">
+          <textarea class="dc-value dc-tl-title" name="tl16Title" rows="1" autocomplete="off" aria-label="Entry 16 title"
+                    data-word-label="Entry 16 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl16Notes" rows="1" aria-label="Entry 16 notes"
+                    data-word-label="Entry 16 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="17">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl17Date" aria-label="Entry 17 date" data-word-label="Entry 17 date">
+          <textarea class="dc-value dc-tl-title" name="tl17Title" rows="1" autocomplete="off" aria-label="Entry 17 title"
+                    data-word-label="Entry 17 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl17Notes" rows="1" aria-label="Entry 17 notes"
+                    data-word-label="Entry 17 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="18">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl18Date" aria-label="Entry 18 date" data-word-label="Entry 18 date">
+          <textarea class="dc-value dc-tl-title" name="tl18Title" rows="1" autocomplete="off" aria-label="Entry 18 title"
+                    data-word-label="Entry 18 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl18Notes" rows="1" aria-label="Entry 18 notes"
+                    data-word-label="Entry 18 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="19">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl19Date" aria-label="Entry 19 date" data-word-label="Entry 19 date">
+          <textarea class="dc-value dc-tl-title" name="tl19Title" rows="1" autocomplete="off" aria-label="Entry 19 title"
+                    data-word-label="Entry 19 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl19Notes" rows="1" aria-label="Entry 19 notes"
+                    data-word-label="Entry 19 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-entry" data-tl-row="20">
+        <span class="dc-tl-gap" aria-hidden="true"></span>
+        <span class="dc-tl-rail" aria-hidden="true"><span class="dc-tl-dot"></span></span>
+        <div class="dc-tl-body">
+          <input type="date" name="tl20Date" aria-label="Entry 20 date" data-word-label="Entry 20 date">
+          <textarea class="dc-value dc-tl-title" name="tl20Title" rows="1" autocomplete="off" aria-label="Entry 20 title"
+                    data-word-label="Entry 20 title" placeholder="What happened"></textarea>
+          <textarea class="dc-textarea dc-tl-notes" name="tl20Notes" rows="1" aria-label="Entry 20 notes"
+                    data-word-label="Entry 20 notes" placeholder="Notes"></textarea>
+        </div>
+        <button type="button" class="dc-tl-remove dc-ui" data-tl-remove aria-label="Remove this entry" title="Remove this entry">&times;</button>
+      </div>
+      <div class="dc-tl-controls dc-ui">
+        <button type="button" class="dc-tl-action" data-tl-add>Add an entry</button>
+        <button type="button" class="dc-tl-action" data-tl-sort>Sort by date</button>
+        <label class="dc-tl-toggle"><input type="checkbox" data-tl-gaps checked> Show the days between entries</label>
+      </div>
+      <input type="hidden" name="tlCount" value="3">
+      <input type="hidden" name="showGaps" value="yes">
+    </form>
+
+    <!-- Outside the sheet: these are appended after the form, not printed on it -->
+    <div class="dc-attachments" aria-label="Supporting documents"></div>
+  </section>
+
 </main>
 
 
@@ -1589,9 +1931,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=93"></script>
+<script src="forms.config.js?v=94"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=93"></script>
-<script src="script.js?v=93"></script>
+<script src="annotate.js?v=94"></script>
+<script src="script.js?v=94"></script>
 </body>
 </html>
