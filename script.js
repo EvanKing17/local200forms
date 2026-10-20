@@ -2015,8 +2015,15 @@ function syncTimelineRows(form) {
   let previous = null;
   rows.forEach((row, i) => {
     const on = i < count;
+    const shown = on && row.hidden;
     row.hidden = !on;
     row.querySelectorAll('input, textarea, button').forEach(el => { el.disabled = !on; });
+    if (shown) {
+      // Sized at load while hidden, it measured nothing. Once now, and once more on the next
+      // frame in case the row was measured before its column had its width.
+      row.querySelectorAll('textarea').forEach(autoGrow);
+      requestAnimationFrame(() => row.querySelectorAll('textarea').forEach(autoGrow));
+    }
     row.classList.toggle('is-first', i === 0);
     row.classList.toggle('is-last', i === count - 1);
     const date = row.querySelector('.datepicker input[type=hidden]').value;
@@ -2122,8 +2129,15 @@ function syncSignatureRows(form) {
   counter.value = String(count);
   rows.forEach((row, i) => {
     const on = i < count;
+    const shown = on && row.hidden;
     row.hidden = !on;
     row.querySelectorAll('input, textarea, button').forEach(el => { el.disabled = !on; });
+    if (shown) {
+      // Sized at load while hidden, it measured nothing. Once now, and once more on the next
+      // frame in case the row was measured before its column had its width.
+      row.querySelectorAll('textarea').forEach(autoGrow);
+      requestAnimationFrame(() => row.querySelectorAll('textarea').forEach(autoGrow));
+    }
   });
   const add = form.querySelector('[data-sig-add]');
   if (add) add.disabled = count >= SIG_MAX;
