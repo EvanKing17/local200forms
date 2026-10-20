@@ -178,7 +178,7 @@ function run(win, doc) {
     { type: 'unifor', build: 'buildUniforDoc', form: 'uniforForm', pages: 5, fields: 37 },
     { type: 'investigation', build: 'buildInvestigationDoc', form: 'investigationForm', pages: 1, fields: 13 },
     { type: 'witness', build: 'buildWitnessDoc', form: 'witnessForm', pages: 1, fields: 12 },
-    { type: 'timeline', build: 'buildTimelineDoc', form: 'timelineForm', pages: 1, fields: 14 },
+    { type: 'timeline', build: 'buildTimelineDoc', form: 'timelineForm', pages: 1, fields: 8 },
   ];
 
   const g1 = group('Loads');
@@ -392,8 +392,7 @@ function run(win, doc) {
                     'witnessNames','uniforRep','hrRep','investigation','supervisorRemarks','resolution'],
     witness: ['statementRe','dateTaken','givenBy','takenBy','statement',
               'sig1Name','sig1Role','sig1Date','sig2Name','sig2Role','sig2Date'],
-    timeline: ['subject','submittedBy','datePrepared','tl1Date','tl1Title','tl1Notes',
-               'tl2Date','tl2Title','tl2Notes','tl3Date','tl3Title','tl3Notes'],
+    timeline: ['subject','submittedBy','datePrepared','tl1Title','tl1Date','tl1Notes'],
   };
 
   function fieldNames(win, form) {
@@ -1640,20 +1639,20 @@ function run(win, doc) {
   const tlLabels = (form) => [].map.call(form.querySelectorAll('[data-tl-row]:not([hidden]) .dc-tl-gap'), g => g.textContent);
   const tlShowing = (form) => form.querySelectorAll('[data-tl-row]:not([hidden])').length;
 
-  check(g9g, 'A fresh timeline has three entries dated today, and counts as empty', () => {
+  check(g9g, 'A fresh timeline has one entry dated today, and counts as empty', () => {
     const form = doc.getElementById('timelineForm');
     win.showForm('timeline');
     win.clearForm(form);
     const today = win.dateKeyLocal(new Date());
     const data = win.fd(form);
-    const dated = ['tl1Date', 'tl2Date', 'tl3Date'].every(k => data[k] === today);
+    const dated = data.tl1Date === today && data.tl2Date === undefined;
     const showing = tlShowing(form);
     const empty = !win.formHasContent('timeline');
     const ends = form.querySelector('[data-tl-row="1"]').classList.contains('is-first') &&
-                 form.querySelector('[data-tl-row="3"]').classList.contains('is-last');
+                 form.querySelector('[data-tl-row="1"]').classList.contains('is-last');
     win.showHome();
     const flagged = !!doc.querySelector('.form-card[data-form=timeline] .draft-flag');
-    return (showing === 3 && dated && empty && data.showGaps === 'yes' && ends && !flagged) ||
+    return (showing === 1 && dated && empty && data.showGaps === 'yes' && ends && !flagged) ||
       { detail: 'showing=' + showing + ' dated=' + dated + ' empty=' + empty + ' gaps=' + data.showGaps + ' ends=' + ends + ' flagged=' + flagged };
   });
 
@@ -1661,6 +1660,8 @@ function run(win, doc) {
     const form = doc.getElementById('timelineForm');
     win.showForm('timeline');
     win.clearForm(form);
+    form.querySelector('[data-tl-add]').click();
+    form.querySelector('[data-tl-add]').click();
     tlDate(form, 1, '2026-08-01'); tlDate(form, 2, '2026-08-13'); tlDate(form, 3, '2026-08-13');
     const spaced = tlLabels(form).join('|') === '|12 days later|Same day';
     tlDate(form, 3, '2026-08-12');
@@ -1668,9 +1669,8 @@ function run(win, doc) {
     tlDate(form, 3, 'Ongoing');
     const words = tlLabels(form)[2] === '';
     const toggle = form.querySelector('[data-tl-gaps]');
-    toggle.checked = false;
-    toggle.dispatchEvent(new win.Event('change', { bubbles: true }));
-    const off = tlLabels(form).join('') === '' && win.fd(form).showGaps === 'no';
+    toggle.click();
+    const off = !toggle.checked && tlLabels(form).join('') === '' && win.fd(form).showGaps === 'no';
     win.clearForm(form);
     const back = win.fd(form).showGaps === 'yes' && toggle.checked;
     win.showHome();
@@ -1682,6 +1682,8 @@ function run(win, doc) {
     const form = doc.getElementById('timelineForm');
     win.showForm('timeline');
     win.clearForm(form);
+    form.querySelector('[data-tl-add]').click();
+    form.querySelector('[data-tl-add]').click();
     tlDate(form, 3, '2026-08-20');
     form.querySelector('[data-tl-add]').click();                     // the new one starts where the last left off
     const four = tlShowing(form) === 4 && win.fd(form).tlCount === '4' && win.fd(form).tl4Date === '2026-08-20';
@@ -1697,7 +1699,7 @@ function run(win, doc) {
     const sorted = data.tl1Title === 'D' && data.tl2Title === 'A' && data.tl3Title === 'C' && data.tl1Date === '2026-08-05';
     const gaps = tlLabels(form).join('|') === '|5 days later|10 days later';
     win.clearForm(form);
-    const reset = tlShowing(form) === 3;
+    const reset = tlShowing(form) === 1;
     win.showHome();
     return (four && closed && sorted && gaps && reset) ||
       { detail: 'four=' + four + ' closed=' + closed + ' sorted=' + sorted + ' gaps=' + gaps + ' reset=' + reset };
@@ -1708,9 +1710,9 @@ function run(win, doc) {
     win.showForm('timeline');
     win.clearForm(form);
     form.elements.subject.value = 'Overtime on line 3';
+    form.querySelector('[data-tl-add]').click();
     tlDate(form, 1, '2026-08-01'); form.elements.tl1Title.value = 'Written warning issued';
     tlDate(form, 2, '2026-08-13'); form.elements.tl2Title.value = 'Step 1 filed'; form.elements.tl2Notes.value = 'Filed by hand.';
-    form.querySelectorAll('[data-tl-remove]')[2].click();
     const one = win.buildTimelineDoc(win.fd(form));
     const raw = atob(one.output('datauristring').split(',')[1]);
     const printed = ['(Written warning issued)', '(12 days later)', '(Filed by hand.)', '(August 1 2026)', '(Overtime on line 3)']
@@ -1738,7 +1740,7 @@ function run(win, doc) {
     const entries = labels.filter(l => /^Entry \d/.test(l)).length;
     const noPlumbing = !labels.some(l => /tlCount|showGaps/i.test(l));
     win.showHome();
-    return (distinct && entries === 9 && noPlumbing) || { detail: labels.join(' | ') };
+    return (distinct && entries === 3 && noPlumbing) || { detail: labels.join(' | ') };
   });
 
   const g10 = group('Filling a form from JSON');

@@ -1825,7 +1825,7 @@ document.getElementById('witnessClear').addEventListener('click', () => {
  * data, the Word text and the Enter order.
  */
 const TL_MAX = 20;
-const TL_DEFAULT_ROWS = 3;
+const TL_DEFAULT_ROWS = 1;
 const TL_GAP_W = 84;            // pt: the column to the left of the rail, for "12 days later"
 const TL_RAIL_PAD = 14;         // pt: from that column to the rail, and from the rail to the text
 
@@ -1886,12 +1886,13 @@ function buildTimelineDoc(data) {
 
   timelineEntries(data).forEach((entry, i) => {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(10);
     const titleLines = entry.title.trim() ? doc.splitTextToSize(entry.title.trim(), textW) : [];
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     const noteLines = entry.notes.trim() ? doc.splitTextToSize(entry.notes.trim(), textW) : [];
-    const h = 14 + titleLines.length * 12 + noteLines.length * 11 + 8;
+    // What happened, then when, then the notes: title lines 12pt apart, the date 12pt under, notes 11pt
+    const h = 18 + titleLines.length * 12 + noteLines.length * 11;
 
     if (y + h > PAGE_BOTTOM) {
       doc.setDrawColor(...DC.primary);
@@ -1921,16 +1922,16 @@ function buildTimelineDoc(data) {
       }
     }
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...DC.ink);
-    doc.text(fmtDate(entry.date) || '', textX, y + 10);
     let ty = y + 10;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...DC.ink);
     if (titleLines.length) {
-      doc.setFontSize(9.5);
-      doc.text(titleLines, textX, ty + 12);
+      doc.setFontSize(10);
+      doc.text(titleLines, textX, ty);
       ty += titleLines.length * 12;
     }
+    doc.setFontSize(9.5);
+    doc.text(fmtDate(entry.date) || '', textX, ty);
     if (noteLines.length) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
@@ -2085,11 +2086,14 @@ timelineForm.addEventListener('click', (e) => {
   if (e.target.closest('[data-tl-sort]')) sortTimelineRows(timelineForm);
 });
 
-// The toggle is screen furniture over a hidden field, so the draft and the .grv carry the choice
-timelineForm.querySelector('[data-tl-gaps]').addEventListener('change', (e) => {
+/*
+ * The toggle is screen furniture over a hidden field, so the draft and the .grv carry the
+ * choice. On `input` rather than `change`: a checkbox fires input first, and the form's own
+ * input listener below re-syncs the box from the hidden field, so the field has to be updated
+ * before that runs — and the box's own listeners fire before the form's.
+ */
+timelineForm.querySelector('[data-tl-gaps]').addEventListener('input', (e) => {
   timelineForm.elements.showGaps.value = e.target.checked ? 'yes' : 'no';
-  syncTimelineRows(timelineForm);
-  timelineForm.dispatchEvent(new Event('input', { bubbles: true }));
 });
 
 ['input', 'change'].forEach(type => timelineForm.addEventListener(type, () => syncTimelineRows(timelineForm)));

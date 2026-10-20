@@ -1037,16 +1037,17 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 .dc-tl-body { min-width: 0; }
 .dc-tl-body .datepicker { width: 240px; }
-/* The date is document text here, as it is in a grid cell, and bolder: it is the entry's heading */
+/* The date is document text here, as it is in a grid cell, under the title that heads the entry */
+.dc-tl-body .datepicker { margin-top: 2px; }
 .dc-tl-body .datepicker input.datepicker-text {
   border: none;
   background: transparent;
   padding: 0;
   min-height: 0;
   font-family: Helvetica, Arial, sans-serif;
-  font-size: 13.333px;
+  font-size: 12.667px;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 14.667px;
   color: var(--dc-ink);
 }
 .dc-tl-body .datepicker input.datepicker-text:focus { outline: none; background: var(--dc-field-bg); }
@@ -1054,7 +1055,7 @@ input[type="radio"] { width: 15px; height: 15px; }
 .dc-tl-body .datepicker-open svg { width: 13px; height: 13px; }
 /* Written against the body as well: the sheet's own .dc-value and .dc-textarea rules come later
    in this file and would otherwise put back their label gap and their 80px minimum */
-.dc-tl-body .dc-tl-title { margin-top: 2px; font-weight: 700; }
+.dc-tl-body .dc-tl-title { margin-top: 0; font-size: 13.333px; line-height: 16px; font-weight: 700; }
 .dc-tl-body .dc-tl-notes {
   min-height: 0;
   margin-top: 2px;
