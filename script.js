@@ -2132,7 +2132,7 @@ function interviewQuestions(data) {
     const text = data['q' + i + 'Text'] || '';
     // a question put away but still written in prints anyway, rather than being lost quietly
     if (i <= count || text.trim()) {
-      rows.push({ text, lines: Math.max(1, parseInt(data['q' + i + 'Lines'], 10) || 3) });
+      rows.push({ text, lines: Math.max(1, parseInt(data['q' + i + 'Lines'], 10) || 1) });
     }
   }
   return rows;
@@ -2192,7 +2192,7 @@ function removeInterviewRow(form, index) {
   const count = parseInt(counter.value, 10) || Q_DEFAULT_ROWS;
   if (index >= count || count <= 1) return;
   for (let i = index; i < count - 1; i++) setInterviewRow(rows[i], readInterviewRow(rows[i + 1]));
-  setInterviewRow(rows[count - 1], { text: '', lines: '3' });
+  setInterviewRow(rows[count - 1], { text: '', lines: '1' });
   counter.value = String(count - 1);
   syncInterviewRows(form);
   form.dispatchEvent(new Event('input', { bubbles: true }));
@@ -2402,7 +2402,7 @@ function formDefaults(form) {
   }
   if (form === interviewForm) {
     const defaults = { qCount: String(Q_DEFAULT_ROWS), dateInterview: today };
-    for (let i = 1; i <= Q_MAX; i++) defaults['q' + i + 'Lines'] = '3';
+    for (let i = 1; i <= Q_MAX; i++) defaults['q' + i + 'Lines'] = '1';
     return defaults;
   }
   if (form !== witnessForm) return {};
