@@ -2220,14 +2220,16 @@ function buildInterviewDoc(data) {
   y = sectionBar(doc, marginX, y, W, 'Details', '');
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Regarding', value: data.subject, width: W * 0.5 },
-    { label: 'Interviewing', value: data.interviewee, width: W * 0.25 },
+    { label: 'Location', value: data.location, width: W * 0.25 },
     { label: 'Date', value: fmtDateFit(doc, data.dateInterview, W * 0.25 - CELL_X * 2), width: W * 0.25 },
   ], CELL_MIN_H, true);
+  // Who is in the room, a side each
   y = boxedGrid(doc, marginX, y, W, [
-    { label: 'Also Present', value: data.alsoPresent, width: W * 0.5 },
-    { label: 'Asked By', value: data.submittedBy, width: W * 0.25 },
-    { label: 'Location', value: data.location, width: W * 0.25 },
+    { label: 'Company', value: data.company, width: W / 3 },
+    { label: 'Member', value: data.member, width: W / 3 },
+    { label: 'Union', value: data.submittedBy, width: W / 3 },
   ], CELL_MIN_H, true);
+  y = flowTextBox(doc, marginX, y, W, 'Also Present:', data.alsoPresent, 34);
   y += 14;
 
   y = sectionBar(doc, marginX, y, W, 'Questions', '');
@@ -5613,7 +5615,7 @@ const KEY_FIELD = {
   investigation: { name: 'supervisorName', label: 'Name of Supervisor' },
   witness: { name: 'givenBy', label: 'Statement Given By' },
   timeline: { name: 'subject', label: 'Regarding' },
-  interview: { name: 'interviewee', label: 'Interviewing' },
+  interview: { name: 'member', label: 'Member' },
 };
 
 function noticeFor(type) {
@@ -7007,7 +7009,7 @@ const FORM_NAME_FIELDS = {
   investigation: ['supervisorName', 'dateInfraction'],
   witness: ['givenBy', 'dateTaken'],
   timeline: ['subject', 'datePrepared'],
-  interview: ['interviewee', 'dateInterview'],
+  interview: ['member', 'dateInterview'],
 };
 
 /*

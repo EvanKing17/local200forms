@@ -3649,6 +3649,9 @@ body.has-bar-text-size .text-size-toggle { display: none; }
  * On screen the answer space is shown as ruled lines too, so what is on the sheet is what
  * prints. They are drawn, not typed into: the answers are written on paper in the room.
  */
+/* Room for a couple of names without being a narrative box — 34pt, as the PDF draws it */
+.dc-present { min-height: 45.333px; }
+
 .dc-q-row {
   display: grid;
   grid-template-columns: 26px 1fr 28px;

@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=101">
+<link rel="stylesheet" href="style.css?v=102">
 </head>
 <body>
 
@@ -1746,27 +1746,35 @@
           <textarea class="dc-value" name="subject" rows="1" autocomplete="off"></textarea>
         </label>
         <label>
-          <span class="dc-field-label">Interviewing</span>
-          <textarea class="dc-value" name="interviewee" rows="1" autocomplete="off"></textarea>
+          <span class="dc-field-label">Location</span>
+          <textarea class="dc-value" name="location" rows="1" autocomplete="off"></textarea>
         </label>
         <label>
           <span class="dc-field-label">Date</span>
           <input type="date" name="dateInterview">
         </label>
       </div>
-      <div class="dc-field-grid dc-cols-211 dc-standalone dc-block">
+      <!-- Who is in the room, a side each. Union keeps the name "submittedBy" so it fills
+           itself in from the last form the way every other one does. -->
+      <div class="dc-field-grid dc-cols-3 dc-attached">
         <label>
-          <span class="dc-field-label">Also Present</span>
-          <textarea class="dc-value" name="alsoPresent" rows="1" autocomplete="off"></textarea>
+          <span class="dc-field-label">Company</span>
+          <textarea class="dc-value" name="company" rows="1" autocomplete="off"></textarea>
         </label>
         <label>
-          <span class="dc-field-label">Asked By</span>
+          <span class="dc-field-label">Member</span>
+          <textarea class="dc-value" name="member" rows="1" autocomplete="off"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Union</span>
           <textarea class="dc-value" name="submittedBy" rows="1" autocomplete="name"></textarea>
         </label>
-        <label>
-          <span class="dc-field-label">Location</span>
-          <textarea class="dc-value" name="location" rows="1" autocomplete="off"></textarea>
-        </label>
+      </div>
+      <div class="dc-block">
+        <div class="dc-field-label dc-box-label">Also Present</div>
+        <div class="dc-box dc-present">
+          <textarea class="dc-textarea" name="alsoPresent" rows="2"></textarea>
+        </div>
       </div>
 
       <div class="dc-band dc-block"><span>Questions</span></div>
@@ -2589,9 +2597,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=101"></script>
+<script src="forms.config.js?v=102"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=101"></script>
-<script src="script.js?v=101"></script>
+<script src="annotate.js?v=102"></script>
+<script src="script.js?v=102"></script>
 </body>
 </html>
