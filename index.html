@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=99">
+<link rel="stylesheet" href="style.css?v=100">
 </head>
 <body>
 
@@ -88,6 +88,11 @@
       <button class="form-card" data-form="timeline">
         <span class="picker-index">06</span>
         <span class="picker-text"><span class="picker-label">Timeline</span><span class="picker-sub"></span></span>
+        <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    <button class="form-card" data-form="interview">
+        <span class="picker-index">07</span>
+        <span class="picker-text"><span class="picker-label">Interview Questions</span><span class="picker-sub"></span></span>
         <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
     </div>
@@ -1669,6 +1674,595 @@
     <div class="dc-attachments" aria-label="Supporting documents"></div>
   </section>
 
+<section class="form-panel" id="form-interview" aria-labelledby="form-interview-heading">
+    <div class="dc-toolbar">
+      <div class="dc-titlebar">
+        <button type="button" class="dc-back" data-back-to-forms>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+          Forms
+        </button>
+        <span class="dc-titlebar-sep" aria-hidden="true"></span>
+        <span class="dc-titlebar-app">Union Forms</span>
+        <span class="dc-titlebar-doc" data-form-title="interview">Interview Questions</span>
+        <span class="dc-titlebar-spacer"></span>
+        <span class="dc-saved" role="status"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Draft saved</span>
+        <button type="button" class="bar-text-size" data-text-size
+                aria-pressed="false" title="Larger text" aria-label="Larger text"><span class="tsz-mark" aria-hidden="true"><span class="tsz-small">A</span><span class="tsz-large">A</span></span></button>
+      </div>
+      <div class="dc-ribbon">
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-word-out="interview"
+                    data-tip="Send to Word" data-tip-note="Copy this form out as plain text, to dictate into in Word." aria-label="Send to Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M9 13h4"></path><path d="M9 17h6"></path></svg>Send to Word</button>
+            <button type="button" class="dc-tool" data-word-in="interview"
+                    data-tip="Import from Word" data-tip-note="Paste the dictated text back in to fill this form." aria-label="Import from Word"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"></path><path d="M12 11v6"></path><path d="m9 14 3 3 3-3"></path></svg>Import from Word</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Word</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row">
+            <button type="button" class="dc-tool" data-markup-form="interview"
+                    data-tip="Mark up" data-tip-note="Draw on the form and its supporting documents." aria-label="Mark up"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>Mark up</button>
+            <button type="button" class="dc-tool" id="interviewClear"
+                    data-tip="Clear form" data-tip-note="Empty every field on this form." aria-label="Clear form"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>Clear form</button>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Document</span>
+        </div>
+        <span class="dc-ribbon-sep" aria-hidden="true"></span>
+        <div class="dc-ribbon-group">
+          <div class="dc-ribbon-row dc-advanced">
+            <button type="button" class="dc-tool" data-advanced="interview" aria-expanded="false"
+                    data-tip="Advanced" data-tip-note="Tools most people never need." aria-label="Advanced"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>Advanced</button>
+            <div class="dc-advanced-menu" data-advanced-menu="interview" hidden>
+              <p class="dc-advanced-head">Advanced</p>
+              <button type="button" data-save-grv="interview">Save as .grv</button>
+              <p class="dc-advanced-note">Your own backup copy: drop it back on this page later and the
+                form fills itself in again. <b>Never send a .grv to the company.</b> It is not a
+                grievance and they cannot open it.</p>
+            </div>
+          </div>
+          <span class="dc-ribbon-name" aria-hidden="true">Other</span>
+        </div>
+        <span class="dc-ribbon-spacer"></span>
+        <button type="submit" class="dc-ribbon-print" form="interviewForm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print / Download PDF</button>
+      </div>
+    </div>
+
+        <form id="interviewForm" class="dc-page">
+      <div class="dc-page-head dc-compact-head">
+        <div class="dc-head-text">
+          <div class="dc-doc-title" id="form-interview-heading">Interview Questions</div>
+          <p class="dc-doc-note">For Local Union Use Only</p>
+        </div>
+        <img class="dc-logo" alt="Unifor" data-unifor-logo>
+      </div>
+      <div class="dc-doc-rule"></div>
+
+      <div class="dc-band"><span>Details</span></div>
+      <div class="dc-field-grid dc-cols-211 dc-attached">
+        <label>
+          <span class="dc-field-label">Regarding</span>
+          <textarea class="dc-value" name="subject" rows="1" autocomplete="off"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Interviewing</span>
+          <textarea class="dc-value" name="interviewee" rows="1" autocomplete="off"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Date</span>
+          <input type="date" name="dateInterview">
+        </label>
+      </div>
+      <div class="dc-field-grid dc-cols-211 dc-standalone dc-block">
+        <label>
+          <span class="dc-field-label">Also Present</span>
+          <textarea class="dc-value" name="alsoPresent" rows="1" autocomplete="off"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Asked By</span>
+          <textarea class="dc-value" name="submittedBy" rows="1" autocomplete="name"></textarea>
+        </label>
+        <label>
+          <span class="dc-field-label">Location</span>
+          <textarea class="dc-value" name="location" rows="1" autocomplete="off"></textarea>
+        </label>
+      </div>
+
+      <div class="dc-band dc-block"><span>Questions</span></div>
+      <!-- The answers are written on paper during the interview, so what prints under each
+           question is ruled lines, not a box. Twenty-four are here; qCount says how many show.
+           See the interview code in script.js. -->
+      <div class="dc-q-row" data-q-row="1">
+        <span class="dc-q-number" aria-hidden="true">1</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q1Text" rows="1" autocomplete="off"
+                    aria-label="Question 1" data-word-label="Question 1"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q1Lines" aria-label="Answer lines for question 1"
+                    data-word-label="Answer lines for question 1">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 1" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="2">
+        <span class="dc-q-number" aria-hidden="true">2</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q2Text" rows="1" autocomplete="off"
+                    aria-label="Question 2" data-word-label="Question 2"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q2Lines" aria-label="Answer lines for question 2"
+                    data-word-label="Answer lines for question 2">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 2" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="3">
+        <span class="dc-q-number" aria-hidden="true">3</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q3Text" rows="1" autocomplete="off"
+                    aria-label="Question 3" data-word-label="Question 3"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q3Lines" aria-label="Answer lines for question 3"
+                    data-word-label="Answer lines for question 3">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 3" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="4">
+        <span class="dc-q-number" aria-hidden="true">4</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q4Text" rows="1" autocomplete="off"
+                    aria-label="Question 4" data-word-label="Question 4"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q4Lines" aria-label="Answer lines for question 4"
+                    data-word-label="Answer lines for question 4">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 4" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="5">
+        <span class="dc-q-number" aria-hidden="true">5</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q5Text" rows="1" autocomplete="off"
+                    aria-label="Question 5" data-word-label="Question 5"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q5Lines" aria-label="Answer lines for question 5"
+                    data-word-label="Answer lines for question 5">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 5" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="6">
+        <span class="dc-q-number" aria-hidden="true">6</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q6Text" rows="1" autocomplete="off"
+                    aria-label="Question 6" data-word-label="Question 6"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q6Lines" aria-label="Answer lines for question 6"
+                    data-word-label="Answer lines for question 6">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 6" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="7">
+        <span class="dc-q-number" aria-hidden="true">7</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q7Text" rows="1" autocomplete="off"
+                    aria-label="Question 7" data-word-label="Question 7"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q7Lines" aria-label="Answer lines for question 7"
+                    data-word-label="Answer lines for question 7">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 7" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="8">
+        <span class="dc-q-number" aria-hidden="true">8</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q8Text" rows="1" autocomplete="off"
+                    aria-label="Question 8" data-word-label="Question 8"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q8Lines" aria-label="Answer lines for question 8"
+                    data-word-label="Answer lines for question 8">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 8" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="9">
+        <span class="dc-q-number" aria-hidden="true">9</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q9Text" rows="1" autocomplete="off"
+                    aria-label="Question 9" data-word-label="Question 9"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q9Lines" aria-label="Answer lines for question 9"
+                    data-word-label="Answer lines for question 9">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 9" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="10">
+        <span class="dc-q-number" aria-hidden="true">10</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q10Text" rows="1" autocomplete="off"
+                    aria-label="Question 10" data-word-label="Question 10"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q10Lines" aria-label="Answer lines for question 10"
+                    data-word-label="Answer lines for question 10">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 10" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="11">
+        <span class="dc-q-number" aria-hidden="true">11</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q11Text" rows="1" autocomplete="off"
+                    aria-label="Question 11" data-word-label="Question 11"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q11Lines" aria-label="Answer lines for question 11"
+                    data-word-label="Answer lines for question 11">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 11" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="12">
+        <span class="dc-q-number" aria-hidden="true">12</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q12Text" rows="1" autocomplete="off"
+                    aria-label="Question 12" data-word-label="Question 12"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q12Lines" aria-label="Answer lines for question 12"
+                    data-word-label="Answer lines for question 12">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 12" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="13">
+        <span class="dc-q-number" aria-hidden="true">13</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q13Text" rows="1" autocomplete="off"
+                    aria-label="Question 13" data-word-label="Question 13"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q13Lines" aria-label="Answer lines for question 13"
+                    data-word-label="Answer lines for question 13">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 13" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="14">
+        <span class="dc-q-number" aria-hidden="true">14</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q14Text" rows="1" autocomplete="off"
+                    aria-label="Question 14" data-word-label="Question 14"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q14Lines" aria-label="Answer lines for question 14"
+                    data-word-label="Answer lines for question 14">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 14" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="15">
+        <span class="dc-q-number" aria-hidden="true">15</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q15Text" rows="1" autocomplete="off"
+                    aria-label="Question 15" data-word-label="Question 15"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q15Lines" aria-label="Answer lines for question 15"
+                    data-word-label="Answer lines for question 15">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 15" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="16">
+        <span class="dc-q-number" aria-hidden="true">16</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q16Text" rows="1" autocomplete="off"
+                    aria-label="Question 16" data-word-label="Question 16"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q16Lines" aria-label="Answer lines for question 16"
+                    data-word-label="Answer lines for question 16">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 16" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="17">
+        <span class="dc-q-number" aria-hidden="true">17</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q17Text" rows="1" autocomplete="off"
+                    aria-label="Question 17" data-word-label="Question 17"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q17Lines" aria-label="Answer lines for question 17"
+                    data-word-label="Answer lines for question 17">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 17" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="18">
+        <span class="dc-q-number" aria-hidden="true">18</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q18Text" rows="1" autocomplete="off"
+                    aria-label="Question 18" data-word-label="Question 18"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q18Lines" aria-label="Answer lines for question 18"
+                    data-word-label="Answer lines for question 18">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 18" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="19">
+        <span class="dc-q-number" aria-hidden="true">19</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q19Text" rows="1" autocomplete="off"
+                    aria-label="Question 19" data-word-label="Question 19"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q19Lines" aria-label="Answer lines for question 19"
+                    data-word-label="Answer lines for question 19">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 19" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="20">
+        <span class="dc-q-number" aria-hidden="true">20</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q20Text" rows="1" autocomplete="off"
+                    aria-label="Question 20" data-word-label="Question 20"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q20Lines" aria-label="Answer lines for question 20"
+                    data-word-label="Answer lines for question 20">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 20" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="21">
+        <span class="dc-q-number" aria-hidden="true">21</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q21Text" rows="1" autocomplete="off"
+                    aria-label="Question 21" data-word-label="Question 21"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q21Lines" aria-label="Answer lines for question 21"
+                    data-word-label="Answer lines for question 21">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 21" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="22">
+        <span class="dc-q-number" aria-hidden="true">22</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q22Text" rows="1" autocomplete="off"
+                    aria-label="Question 22" data-word-label="Question 22"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q22Lines" aria-label="Answer lines for question 22"
+                    data-word-label="Answer lines for question 22">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 22" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="23">
+        <span class="dc-q-number" aria-hidden="true">23</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q23Text" rows="1" autocomplete="off"
+                    aria-label="Question 23" data-word-label="Question 23"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q23Lines" aria-label="Answer lines for question 23"
+                    data-word-label="Answer lines for question 23">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 23" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-row" data-q-row="24">
+        <span class="dc-q-number" aria-hidden="true">24</span>
+        <div class="dc-q-body">
+          <textarea class="dc-value dc-q-text" name="q24Text" rows="1" autocomplete="off"
+                    aria-label="Question 24" data-word-label="Question 24"
+                    placeholder="What are you asking?"></textarea>
+          <label class="dc-q-lines">
+            <span>Answer space</span>
+            <select name="q24Lines" aria-label="Answer lines for question 24"
+                    data-word-label="Answer lines for question 24">
+              <option value="2">2 lines</option>
+              <option value="3" selected>3 lines</option>
+              <option value="5">5 lines</option>
+              <option value="8">8 lines</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" class="dc-q-remove dc-ui" data-q-remove
+                aria-label="Remove question 24" title="Remove this question">&times;</button>
+      </div>
+      <div class="dc-q-tools dc-ui">
+        <button type="button" class="dc-tl-action" data-q-add>Add a question</button>
+      </div>
+      <input type="hidden" name="qCount" value="3">
+    </form>
+
+    <!-- Outside the sheet: these are appended after the form, not printed on it -->
+    <div class="dc-attachments" aria-label="Supporting documents"></div>
+  </section>
+
 </main>
 
 
@@ -1971,9 +2565,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=99"></script>
+<script src="forms.config.js?v=100"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=99"></script>
-<script src="script.js?v=99"></script>
+<script src="annotate.js?v=100"></script>
+<script src="script.js?v=100"></script>
 </body>
 </html>

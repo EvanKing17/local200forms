@@ -19,6 +19,8 @@ const DEFAULT_FORMS_CONFIG = {
   },
   witness: { title: 'Witness Statement', homeLabel: 'Witness Statement', homeSub: '' },
   timeline: { title: 'Timeline', homeLabel: 'Timeline', homeSub: '' },
+  interview: { title: 'Interview Questions', homeLabel: 'Interview Questions',
+               homeSub: 'Questions to take in, with room to write the answers' },
 };
 const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };
 
@@ -2105,6 +2107,200 @@ timelineForm.querySelector('[data-tl-gaps]').addEventListener('input', (e) => {
 
 ['input', 'change'].forEach(type => timelineForm.addEventListener(type, () => syncTimelineRows(timelineForm)));
 
+/* ============ Interview questions ============
+ *
+ * Questions typed up beforehand, printed with ruled lines under each one, and the answers
+ * written on the sheet during the interview. Nobody types while someone is talking to them.
+ *
+ * Same shape as the timeline: every row is in the markup and qCount says how many are showing.
+ * A row that is put away is disabled, so it stays out of the data, out of the Word text and out
+ * of the Enter order.
+ */
+const Q_MAX = 24;
+const Q_DEFAULT_ROWS = 3;
+const Q_LINE_GAP = 18;        // a ruled line every 18pt, which is room enough to write on
+const interviewForm = document.getElementById('interviewForm');
+
+function interviewRows(form) {
+  return Array.from(form.querySelectorAll('[data-q-row]'));
+}
+
+function interviewQuestions(data) {
+  const count = Math.min(Q_MAX, Math.max(1, parseInt(data.qCount, 10) || Q_DEFAULT_ROWS));
+  const rows = [];
+  for (let i = 1; i <= Q_MAX; i++) {
+    const text = data['q' + i + 'Text'] || '';
+    // a question put away but still written in prints anyway, rather than being lost quietly
+    if (i <= count || text.trim()) {
+      rows.push({ text, lines: Math.max(1, parseInt(data['q' + i + 'Lines'], 10) || 3) });
+    }
+  }
+  return rows;
+}
+
+function readInterviewRow(row) {
+  return { text: row.querySelector('.dc-q-text').value, lines: row.querySelector('select').value };
+}
+
+function setInterviewRow(row, values) {
+  const text = row.querySelector('.dc-q-text');
+  text.value = values.text;
+  row.querySelector('select').value = values.lines;
+  autoGrow(text);
+}
+
+function syncInterviewRows(form) {
+  if (form !== interviewForm) return;
+  const rows = interviewRows(form);
+  const counter = form.elements.qCount;
+  let count = Math.min(Q_MAX, Math.max(1, parseInt(counter.value, 10) || Q_DEFAULT_ROWS));
+  rows.forEach((row, i) => { if (i >= count && row.querySelector('.dc-q-text').value.trim()) count = i + 1; });
+  counter.value = String(count);
+
+  rows.forEach((row, i) => {
+    const on = i < count;
+    const shown = on && row.hidden;
+    row.hidden = !on;
+    row.querySelectorAll('textarea, select, button').forEach(el => { el.disabled = !on; });
+    if (shown) {
+      // Measured while hidden it reads nothing, so once now and once on the next frame
+      row.querySelectorAll('textarea').forEach(autoGrow);
+      requestAnimationFrame(() => row.querySelectorAll('textarea').forEach(autoGrow));
+    }
+    const number = row.querySelector('.dc-q-number');
+    if (number) number.textContent = String(i + 1);
+  });
+  const add = form.querySelector('[data-q-add]');
+  if (add) add.disabled = count >= Q_MAX;
+}
+
+function addInterviewRow(form) {
+  const counter = form.elements.qCount;
+  const count = parseInt(counter.value, 10) || Q_DEFAULT_ROWS;
+  if (count >= Q_MAX) return;
+  counter.value = String(count + 1);
+  syncInterviewRows(form);
+  const row = interviewRows(form)[count];
+  row.querySelector('.dc-q-text').focus();
+  form.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/* The questions below close up, so the numbering never has a hole in it */
+function removeInterviewRow(form, index) {
+  const rows = interviewRows(form);
+  const counter = form.elements.qCount;
+  const count = parseInt(counter.value, 10) || Q_DEFAULT_ROWS;
+  if (index >= count || count <= 1) return;
+  for (let i = index; i < count - 1; i++) setInterviewRow(rows[i], readInterviewRow(rows[i + 1]));
+  setInterviewRow(rows[count - 1], { text: '', lines: '3' });
+  counter.value = String(count - 1);
+  syncInterviewRows(form);
+  form.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+interviewForm.addEventListener('click', (e) => {
+  const remove = e.target.closest('[data-q-remove]');
+  if (remove) {
+    removeInterviewRow(interviewForm, interviewRows(interviewForm).indexOf(remove.closest('[data-q-row]')));
+    return;
+  }
+  if (e.target.closest('[data-q-add]')) addInterviewRow(interviewForm);
+});
+
+['input', 'change'].forEach(type =>
+  interviewForm.addEventListener(type, () => syncInterviewRows(interviewForm)));
+
+function buildInterviewDoc(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const marginX = 40;
+  const W = 532;
+  let y = drawCompactHeader(doc, marginX, W, FORMS_CONFIG.interview.title);
+
+  y = sectionBar(doc, marginX, y, W, 'Details', '');
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Regarding', value: data.subject, width: W * 0.5 },
+    { label: 'Interviewing', value: data.interviewee, width: W * 0.25 },
+    { label: 'Date', value: fmtDateFit(doc, data.dateInterview, W * 0.25 - CELL_X * 2), width: W * 0.25 },
+  ], CELL_MIN_H, true);
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Also Present', value: data.alsoPresent, width: W * 0.5 },
+    { label: 'Asked By', value: data.submittedBy, width: W * 0.25 },
+    { label: 'Location', value: data.location, width: W * 0.25 },
+  ], CELL_MIN_H, true);
+  y += 14;
+
+  y = sectionBar(doc, marginX, y, W, 'Questions', '');
+  y += 14;
+
+  const numberW = 22;
+  const textX = marginX + numberW;
+  const textW = W - numberW;
+
+  interviewQuestions(data).forEach((question, i) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    const asked = question.text.trim();
+    const lines = asked ? doc.splitTextToSize(asked, textW) : [''];
+    const height = lines.length * 13 + 6 + question.lines * Q_LINE_GAP + 14;
+
+    /*
+     * A question and the room to answer it stay together. Splitting them would leave a question
+     * at the foot of one page and its blank lines at the head of the next, which is no use to
+     * somebody writing on it.
+     */
+    if (y + height > PAGE_BOTTOM) {
+      doc.addPage();
+      y = 40;
+    }
+
+    doc.setTextColor(...DC.label);
+    doc.setFontSize(9.5);
+    doc.text(String(i + 1) + '.', marginX, y + 10);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...DC.ink);
+    doc.text(lines, textX, y + 10);
+    let lineY = y + 10 + lines.length * 13 + 6;
+
+    doc.setDrawColor(...DC.border);
+    doc.setLineWidth(0.6);
+    for (let n = 0; n < question.lines; n++) {
+      lineY += Q_LINE_GAP;
+      doc.line(textX, lineY, marginX + W, lineY);
+    }
+    y += height;
+  });
+
+  const total = doc.getNumberOfPages();
+  if (total > 1) {
+    for (let n = 1; n <= total; n++) {
+      doc.setPage(n);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...DC.labelSoft);
+      doc.text('Page ' + n + ' of ' + total, 306, 774, { align: 'center' });
+    }
+  }
+
+  embedFormData(doc, 'interview', data);
+  return doc;
+}
+
+interviewForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  confirmFlags('interview', () => {
+    const data = fd(interviewForm);
+    const doc = buildInterviewDoc(data);
+    openWithAttachments(doc, 'interview', formStem('interview', data) + '.pdf');
+  });
+});
+
+document.getElementById('interviewClear').addEventListener('click', () => {
+  confirmClear('interview', () => clearForm(interviewForm));
+});
+
 /* ---------- Signature lines ----------
  * Six lines are in the markup; a count says how many are showing. A line that is put away has
  * its fields disabled, so it stays out of the data, the Word text and the Enter order, and
@@ -2204,6 +2400,11 @@ function formDefaults(form) {
     for (let i = 1; i <= TL_MAX; i++) defaults['tl' + i + 'Date'] = today;
     return defaults;
   }
+  if (form === interviewForm) {
+    const defaults = { qCount: String(Q_DEFAULT_ROWS), dateInterview: today };
+    for (let i = 1; i <= Q_MAX; i++) defaults['q' + i + 'Lines'] = '3';
+    return defaults;
+  }
   if (form !== witnessForm) return {};
   const defaults = { sigLines: String(SIG_DEFAULT_ROWS), dateTaken: today, sig1Date: today, sig2Date: today };
   for (let i = 1; i <= SIG_MAX; i++) defaults['sig' + i + 'Role'] = i === 2 ? 'Union Rep' : 'Witness';
@@ -2221,6 +2422,7 @@ function applyFormDefaults(form) {
   });
   syncSignatureRows(form);
   syncTimelineRows(form);
+  syncInterviewRows(form);
 }
 
 
@@ -2252,7 +2454,7 @@ function formHasData(form) {
  */
 window.addEventListener('beforeunload', (e) => {
   if (draftsAvailable()) return;
-  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm) || formHasData(witnessForm) || formHasData(timelineForm)) {
+  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm) || formHasData(witnessForm) || formHasData(timelineForm) || formHasData(interviewForm)) {
     e.preventDefault();
     e.returnValue = '';
   }
@@ -2266,6 +2468,7 @@ const FORM_BUILDERS = {
   investigation: { form: investigationForm, build: buildInvestigationDoc, label: 'Investigation Form' },
   witness: { form: witnessForm, build: buildWitnessDoc, label: 'Witness Statement' },
   timeline: { form: timelineForm, build: buildTimelineDoc, label: 'Timeline' },
+  interview: { form: interviewForm, build: buildInterviewDoc, label: 'Interview Questions' },
 };
 
 let currentFormType = null;
@@ -3633,6 +3836,7 @@ function populateForm(form, data) {
   });
   syncSignatureRows(form);
   syncTimelineRows(form);
+  syncInterviewRows(form);
   syncRichFields(form);
 }
 
@@ -4916,7 +5120,7 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
 
 // Native form.reset() restores the hidden inputs' default values without firing input/change,
 // so each date picker's visible trigger label needs an explicit nudge afterward.
-[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm].forEach(form => {
+[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm, interviewForm].forEach(form => {
   form.addEventListener('reset', () => {
     setTimeout(() => {
       form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
@@ -5221,7 +5425,7 @@ const refreshPageBreaks = debounce(() => {
   if (currentFormType) updatePageBreaks(currentFormType);
 }, 400);
 
-[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm].forEach(form => {
+[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm, interviewForm].forEach(form => {
   form.addEventListener('input', refreshPageBreaks);
   form.addEventListener('change', refreshPageBreaks);
   // A new name or date is a new filename, and the title bar says so as it is typed
@@ -5409,6 +5613,7 @@ const KEY_FIELD = {
   investigation: { name: 'supervisorName', label: 'Name of Supervisor' },
   witness: { name: 'givenBy', label: 'Statement Given By' },
   timeline: { name: 'subject', label: 'Regarding' },
+  interview: { name: 'interviewee', label: 'Interviewing' },
 };
 
 function noticeFor(type) {
@@ -5692,15 +5897,15 @@ const FREEHAND_TOOLS = ['pen', 'highlight'];
 const DRAG_TOOLS = ['rect', 'ellipse', 'pixelate', 'arrow'];
 const NOTE_TOOLS = ['text', 'select'];
 
-const attachments = { ford: [], policy: [], unifor: [], investigation: [], witness: [], timeline: [] };
+const attachments = { ford: [], policy: [], unifor: [], investigation: [], witness: [], timeline: [], interview: [] };
 
 /*
  * How each form lays its pictures out. One page per picture by default: a grievance is a paper
  * document that gets printed and handed over, so its pages should be paper-sized. The page turns
  * sideways for a wide picture rather than shrinking it into a strip across an empty sheet.
  */
-const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter', witness: 'letter', timeline: 'letter' };
-const attachmentOrient = { ford: DEFAULT_ORIENT, policy: DEFAULT_ORIENT, unifor: DEFAULT_ORIENT, investigation: DEFAULT_ORIENT, witness: DEFAULT_ORIENT, timeline: DEFAULT_ORIENT };
+const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter', witness: 'letter', timeline: 'letter', interview: 'letter' };
+const attachmentOrient = { ford: DEFAULT_ORIENT, policy: DEFAULT_ORIENT, unifor: DEFAULT_ORIENT, investigation: DEFAULT_ORIENT, witness: DEFAULT_ORIENT, timeline: DEFAULT_ORIENT, interview: DEFAULT_ORIENT };
 
 const editor = document.getElementById('editor');
 const editorStage = document.getElementById('editorStage');
@@ -6802,6 +7007,7 @@ const FORM_NAME_FIELDS = {
   investigation: ['supervisorName', 'dateInfraction'],
   witness: ['givenBy', 'dateTaken'],
   timeline: ['subject', 'datePrepared'],
+  interview: ['interviewee', 'dateInterview'],
 };
 
 /*
@@ -6961,7 +7167,7 @@ const IMPORT_LABELS = {
 const IMPORT_FORM_NAMES = {
   ford: 'Grievance Investigation & Claim', policy: 'Policy Grievance',
   unifor: 'Fact Sheet', investigation: 'Investigation Form', witness: 'Witness Statement',
-  timeline: 'Timeline',
+  timeline: 'Timeline', interview: 'Interview Questions',
 };
 
 function normaliseKey(key) {
@@ -6980,6 +7186,7 @@ function importFormType(raw) {
   if (['investigation', 'investigationform', '401', 'step401'].includes(word)) return 'investigation';
   if (['witness', 'witnessstatement', 'statement'].includes(word)) return 'witness';
   if (['timeline', 'chronology'].includes(word)) return 'timeline';
+  if (['interview', 'interviewquestions', 'questions'].includes(word)) return 'interview';
   return null;
 }
 

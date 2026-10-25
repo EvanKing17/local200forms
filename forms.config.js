@@ -29,5 +29,10 @@ window.FORMS_CONFIG_DATA = {
     "title": "Timeline",
     "homeLabel": "Timeline",
     "homeSub": ""
+  },
+  "interview": {
+    "title": "Interview Questions",
+    "homeLabel": "Interview Questions",
+    "homeSub": "Questions to take in, with room to write the answers"
   }
 };
