@@ -2494,6 +2494,20 @@ input[type="radio"] { width: 15px; height: 15px; }
   color: var(--c-text);
 }
 
+/* A reading that doesn't match the rest of the batch — not corrected, just made obvious */
+.ocr-result-value.is-odd {
+  border-color: #c31a1a;
+  background: #fff5f5;
+  color: #8a1010;
+  font-weight: 700;
+}
+
+.builder-read-chip.is-odd {
+  color: #8a1010;
+  background: #fff1f1;
+  border-color: #f3b4b4;
+}
+
 .ocr-sortby {
   margin-top: 14px;
   flex-direction: row;

@@ -2408,6 +2408,51 @@ function cropToRegion(view, region) {
   return cut;
 }
 
+/*
+ * Shaves the crop back to the text inside it.
+ *
+ * Screenshots are never framed identically, so a box drawn once catches a bit of the field's
+ * border on some of them, and a border stroke can come back as a digit — a leading 1 on a
+ * global ID, which then sorts to the wrong place without looking wrong.
+ *
+ * A border is a run of dark pixels across almost the whole width or height; text never is. So
+ * rows and columns that are nearly solid, and blank ones, are peeled off each edge until a
+ * partly-dark line is reached, which is the text.
+ */
+function trimToInk(canvas) {
+  const w = canvas.width, h = canvas.height;
+  if (w < 6 || h < 6) return canvas;
+  const px = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+
+  const darkAt = (x, y) => {
+    const i = (y * w + x) * 4;
+    return (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) < 140;
+  };
+  const colInk = [], rowInk = [];
+  for (let x = 0; x < w; x++) { let n = 0; for (let y = 0; y < h; y++) if (darkAt(x, y)) n++; colInk.push(n / h); }
+  for (let y = 0; y < h; y++) { let n = 0; for (let x = 0; x < w; x++) if (darkAt(x, y)) n++; rowInk.push(n / w); }
+
+  // blank, or so solid it can only be a rule
+  const junk = (share) => share < 0.02 || share > 0.80;
+  let left = 0, right = w - 1, top = 0, bottom = h - 1;
+  while (left < right && junk(colInk[left])) left++;
+  while (right > left && junk(colInk[right])) right--;
+  while (top < bottom && junk(rowInk[top])) top++;
+  while (bottom > top && junk(rowInk[bottom])) bottom--;
+  if (right - left < 4 || bottom - top < 4) return canvas;    // nothing recognisable left
+
+  // a little air around the text, which the reader prefers to a tight crop
+  const pad = 4;
+  left = Math.max(0, left - pad); top = Math.max(0, top - pad);
+  right = Math.min(w - 1, right + pad); bottom = Math.min(h - 1, bottom + pad);
+
+  const out = document.createElement('canvas');
+  out.width = right - left + 1;
+  out.height = bottom - top + 1;
+  out.getContext('2d').drawImage(canvas, left, top, out.width, out.height, 0, 0, out.width, out.height);
+  return out;
+}
+
 function tidyOcr(text, digitsOnly) {
   const flat = String(text).replace(/\s+/g, ' ').trim();
   return digitsOnly ? flat.replace(/\D/g, '') : flat;
@@ -2433,7 +2478,7 @@ async function readRegions(items, regions, onProgress) {
     for (const item of items) {
       const view = item.pages[0] && item.pages[0].view;
       if (view) {
-        const result = await worker.recognize(cropToRegion(view, region));
+        const result = await worker.recognize(trimToInk(cropToRegion(view, region)));
         item.ocr[region.name] = tidyOcr(result.data.text, region.digits);
       } else {
         item.ocr[region.name] = '';
@@ -2443,6 +2488,37 @@ async function readRegions(items, regions, onProgress) {
     }
   }
   await worker.setParameters({ tessedit_char_whitelist: '' });
+  markOddReadings(items, regions);
+}
+
+/*
+ * Flags the ones that don't look like the others.
+ *
+ * A global ID is a fixed length, so if most of a batch comes back nine digits and one comes
+ * back ten, that one has picked something up — a border read as a leading 1. Nothing is
+ * corrected automatically: a wrong ID that looks right is the thing to avoid, and a wrong ID
+ * that is marked costs a couple of seconds. The length is learned from the batch, so there is
+ * nothing to set up and it works whatever the IDs here happen to look like.
+ */
+function markOddReadings(items, regions) {
+  items.forEach(item => { item.ocrOdd = item.ocrOdd || {}; });
+  regions.forEach(region => {
+    const lengths = {};
+    items.forEach(item => {
+      const value = ((item.ocr || {})[region.name] || '').trim();
+      if (value) lengths[value.length] = (lengths[value.length] || 0) + 1;
+    });
+    const counts = Object.keys(lengths).map(Number);
+    if (!counts.length) return;
+    const usual = counts.sort((a, b) => lengths[b] - lengths[a])[0];
+    const agree = lengths[usual];
+
+    items.forEach(item => {
+      const value = ((item.ocr || {})[region.name] || '').trim();
+      // only worth saying when there's a clear majority to be the odd one out from
+      item.ocrOdd[region.name] = !!value && agree >= 2 && value.length !== usual;
+    });
+  });
 }
 
 /*
@@ -2637,9 +2713,16 @@ function showOcrResults() {
       field.value = (item.ocr && item.ocr[region.name]) || '';
       field.placeholder = region.name;
       field.setAttribute('aria-label', region.name);
+      if (item.ocrOdd && item.ocrOdd[region.name]) {
+        field.classList.add('is-odd');
+        field.title = 'This one is a different length from the rest — check it.';
+      }
       field.addEventListener('input', () => {
         item.ocr = item.ocr || {};
         item.ocr[region.name] = field.value;
+        // corrected by hand, so stop calling it odd
+        if (item.ocrOdd) item.ocrOdd[region.name] = false;
+        field.classList.remove('is-odd');
         renderBuilder();
       });
       row.appendChild(field);
@@ -3962,6 +4045,10 @@ function renderBuilder() {
       chip.className = 'builder-read-chip';
       chip.textContent = value;
       chip.title = key;
+      if (item.ocrOdd && item.ocrOdd[key]) {
+        chip.classList.add('is-odd');
+        chip.title = key + ' — a different length from the rest, worth checking';
+      }
       readings.appendChild(chip);
     });
 

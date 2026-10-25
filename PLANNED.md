@@ -113,3 +113,40 @@ it:
   fails if that rule goes missing.
 - The build number in the bottom right of the form list is read off the `?v=`
   on `script.js`, so it cannot disagree with what the browser actually loaded.
+
+---
+
+## OCR: parallel workers — if needed
+
+Reading is about 1.0s per cropped region, measured repeatedly and steady across
+page-segmentation modes. Twenty screenshots across two regions is roughly forty
+seconds, with a running count on screen.
+
+If that is too slow in practice, the lever is `Tesseract.createScheduler()` with
+three or four workers instead of the single worker in `ocrEngine()`. Near-linear
+on a multi-core machine, so forty seconds becomes ten or so. Costs memory: each
+worker loads its own copy of the 4.6MB core.
+
+Do not reach for page-segmentation modes — 3, 6 and 7 were measured at 1030,
+1033 and 1029ms on the same crop, so layout analysis is not where the time goes.
+
+---
+
+## OCR: things already tried, so they aren't tried again
+
+- **Do not pre-process the crop.** Upscaling 3x and thresholding to black and
+  white made accuracy *worse*, not better: at 11px grey-on-tint the raw crop
+  read `MACAULEY, WESLEY J` and `002173535` correctly, while the processed one
+  returned `MACAILEY WESLEY J` and `6252`. Tesseract 5's LSTM uses the greyscale
+  edges that thresholding throws away.
+- **Page-segmentation mode is not the lever either.** Modes 3, 6 and 7 measured
+  1030, 1033 and 1029ms on the same crop.
+- **If accuracy does need work**, in order: swap the `fast` language file
+  (1.9MB) for `best` (12.5MB, one file, no training); add a letters-and-
+  punctuation whitelist for name regions; then snap readings to a remembered
+  list of members, which beats any OCR improvement for a closed set of names.
+- **Training a custom model is possible** — a fine-tuned `.traineddata` is just
+  a file and would load from `vendor/tesseract` like the current one — but it
+  needs the native Tesseract training tools, hundreds of labelled line images
+  and hours of CPU. Not worth starting without a measured failure that the
+  cheaper levers above don't fix.
