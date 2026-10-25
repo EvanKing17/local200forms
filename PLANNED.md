@@ -134,6 +134,12 @@ Do not reach for page-segmentation modes — 3, 6 and 7 were measured at 1030,
 
 ## OCR: things already tried, so they aren't tried again
 
+- **Do not restrict the reader to digits.** `tessedit_char_whitelist` does not
+  make Tesseract ignore other characters, it makes it render them as the nearest
+  allowed one. A box that catches the words "Global ID:" beside the number turns
+  the I into a 1, so the value comes back ten digits long and sorts wrong. Same
+  crop, measured: restricted `1002900111`, unrestricted `Global ID: 002900111`
+  which cleans to `002900111`. Read as text, drop the non-digits afterwards.
 - **Do not pre-process the crop.** Upscaling 3x and thresholding to black and
   white made accuracy *worse*, not better: at 11px grey-on-tint the raw crop
   read `MACAULEY, WESLEY J` and `002173535` correctly, while the processed one

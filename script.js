@@ -2469,12 +2469,20 @@ async function readRegions(items, regions, onProgress) {
   items.forEach(item => { item.ocr = item.ocr || {}; });
 
   /*
-   * A region at a time, not a picture at a time. Changing the character whitelist makes the
-   * reader rebuild its character set, which costs far more than reading a small crop — doing it
-   * per picture took a second each. Set once per region, then run every picture through it.
+   * Global ID regions are read as ordinary text and the non-digits dropped afterwards, rather
+   * than restricting the reader to digits.
+   *
+   * Restricting it looked obviously right and was the cause of the reported fault. A whitelist
+   * doesn't make the reader ignore other characters, it makes it render them as the nearest
+   * allowed one — so a box that catches the words "Global ID:" beside the number turns the I
+   * into a 1 and the value comes back ten digits long. Measured on the same crop: restricted
+   * gave 1002900111, unrestricted gave "Global ID: 002900111" which cleans to 002900111.
+   *
+   * Reading normally also means a stray letter is discarded rather than becoming a digit, so a
+   * badly placed box gives a short value, which the odd-length check catches, instead of a
+   * plausible wrong one. That matters more than tidiness: these sort people's payroll.
    */
   for (const region of regions) {
-    await worker.setParameters({ tessedit_char_whitelist: region.digits ? '0123456789' : '' });
     for (const item of items) {
       const view = item.pages[0] && item.pages[0].view;
       if (view) {
@@ -2487,9 +2495,87 @@ async function readRegions(items, regions, onProgress) {
       if (onProgress) onProgress(done, steps);
     }
   }
-  await worker.setParameters({ tessedit_char_whitelist: '' });
+  // Kept so a hover can show exactly what was read, even if the boxes are redrawn afterwards
+  items.forEach(item => { item.ocrBoxes = regions.map(r => ({ ...r })); });
   markOddReadings(items, regions);
 }
+
+/* ---------- Showing what was actually read ----------
+ * The value on its own doesn't tell you whether the box was aimed properly. Hovering a picture
+ * shows the crops the reader saw, enlarged, with what it made of each — which is the only way
+ * to tell a bad reading from a badly placed box.
+ *
+ * The crops are cut again on hover rather than kept. Thirty pictures' worth of enlarged crops
+ * is tens of megabytes of canvas sitting in the page, and that has already cost this app its
+ * frame rate once.
+ */
+const ocrPeek = document.createElement('div');
+ocrPeek.className = 'ocr-peek';
+ocrPeek.hidden = true;
+document.body.appendChild(ocrPeek);
+
+function hideOcrPeek() {
+  ocrPeek.hidden = true;
+  ocrPeek.innerHTML = '';
+}
+
+function showOcrPeek(item, anchor) {
+  const view = item.pages[0] && item.pages[0].view;
+  const boxes = item.ocrBoxes || [];
+  if (!view || !boxes.length) return;
+
+  ocrPeek.innerHTML = '';
+  boxes.forEach(region => {
+    const strip = document.createElement('div');
+    strip.className = 'ocr-peek-row';
+
+    const name = document.createElement('span');
+    name.className = 'ocr-peek-name';
+    name.textContent = region.name;
+
+    // what the reader was actually handed, after the border trim
+    const shot = trimToInk(cropToRegion(view, region));
+    const big = document.createElement('canvas');
+    const scale = Math.min(3, 380 / Math.max(1, shot.width));
+    big.width = Math.round(shot.width * scale);
+    big.height = Math.round(shot.height * scale);
+    const ctx = big.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(shot, 0, 0, big.width, big.height);
+    big.className = 'ocr-peek-shot';
+
+    const read = document.createElement('span');
+    read.className = 'ocr-peek-read';
+    const value = (item.ocr && item.ocr[region.name]) || '';
+    read.textContent = value || '(nothing read)';
+    if (item.ocrOdd && item.ocrOdd[region.name]) read.classList.add('is-odd');
+
+    strip.append(name, big, read);
+    ocrPeek.appendChild(strip);
+  });
+
+  // Measured once it is on the page, then clamped — and put to the left of the picture when
+  // there is no room to its right, rather than hanging off the edge
+  ocrPeek.style.left = '0px';
+  ocrPeek.style.top = '0px';
+  ocrPeek.hidden = false;
+  const box = anchor.getBoundingClientRect();
+  const panel = ocrPeek.getBoundingClientRect();
+  const roomRight = window.innerWidth - box.right - 18;
+  const left = roomRight >= panel.width
+    ? box.right + 10
+    : Math.max(8, Math.min(box.left - panel.width - 10, window.innerWidth - panel.width - 8));
+  const top = Math.max(8, Math.min(box.top - 8, window.innerHeight - panel.height - 8));
+  ocrPeek.style.left = Math.round(Math.max(8, left)) + 'px';
+  ocrPeek.style.top = Math.round(top) + 'px';
+}
+
+/* One listener for both places a picture is shown, since the markup differs but the job doesn't */
+function watchForPeek(element, item) {
+  element.addEventListener('pointerenter', () => showOcrPeek(item, element));
+  element.addEventListener('pointerleave', hideOcrPeek);
+}
+window.addEventListener('scroll', hideOcrPeek, true);
 
 /*
  * Flags the ones that don't look like the others.
@@ -2703,6 +2789,8 @@ function showOcrResults() {
       shrunk.height = Math.max(20, Math.round(54 * thumb.height / thumb.width));
       shrunk.getContext('2d').drawImage(thumb, 0, 0, shrunk.width, shrunk.height);
       shrunk.className = 'ocr-result-thumb';
+      shrunk.title = 'Hover to see what was read';
+      watchForPeek(shrunk, item);
       row.appendChild(shrunk);
     }
 
@@ -4026,6 +4114,10 @@ function renderBuilder() {
     thumb.className = 'builder-thumb';
     const picture = thumbnailOf(item);
     if (picture) thumb.appendChild(picture);
+    if (item.ocrBoxes && item.ocrBoxes.length) {
+      thumb.classList.add('has-reading');
+      watchForPeek(thumb, item);
+    }
 
     const name = document.createElement('span');
     name.className = 'builder-name';

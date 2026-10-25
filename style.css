@@ -2494,6 +2494,54 @@ input[type="radio"] { width: 15px; height: 15px; }
   color: var(--c-text);
 }
 
+/* What the reader was handed, enlarged, so a reading can be checked against the pixels */
+.ocr-peek {
+  position: fixed;
+  z-index: 210;
+  max-width: 440px;
+  padding: 10px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(17, 24, 39, 0.26);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ocr-peek[hidden] { display: none; }
+
+.ocr-peek-row { display: flex; flex-direction: column; gap: 4px; }
+
+.ocr-peek-name {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+}
+
+.ocr-peek-shot {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--c-border);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.ocr-peek-read {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+.ocr-peek-read.is-odd { color: #8a1010; }
+
+/* a picture with a reading behind it is worth hovering, so it says so */
+.builder-thumb.has-reading { cursor: zoom-in; }
+.ocr-result-thumb { cursor: zoom-in; }
+
 /* A reading that doesn't match the rest of the batch — not corrected, just made obvious */
 .ocr-result-value.is-odd {
   border-color: #c31a1a;
