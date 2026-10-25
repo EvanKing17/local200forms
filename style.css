@@ -2397,6 +2397,139 @@ input[type="radio"] { width: 15px; height: 15px; }
 
 @media print { .app-version { display: none !important; } }
 
+/* ---------- Reading a region off the pictures ---------- */
+.ocr-stage {
+  position: relative;
+  margin-top: 12px;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--c-surface-alt);
+}
+
+#ocrCanvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  cursor: crosshair;
+  touch-action: none;      /* dragging a box must not pan the dialog */
+}
+
+.ocr-marquee {
+  position: absolute;
+  border: 2px solid var(--c-accent);
+  background: rgba(37, 99, 235, 0.16);
+  pointer-events: none;
+}
+.ocr-marquee[hidden] { display: none; }
+
+.ocr-regions { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.ocr-region-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: var(--c-surface-alt);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+}
+
+.ocr-region-name {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 7px 9px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-input-bg);
+  color: var(--c-text);
+}
+
+.ocr-region-digits {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+}
+
+.ocr-region-drop {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--c-text-muted);
+  background: none;
+  border: 1px solid var(--c-border-strong);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.ocr-region-drop:hover { border-color: var(--c-alert, #c31a1a); color: #c31a1a; }
+
+.ocr-results { margin-top: 12px; max-height: 44vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+
+.ocr-result-row { display: flex; align-items: center; gap: 10px; }
+.ocr-result-thumb {
+  flex-shrink: 0;
+  border: 1px solid var(--c-border);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.ocr-result-value {
+  flex: 1 1 120px;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-input-bg);
+  color: var(--c-text);
+}
+
+.ocr-sortby {
+  margin-top: 14px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--c-text-muted);
+}
+.ocr-sortby select {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 7px 9px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-input-bg);
+  color: var(--c-text);
+}
+
+/* What was read, on the card beside the page it lands on */
+.builder-read { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.builder-read:empty { display: none; }
+
+.builder-read-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d4ed8;
+  background: #eaf1ff;
+  border: 1px solid #c7dafd;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
 /* ---------- Word, out and back ---------- */
 .admin-modal.is-wide { max-width: 720px; }
 

@@ -2345,6 +2345,324 @@ document.querySelectorAll('[name="submittedBy"]').forEach(field => {
   field.addEventListener('input', () => rememberSubmitter(field.value));
 });
 
+/* ============ Reading a region off every picture ============
+ *
+ * A pile of payroll screenshots comes off the same system, so the member's name sits in the
+ * same place on all of them. The box is drawn once on the first picture and read on every one,
+ * as a fraction of the picture rather than in pixels, so it still lands if the screenshots
+ * aren't all exactly the same size.
+ *
+ * It reads the crop, not the picture. That is the whole reason this is affordable: on a
+ * 1920x1080 screenshot the full page takes about 480ms, the cropped name box 57ms, and a
+ * digits-only ID box 14ms. Several regions across thirty pictures is a couple of seconds.
+ *
+ * Tesseract is 6.7MB and loads only when this is used — it is deliberately not in the service
+ * worker's precache, so the forms stay a small offline bundle for the plant floor. Nothing
+ * leaves the machine: these screenshots have members' names and IDs on them.
+ */
+const OCR_PATHS = {
+  script: './vendor/tesseract/tesseract.min.js',
+  workerPath: './vendor/tesseract/worker.min.js',
+  corePath: './vendor/tesseract/tesseract-core-simd.wasm.js',
+  langPath: './vendor/tesseract',
+};
+
+let ocrScriptPromise = null;
+let ocrWorker = null;
+
+function loadOcrScript() {
+  if (!ocrScriptPromise) {
+    ocrScriptPromise = new Promise((resolve, reject) => {
+      if (window.Tesseract) { resolve(window.Tesseract); return; }
+      const tag = document.createElement('script');
+      tag.src = OCR_PATHS.script;
+      tag.onload = () => resolve(window.Tesseract);
+      tag.onerror = () => reject(new Error('couldn’t load the text reader'));
+      document.head.appendChild(tag);
+    });
+  }
+  return ocrScriptPromise;
+}
+
+async function ocrEngine() {
+  if (ocrWorker) return ocrWorker;
+  const Tesseract = await loadOcrScript();
+  ocrWorker = await Tesseract.createWorker('eng', 1, {
+    workerPath: OCR_PATHS.workerPath,
+    corePath: OCR_PATHS.corePath,
+    langPath: OCR_PATHS.langPath,
+  });
+  return ocrWorker;
+}
+
+/* The box as fractions of the picture, so it lands on a screenshot of a different size */
+function cropToRegion(view, region) {
+  const x = Math.round(region.x * view.width);
+  const y = Math.round(region.y * view.height);
+  const w = Math.max(8, Math.round(region.w * view.width));
+  const h = Math.max(8, Math.round(region.h * view.height));
+  const cut = document.createElement('canvas');
+  cut.width = w;
+  cut.height = h;
+  cut.getContext('2d').drawImage(view, x, y, w, h, 0, 0, w, h);
+  return cut;
+}
+
+function tidyOcr(text, digitsOnly) {
+  const flat = String(text).replace(/\s+/g, ' ').trim();
+  return digitsOnly ? flat.replace(/\D/g, '') : flat;
+}
+
+/*
+ * Digits-only isn't just for accuracy. A global ID has no letters in it, so telling the reader
+ * that removes the 0/O, 1/l and 5/S confusions outright — and it runs about four times faster.
+ */
+async function readRegions(items, regions, onProgress) {
+  const worker = await ocrEngine();
+  let done = 0;
+  const steps = items.length * regions.length;
+  items.forEach(item => { item.ocr = item.ocr || {}; });
+
+  /*
+   * A region at a time, not a picture at a time. Changing the character whitelist makes the
+   * reader rebuild its character set, which costs far more than reading a small crop — doing it
+   * per picture took a second each. Set once per region, then run every picture through it.
+   */
+  for (const region of regions) {
+    await worker.setParameters({ tessedit_char_whitelist: region.digits ? '0123456789' : '' });
+    for (const item of items) {
+      const view = item.pages[0] && item.pages[0].view;
+      if (view) {
+        const result = await worker.recognize(cropToRegion(view, region));
+        item.ocr[region.name] = tidyOcr(result.data.text, region.digits);
+      } else {
+        item.ocr[region.name] = '';
+      }
+      done++;
+      if (onProgress) onProgress(done, steps);
+    }
+  }
+  await worker.setParameters({ tessedit_char_whitelist: '' });
+}
+
+/*
+ * Sorted by what was read, with everything that has no reading left at the end in the order it
+ * arrived — a PDF dropped in among the screenshots has no name on it to sort by.
+ */
+function sortByReading(name) {
+  const withValue = [];
+  const without = [];
+  builderItems.forEach(item => {
+    const value = item.ocr && (item.ocr[name] || '').trim();
+    (value ? withValue : without).push(item);
+  });
+  withValue.sort((a, b) =>
+    String(a.ocr[name]).localeCompare(String(b.ocr[name]), undefined, { numeric: true, sensitivity: 'base' }));
+  builderItems = withValue.concat(without);
+  renderBuilder();
+}
+
+/* ---------- Picking the boxes ---------- */
+const ocrOverlay = document.getElementById('ocrOverlay');
+const ocrCanvas = document.getElementById('ocrCanvas');
+const ocrMarquee = document.getElementById('ocrMarquee');
+let ocrRegions = [];
+
+function setOcrStatus(message) {
+  document.getElementById('ocrStatus').textContent = message || '';
+}
+
+function openOcr() {
+  const first = builderItems.find(item => item.kind !== 'pdf');
+  if (!first) {
+    showBuilderError('Add some pictures first — there is nothing to read.');
+    return;
+  }
+  ocrRegions = [];
+  const view = first.pages[0].view;
+  const scale = Math.min(1, 760 / view.width);
+  ocrCanvas.width = Math.round(view.width * scale);
+  ocrCanvas.height = Math.round(view.height * scale);
+  ocrCanvas.getContext('2d').drawImage(view, 0, 0, ocrCanvas.width, ocrCanvas.height);
+
+  document.getElementById('ocrPickStep').hidden = false;
+  document.getElementById('ocrResultStep').hidden = true;
+  document.getElementById('ocrRead').hidden = false;
+  document.getElementById('ocrSort').hidden = true;
+  renderOcrRegions();
+  setOcrStatus('');
+  ocrOverlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeOcr() {
+  ocrOverlay.hidden = true;
+  document.body.style.overflow = '';
+}
+
+document.querySelectorAll('[data-ocr-close]').forEach(b => b.addEventListener('click', closeOcr));
+document.getElementById('builderRead').addEventListener('click', openOcr);
+
+function renderOcrRegions() {
+  const host = document.getElementById('ocrRegions');
+  host.innerHTML = '';
+  ocrRegions.forEach((region, index) => {
+    const row = document.createElement('div');
+    row.className = 'ocr-region-row';
+
+    const name = document.createElement('input');
+    name.type = 'text';
+    name.className = 'ocr-region-name';
+    name.value = region.name;
+    name.setAttribute('aria-label', 'What this box is');
+    name.addEventListener('input', () => { region.name = name.value.trim() || ('Region ' + (index + 1)); });
+
+    const digits = document.createElement('label');
+    digits.className = 'ocr-region-digits';
+    const tick = document.createElement('input');
+    tick.type = 'checkbox';
+    tick.checked = !!region.digits;
+    tick.addEventListener('change', () => { region.digits = tick.checked; });
+    digits.append(tick, document.createTextNode(' Global ID (numbers only)'));
+
+    const drop = document.createElement('button');
+    drop.type = 'button';
+    drop.className = 'ocr-region-drop';
+    drop.textContent = 'Remove';
+    drop.addEventListener('click', () => { ocrRegions.splice(index, 1); renderOcrRegions(); });
+
+    row.append(name, digits, drop);
+    host.appendChild(row);
+  });
+
+  document.getElementById('ocrRead').disabled = ocrRegions.length === 0;
+  if (!ocrRegions.length) setOcrStatus('Drag a box on the picture above.');
+}
+
+/* Dragging a box on the preview */
+(() => {
+  const stage = document.getElementById('ocrStage');
+  let from = null;
+
+  const atPoint = (e) => {
+    const box = ocrCanvas.getBoundingClientRect();
+    return { x: Math.min(Math.max(0, e.clientX - box.left), box.width),
+             y: Math.min(Math.max(0, e.clientY - box.top), box.height), box };
+  };
+
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.target !== ocrCanvas) return;
+    e.preventDefault();
+    stage.setPointerCapture(e.pointerId);
+    from = atPoint(e);
+    ocrMarquee.hidden = false;
+    ocrMarquee.style.cssText = 'left:' + from.x + 'px;top:' + from.y + 'px;width:0;height:0';
+  });
+
+  stage.addEventListener('pointermove', (e) => {
+    if (!from) return;
+    const now = atPoint(e);
+    const left = Math.min(from.x, now.x), top = Math.min(from.y, now.y);
+    ocrMarquee.style.cssText = 'left:' + left + 'px;top:' + top + 'px;width:' +
+      Math.abs(now.x - from.x) + 'px;height:' + Math.abs(now.y - from.y) + 'px';
+  });
+
+  const finish = (e) => {
+    if (!from) return;
+    const now = atPoint(e);
+    const left = Math.min(from.x, now.x), top = Math.min(from.y, now.y);
+    const width = Math.abs(now.x - from.x), height = Math.abs(now.y - from.y);
+    from = null;
+    ocrMarquee.hidden = true;
+    if (width < 10 || height < 8) return;          // a click, not a box
+
+    const box = ocrCanvas.getBoundingClientRect();
+    ocrRegions.push({
+      name: ocrRegions.length ? 'Region ' + (ocrRegions.length + 1) : 'Member',
+      digits: false,
+      x: left / box.width, y: top / box.height,
+      w: width / box.width, h: height / box.height,
+    });
+    renderOcrRegions();
+    setOcrStatus(ocrRegions.length + (ocrRegions.length === 1 ? ' box. ' : ' boxes. ') +
+                 'Drag another, or read every picture.');
+  };
+  stage.addEventListener('pointerup', finish);
+  stage.addEventListener('pointercancel', () => { from = null; ocrMarquee.hidden = true; });
+})();
+
+document.getElementById('ocrRead').addEventListener('click', async () => {
+  const button = document.getElementById('ocrRead');
+  const pictures = builderItems.filter(item => item.kind !== 'pdf');
+  button.disabled = true;
+  setOcrStatus('Starting the text reader…');
+  try {
+    await readRegions(pictures, ocrRegions, (done, steps) => {
+      setOcrStatus('Reading… ' + done + ' of ' + steps);
+    });
+    showOcrResults();
+  } catch (err) {
+    setOcrStatus('Couldn’t read them: ' + err.message + '.');
+  } finally {
+    button.disabled = false;
+  }
+});
+
+function showOcrResults() {
+  document.getElementById('ocrPickStep').hidden = true;
+  document.getElementById('ocrResultStep').hidden = false;
+  document.getElementById('ocrRead').hidden = true;
+  document.getElementById('ocrSort').hidden = false;
+
+  const host = document.getElementById('ocrResults');
+  host.innerHTML = '';
+  builderItems.filter(item => item.kind !== 'pdf').forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'ocr-result-row';
+
+    const thumb = thumbnailOf(item);
+    if (thumb) {
+      const shrunk = document.createElement('canvas');
+      shrunk.width = 54;
+      shrunk.height = Math.max(20, Math.round(54 * thumb.height / thumb.width));
+      shrunk.getContext('2d').drawImage(thumb, 0, 0, shrunk.width, shrunk.height);
+      shrunk.className = 'ocr-result-thumb';
+      row.appendChild(shrunk);
+    }
+
+    ocrRegions.forEach(region => {
+      const field = document.createElement('input');
+      field.type = 'text';
+      field.className = 'ocr-result-value';
+      field.value = (item.ocr && item.ocr[region.name]) || '';
+      field.placeholder = region.name;
+      field.setAttribute('aria-label', region.name);
+      field.addEventListener('input', () => {
+        item.ocr = item.ocr || {};
+        item.ocr[region.name] = field.value;
+        renderBuilder();
+      });
+      row.appendChild(field);
+    });
+    host.appendChild(row);
+  });
+
+  const picker = document.getElementById('ocrSortBy');
+  picker.innerHTML = '';
+  ocrRegions.forEach(region => {
+    const option = document.createElement('option');
+    option.value = region.name;
+    option.textContent = region.name;
+    picker.appendChild(option);
+  });
+  renderBuilder();
+}
+
+document.getElementById('ocrSort').addEventListener('click', () => {
+  sortByReading(document.getElementById('ocrSortBy').value);
+  closeOcr();
+});
+
 /* ============ Word, out and back ============
  *
  * A form goes out as plain text with a heading over every field, gets dictated into in Word,
@@ -3634,6 +3952,19 @@ function renderBuilder() {
     where.className = 'builder-where';
     where.textContent = plan.labels[index] || '';
 
+    // Whatever was read off this picture, beside the page it lands on
+    const readings = document.createElement('span');
+    readings.className = 'builder-read';
+    Object.keys(item.ocr || {}).forEach(key => {
+      const value = (item.ocr[key] || '').trim();
+      if (!value) return;
+      const chip = document.createElement('span');
+      chip.className = 'builder-read-chip';
+      chip.textContent = value;
+      chip.title = key;
+      readings.appendChild(chip);
+    });
+
     const actions = document.createElement('div');
     actions.className = 'builder-card-actions';
 
@@ -3663,7 +3994,7 @@ function renderBuilder() {
                    move('↓', index + 1, index < builderItems.length - 1),
                    remove);
 
-    card.append(thumb, name, where, actions);
+    card.append(thumb, name, where, readings, actions);
     builderPages.appendChild(card);
   });
 }

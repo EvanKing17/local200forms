@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=96">
+<link rel="stylesheet" href="style.css?v=97">
 </head>
 <body>
 
@@ -171,6 +171,7 @@
     </button>
     <span class="builder-count" id="builderCount">Nothing added yet</span>
     <button type="button" class="btn-secondary" id="builderClear">Start over</button>
+    <button type="button" class="btn-secondary" id="builderRead">Read &amp; sort</button>
     <button type="button" class="btn-secondary" id="builderMarkup">Mark up</button>
     <button type="button" class="btn-primary" id="builderPreview">Print/Download PDF</button>
   </div>
@@ -1802,6 +1803,45 @@
 
 <!-- Shown when a .json handover file is dropped or chosen. Nothing is written into a form
      until this is confirmed, since the form may already have a draft in it. -->
+<!-- ================= READ A REGION, THEN SORT =================
+     Payroll screenshots put the name in the same place every time, so the box is drawn once
+     and read on every picture. See the OCR section of script.js. -->
+<div class="admin-overlay" id="ocrOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="ocrTitle">
+  <div class="admin-modal is-wide">
+    <h2 class="admin-title" id="ocrTitle">Read a region</h2>
+
+    <div id="ocrPickStep">
+      <p class="admin-lede">
+        Drag a box around the text to read — a name, a global ID. The same box is read on every
+        picture, so it only works if they're all laid out the same way.
+      </p>
+      <div class="ocr-stage" id="ocrStage">
+        <canvas id="ocrCanvas"></canvas>
+        <div class="ocr-marquee" id="ocrMarquee" hidden></div>
+      </div>
+      <div class="ocr-regions" id="ocrRegions"></div>
+      <p class="admin-status" id="ocrStatus" role="status"></p>
+    </div>
+
+    <div id="ocrResultStep" hidden>
+      <p class="admin-lede">
+        What it read. Fix anything it got wrong before sorting — the sort uses these values.
+      </p>
+      <div class="ocr-results" id="ocrResults"></div>
+      <label class="ocr-sortby">
+        <span>Sort by</span>
+        <select id="ocrSortBy"></select>
+      </label>
+    </div>
+
+    <div class="admin-actions">
+      <button type="button" class="btn-secondary" data-ocr-close>Cancel</button>
+      <button type="button" class="btn-secondary" id="ocrRead">Read every picture</button>
+      <button type="button" class="btn-primary" id="ocrSort" hidden>Sort the pictures</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= WORD: OUT =================
      The form as plain text, to paste into Word and dictate into. -->
 <div class="admin-overlay" id="wordOutOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="wordOutTitle">
@@ -1931,9 +1971,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=96"></script>
+<script src="forms.config.js?v=97"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=96"></script>
-<script src="script.js?v=96"></script>
+<script src="annotate.js?v=97"></script>
+<script src="script.js?v=97"></script>
 </body>
 </html>
