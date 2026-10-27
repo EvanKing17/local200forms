@@ -2148,7 +2148,7 @@ function buildMeetingDoc(data) {
     { label: 'Employee', value: data.employeeName, width: W * 0.3 },
     { label: 'Global ID', value: data.globalId, width: W * 0.22 },
     { label: 'Department', value: data.department, width: W * 0.26 },
-    { label: 'Date', value: fmtDateFit(doc, data.dateMeeting, W * 0.22 - CELL_X * 2), width: W * 0.22 },
+    { label: 'Brief Created', value: fmtDateFit(doc, data.dateMeeting, W * 0.22 - CELL_X * 2), width: W * 0.22 },
   ], CELL_MIN_H, true);
   // Who has been dealing with it so far, not who is in the room today. Flush under the row
   // above, with no gap, so the top of the sheet is one block under one heading.
