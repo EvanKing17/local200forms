@@ -21,6 +21,8 @@ const DEFAULT_FORMS_CONFIG = {
   timeline: { title: 'Timeline', homeLabel: 'Timeline', homeSub: '' },
   interview: { title: 'Interview Questions', homeLabel: 'Interview Questions',
                homeSub: 'Questions to take in, with room to write the answers' },
+  meeting: { title: 'Across the Table', homeLabel: 'Across the Table',
+             homeSub: 'Chair and HR, before it goes to plant committee' },
 };
 const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };
 
@@ -2107,6 +2109,80 @@ timelineForm.querySelector('[data-tl-gaps]').addEventListener('input', (e) => {
 
 ['input', 'change'].forEach(type => timelineForm.addEventListener(type, () => syncTimelineRows(timelineForm)));
 
+/* ============ Across the table ============
+ *
+ * What the Chair takes into a meeting with HR, before an issue escalates to plant committee.
+ * The Fact Sheet's shape with most of it taken out, because at this stage the detail isn't
+ * known yet — who it is about, who was in the room, and what was said.
+ *
+ * One sheet, unless the comments run long: the box is given whatever is left of the page and
+ * flows onto another only when there is more than that to hold.
+ */
+const meetingForm = document.getElementById('meetingForm');
+const MEETING_COMMENTS_MIN = 430;   // what is left of a letter page under the two rows above
+
+function buildMeetingDoc(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const marginX = 40;
+  const W = 532;
+  let y = drawCompactHeader(doc, marginX, W, FORMS_CONFIG.meeting.title);
+
+  y = sectionBar(doc, marginX, y, W, 'Employee', '');
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Employee', value: data.employeeName, width: W * 0.3 },
+    { label: 'Global ID', value: data.globalId, width: W * 0.22 },
+    { label: 'Department', value: data.department, width: W * 0.26 },
+    { label: 'Date', value: fmtDateFit(doc, data.dateMeeting, W * 0.22 - CELL_X * 2), width: W * 0.22 },
+  ], CELL_MIN_H, true);
+  y += 14;
+
+  y = sectionBar(doc, marginX, y, W, 'Present', '');
+  y = boxedGrid(doc, marginX, y, W, [
+    { label: 'Managers', value: data.managers, width: W / 3 },
+    { label: 'HR', value: data.hr, width: W / 3 },
+    { label: 'Union Rep', value: data.submittedBy, width: W / 3 },
+  ], CELL_MIN_H, true);
+  y += 14;
+
+  y = sectionBar(doc, marginX, y, W, 'Comments', '');
+
+  /*
+   * The box takes whatever is left of this page, so a blank form is one sheet with room to
+   * write on rather than a short box and empty paper under it. flowTextBox carries on to
+   * another page by itself when there is more than that to hold.
+   */
+  const room = Math.max(120, PAGE_BOTTOM - y - 6);
+  y = flowTextBox(doc, marginX, y, W, '', data.comments, Math.max(MEETING_COMMENTS_MIN, room));
+
+  const total = doc.getNumberOfPages();
+  if (total > 1) {
+    for (let n = 1; n <= total; n++) {
+      doc.setPage(n);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...DC.labelSoft);
+      doc.text('Page ' + n + ' of ' + total, 306, 774, { align: 'center' });
+    }
+  }
+
+  embedFormData(doc, 'meeting', data);
+  return doc;
+}
+
+meetingForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  confirmFlags('meeting', () => {
+    const data = fd(meetingForm);
+    const doc = buildMeetingDoc(data);
+    openWithAttachments(doc, 'meeting', formStem('meeting', data) + '.pdf');
+  });
+});
+
+document.getElementById('meetingClear').addEventListener('click', () => {
+  confirmClear('meeting', () => clearForm(meetingForm));
+});
+
 /* ============ Interview questions ============
  *
  * Questions typed up beforehand, printed with ruled lines under each one, and the answers
@@ -2456,7 +2532,7 @@ function formHasData(form) {
  */
 window.addEventListener('beforeunload', (e) => {
   if (draftsAvailable()) return;
-  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm) || formHasData(witnessForm) || formHasData(timelineForm) || formHasData(interviewForm)) {
+  if (formHasData(fordForm) || formHasData(policyForm) || formHasData(uniforForm) || formHasData(investigationForm) || formHasData(witnessForm) || formHasData(timelineForm) || formHasData(interviewForm) || formHasData(meetingForm)) {
     e.preventDefault();
     e.returnValue = '';
   }
@@ -2471,6 +2547,7 @@ const FORM_BUILDERS = {
   witness: { form: witnessForm, build: buildWitnessDoc, label: 'Witness Statement' },
   timeline: { form: timelineForm, build: buildTimelineDoc, label: 'Timeline' },
   interview: { form: interviewForm, build: buildInterviewDoc, label: 'Interview Questions' },
+  meeting: { form: meetingForm, build: buildMeetingDoc, label: 'Across the Table' },
 };
 
 let currentFormType = null;
@@ -5122,7 +5199,7 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
 
 // Native form.reset() restores the hidden inputs' default values without firing input/change,
 // so each date picker's visible trigger label needs an explicit nudge afterward.
-[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm, interviewForm].forEach(form => {
+[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm, interviewForm, meetingForm].forEach(form => {
   form.addEventListener('reset', () => {
     setTimeout(() => {
       form.querySelectorAll('.datepicker').forEach(dp => dp.refreshDisplay && dp.refreshDisplay());
@@ -5427,7 +5504,7 @@ const refreshPageBreaks = debounce(() => {
   if (currentFormType) updatePageBreaks(currentFormType);
 }, 400);
 
-[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm, interviewForm].forEach(form => {
+[fordForm, policyForm, uniforForm, investigationForm, witnessForm, timelineForm, interviewForm, meetingForm].forEach(form => {
   form.addEventListener('input', refreshPageBreaks);
   form.addEventListener('change', refreshPageBreaks);
   // A new name or date is a new filename, and the title bar says so as it is typed
@@ -5616,6 +5693,7 @@ const KEY_FIELD = {
   witness: { name: 'givenBy', label: 'Statement Given By' },
   timeline: { name: 'subject', label: 'Regarding' },
   interview: { name: 'member', label: 'Member' },
+  meeting: { name: 'employeeName', label: 'Employee' },
 };
 
 function noticeFor(type) {
@@ -5899,15 +5977,15 @@ const FREEHAND_TOOLS = ['pen', 'highlight'];
 const DRAG_TOOLS = ['rect', 'ellipse', 'pixelate', 'arrow'];
 const NOTE_TOOLS = ['text', 'select'];
 
-const attachments = { ford: [], policy: [], unifor: [], investigation: [], witness: [], timeline: [], interview: [] };
+const attachments = { ford: [], policy: [], unifor: [], investigation: [], witness: [], timeline: [], interview: [], meeting: [] };
 
 /*
  * How each form lays its pictures out. One page per picture by default: a grievance is a paper
  * document that gets printed and handed over, so its pages should be paper-sized. The page turns
  * sideways for a wide picture rather than shrinking it into a strip across an empty sheet.
  */
-const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter', witness: 'letter', timeline: 'letter', interview: 'letter' };
-const attachmentOrient = { ford: DEFAULT_ORIENT, policy: DEFAULT_ORIENT, unifor: DEFAULT_ORIENT, investigation: DEFAULT_ORIENT, witness: DEFAULT_ORIENT, timeline: DEFAULT_ORIENT, interview: DEFAULT_ORIENT };
+const attachmentFit = { ford: 'letter', policy: 'letter', unifor: 'letter', investigation: 'letter', witness: 'letter', timeline: 'letter', interview: 'letter', meeting: 'letter' };
+const attachmentOrient = { ford: DEFAULT_ORIENT, policy: DEFAULT_ORIENT, unifor: DEFAULT_ORIENT, investigation: DEFAULT_ORIENT, witness: DEFAULT_ORIENT, timeline: DEFAULT_ORIENT, interview: DEFAULT_ORIENT, meeting: DEFAULT_ORIENT };
 
 const editor = document.getElementById('editor');
 const editorStage = document.getElementById('editorStage');
@@ -7010,6 +7088,7 @@ const FORM_NAME_FIELDS = {
   witness: ['givenBy', 'dateTaken'],
   timeline: ['subject', 'datePrepared'],
   interview: ['member', 'dateInterview'],
+  meeting: ['employeeName', 'dateMeeting'],
 };
 
 /*
@@ -7169,7 +7248,7 @@ const IMPORT_LABELS = {
 const IMPORT_FORM_NAMES = {
   ford: 'Grievance Investigation & Claim', policy: 'Policy Grievance',
   unifor: 'Fact Sheet', investigation: 'Investigation Form', witness: 'Witness Statement',
-  timeline: 'Timeline', interview: 'Interview Questions',
+  timeline: 'Timeline', interview: 'Interview Questions', meeting: 'Across the Table',
 };
 
 function normaliseKey(key) {
@@ -7189,6 +7268,7 @@ function importFormType(raw) {
   if (['witness', 'witnessstatement', 'statement'].includes(word)) return 'witness';
   if (['timeline', 'chronology'].includes(word)) return 'timeline';
   if (['interview', 'interviewquestions', 'questions'].includes(word)) return 'interview';
+  if (['meeting', 'acrossthetable', 'across', 'meetingrecord'].includes(word)) return 'meeting';
   return null;
 }
 

@@ -34,5 +34,10 @@ window.FORMS_CONFIG_DATA = {
     "title": "Interview Questions",
     "homeLabel": "Interview Questions",
     "homeSub": "Questions to take in, with room to write the answers"
+  },
+  "meeting": {
+    "title": "Across the Table",
+    "homeLabel": "Across the Table",
+    "homeSub": "Chair and HR, before it goes to plant committee"
   }
 };
