@@ -21,7 +21,7 @@ const DEFAULT_FORMS_CONFIG = {
   timeline: { title: 'Timeline', homeLabel: 'Timeline', homeSub: '' },
   interview: { title: 'Interview Questions', homeLabel: 'Interview Questions',
                homeSub: 'Questions to take in, with room to write the answers' },
-  meeting: { title: 'Across the Table', homeLabel: 'Across the Table',
+  meeting: { title: 'Across the Table Brief', homeLabel: 'Across the Table Brief',
              homeSub: 'Chair and HR, before it goes to plant committee' },
 };
 const FORMS_CONFIG = { ...DEFAULT_FORMS_CONFIG, ...(window.FORMS_CONFIG_DATA || {}) };
@@ -1432,12 +1432,15 @@ function drawCompactHeader(doc, marginX, W, title) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(...DC.ink);
-  doc.text(title, marginX, top + 13);
+  // Wrapped, because a title can now carry what the sheet is about and that has no length limit
+  const titleLines = doc.splitTextToSize(title, W - WITNESS_LOGO_W - 16);
+  doc.text(titleLines, marginX, top + 13);
+  const titleH = (titleLines.length - 1) * 17;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(...DC.labelSoft);
-  doc.text('For Local Union Use Only', marginX, top + 25);
-  const ruleY = top + Math.max(logoH, 27) + 8;
+  doc.text('For Local Union Use Only', marginX, top + 25 + titleH);
+  const ruleY = top + Math.max(logoH, 27 + titleH) + 8;
   doc.setDrawColor(...DC.primary);
   doc.setLineWidth(1.5);
   doc.line(marginX, ruleY, marginX + W, ruleY);
@@ -2126,18 +2129,20 @@ function buildMeetingDoc(data) {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const marginX = 40;
   const W = 532;
-  let y = drawCompactHeader(doc, marginX, W, FORMS_CONFIG.meeting.title);
+  // The heading says what the brief is about, so it can be read at a glance off the pile
+  const regarding = (data.subject || '').trim();
+  let y = drawCompactHeader(doc, marginX, W,
+    FORMS_CONFIG.meeting.title + (regarding ? ' — Re: ' + regarding : ''));
 
-  y = sectionBar(doc, marginX, y, W, 'Employee', '');
+  y = sectionBar(doc, marginX, y, W, 'Details', '');
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Employee', value: data.employeeName, width: W * 0.3 },
     { label: 'Global ID', value: data.globalId, width: W * 0.22 },
     { label: 'Department', value: data.department, width: W * 0.26 },
     { label: 'Date', value: fmtDateFit(doc, data.dateMeeting, W * 0.22 - CELL_X * 2), width: W * 0.22 },
   ], CELL_MIN_H, true);
-  y += 14;
-
-  y = sectionBar(doc, marginX, y, W, 'Present', '');
+  // Who has been dealing with it so far, not who is in the room today. Flush under the row
+  // above, with no gap, so the top of the sheet is one block under one heading.
   y = boxedGrid(doc, marginX, y, W, [
     { label: 'Managers', value: data.managers, width: W / 3 },
     { label: 'HR', value: data.hr, width: W / 3 },
@@ -2547,7 +2552,7 @@ const FORM_BUILDERS = {
   witness: { form: witnessForm, build: buildWitnessDoc, label: 'Witness Statement' },
   timeline: { form: timelineForm, build: buildTimelineDoc, label: 'Timeline' },
   interview: { form: interviewForm, build: buildInterviewDoc, label: 'Interview Questions' },
-  meeting: { form: meetingForm, build: buildMeetingDoc, label: 'Across the Table' },
+  meeting: { form: meetingForm, build: buildMeetingDoc, label: 'Across the Table Brief' },
 };
 
 let currentFormType = null;
@@ -7248,7 +7253,7 @@ const IMPORT_LABELS = {
 const IMPORT_FORM_NAMES = {
   ford: 'Grievance Investigation & Claim', policy: 'Policy Grievance',
   unifor: 'Fact Sheet', investigation: 'Investigation Form', witness: 'Witness Statement',
-  timeline: 'Timeline', interview: 'Interview Questions', meeting: 'Across the Table',
+  timeline: 'Timeline', interview: 'Interview Questions', meeting: 'Across the Table Brief',
 };
 
 function normaliseKey(key) {

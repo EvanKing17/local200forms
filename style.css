@@ -3649,6 +3649,25 @@ body.has-bar-text-size .text-size-toggle { display: none; }
  * On screen the answer space is shown as ruled lines too, so what is on the sheet is what
  * prints. They are drawn, not typed into: the answers are written on paper in the room.
  */
+/* "Re: ____" on the title line, so the sheet says what it is about at a glance */
+.dc-doc-subject {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 4px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 14.667px;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.dc-doc-subject > span { flex-shrink: 0; }
+.dc-doc-subject textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14.667px;
+  font-weight: 700;
+}
+
 /* The comments box takes the rest of the sheet, so a blank form is one page with room to
    write on rather than a short box over empty paper. 430pt, as the PDF draws it. */
 .dc-meeting-comments { min-height: 573.333px; }

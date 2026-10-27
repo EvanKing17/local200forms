@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=103">
+<link rel="stylesheet" href="style.css?v=105">
 </head>
 <body>
 
@@ -97,7 +97,7 @@
       </button>
     <button class="form-card" data-form="meeting">
         <span class="picker-index">08</span>
-        <span class="picker-text"><span class="picker-label">Across the Table</span><span class="picker-sub">Chair and HR, before plant committee</span></span>
+        <span class="picker-text"><span class="picker-label">Across the Table Brief</span><span class="picker-sub">Chair and HR, before plant committee</span></span>
         <svg class="picker-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
     </div>
@@ -2309,7 +2309,7 @@
         </button>
         <span class="dc-titlebar-sep" aria-hidden="true"></span>
         <span class="dc-titlebar-app">Union Forms</span>
-        <span class="dc-titlebar-doc" data-form-title="meeting">Across the Table</span>
+        <span class="dc-titlebar-doc" data-form-title="meeting">Across the Table Brief</span>
         <span class="dc-titlebar-spacer"></span>
         <span class="dc-saved" role="status"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>Draft saved</span>
         <button type="button" class="bar-text-size" data-text-size
@@ -2358,14 +2358,20 @@
             <form id="meetingForm" class="dc-page">
       <div class="dc-page-head dc-compact-head">
         <div class="dc-head-text">
-          <div class="dc-doc-title" id="form-meeting-heading">Across the Table</div>
+          <div class="dc-doc-title" id="form-meeting-heading">Across the Table Brief</div>
+          <label class="dc-doc-subject">
+            <span>Re:</span>
+            <textarea class="dc-value" name="subject" rows="1" autocomplete="off"
+                      aria-label="What this brief is regarding"
+                      data-word-label="Regarding" placeholder="what this is about"></textarea>
+          </label>
           <p class="dc-doc-note">For Local Union Use Only</p>
         </div>
         <img class="dc-logo" alt="Unifor" data-unifor-logo>
       </div>
       <div class="dc-doc-rule"></div>
 
-      <div class="dc-band"><span>Employee</span></div>
+      <div class="dc-band"><span>Details</span></div>
       <div class="dc-field-grid dc-cols-4 dc-attached">
         <label>
           <span class="dc-field-label">Employee</span>
@@ -2385,9 +2391,9 @@
         </label>
       </div>
 
-      <div class="dc-band dc-block"><span>Present</span></div>
-      <!-- Union Rep keeps the field name "submittedBy" so it fills itself in from the last
-           form, the way every other one does. -->
+      <!-- Who has been dealing with it so far, not who is in the room today. Sits flush under
+           the row above so the whole top of the sheet is one block under one heading. Union Rep
+           keeps the field name "submittedBy" so it fills itself in from the last form. -->
       <div class="dc-field-grid dc-cols-3 dc-attached">
         <label>
           <span class="dc-field-label">Managers</span>
@@ -2715,9 +2721,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=103"></script>
+<script src="forms.config.js?v=105"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=103"></script>
-<script src="script.js?v=103"></script>
+<script src="annotate.js?v=105"></script>
+<script src="script.js?v=105"></script>
 </body>
 </html>
