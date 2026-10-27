@@ -44,7 +44,16 @@ function applyFormsConfig() {
       if (sub && cfg.homeSub != null) sub.textContent = cfg.homeSub;
     }
     const heading = document.getElementById(`form-${type}-heading`);
-    if (heading && cfg.title != null) heading.textContent = cfg.title;
+    if (heading && cfg.title != null) {
+      /*
+       * Into the name slot when the heading has one. A heading can be more than its title —
+       * the Across the Table brief puts "— Re: ..." and a field for the subject on the same
+       * line — and writing textContent over the whole thing threw those away on load.
+       */
+      const slot = heading.querySelector('.dc-title-name');
+      if (slot) slot.textContent = cfg.title;
+      else heading.textContent = cfg.title;
+    }
     // The title bar shows the file's name rather than the form's; see refreshFormName
   });
 }

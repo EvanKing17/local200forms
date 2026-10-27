@@ -3649,24 +3649,36 @@ body.has-bar-text-size .text-size-toggle { display: none; }
  * On screen the answer space is shown as ruled lines too, so what is on the sheet is what
  * prints. They are drawn, not typed into: the answers are written on paper in the room.
  */
-/* "Re: ____" on the title line, so the sheet says what it is about at a glance */
-.dc-doc-subject {
+/*
+ * The subject sits on the title line, at the title's size, because that is exactly where the
+ * PDF prints it — "Across the Table Brief — Re: ...". A field parked on a line of its own would
+ * have been a different document on screen from the one that comes out.
+ */
+.dc-title-line {
   display: flex;
   align-items: baseline;
   gap: 7px;
-  margin-top: 4px;
-  font-family: Helvetica, Arial, sans-serif;
-  font-size: 14.667px;
-  font-weight: 700;
-  color: var(--dc-ink);
 }
-.dc-doc-subject > span { flex-shrink: 0; }
-.dc-doc-subject textarea {
+
+.dc-title-name, .dc-title-re { flex-shrink: 0; }
+
+.dc-title-subject {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 14.667px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 20px;          /* 15pt, the same as the title beside it */
   font-weight: 700;
+  line-height: 24px;
+  color: var(--dc-ink);
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  resize: none;
+  overflow: hidden;
 }
+.dc-title-subject:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
+.dc-title-subject::placeholder { font-weight: 400; color: var(--dc-label-soft); }
 
 /* The comments box takes the rest of the sheet, so a blank form is one page with room to
    write on rather than a short box over empty paper. 430pt, as the PDF draws it. */
