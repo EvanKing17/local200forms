@@ -3676,6 +3676,9 @@ body.has-bar-text-size .text-size-toggle { display: none; }
   margin: 0;
   resize: none;
   overflow: hidden;
+  /* One line, like the title it sits beside. It borrows dc-textarea so it grows with a long
+     subject, and that class carries the 80px minimum meant for the narrative boxes. */
+  min-height: 24px;
 }
 .dc-title-subject:focus { outline: none; background: var(--dc-field-bg); border-radius: 2px; }
 .dc-title-subject::placeholder { font-weight: 400; color: var(--dc-label-soft); }

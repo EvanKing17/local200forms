@@ -3391,6 +3391,41 @@ function run(win, doc) {
     return (!went && flagsKept === 2) || { detail: 'built=' + went + ' flagsKept=' + flagsKept };
   });
 
+  const g19 = group('Every form reopens from its own PDF');
+
+  checkAsync(g19, 'Each registered form round-trips through a dropped PDF', async () => {
+    // Walks the registry rather than a list here, so a form added later is covered without
+    // anyone remembering to add it. This is the feature reps rely on most: a PDF another rep
+    // made, emailed over, dropped in and edited.
+    const bad = [];
+    for (const type of Object.keys(win.__app.FORM_BUILDERS)) {
+      const entry = win.__app.FORM_BUILDERS[type];
+      win.showForm(type);
+      win.clearForm(entry.form);
+      const filled = {};
+      entry.form.querySelectorAll('textarea[name], input[type=text][name]').forEach(el => {
+        if (el.disabled || filled[el.name]) return;
+        el.value = 'RT ' + type + ' ' + el.name;
+        filled[el.name] = el.value;
+      });
+      entry.form.dispatchEvent(new win.Event('input', { bubbles: true }));
+      const bytes = new Uint8Array(entry.build(win.fd(entry.form)).output('arraybuffer'));
+      win.clearForm(entry.form);
+      win.showHome();
+      await win.handleIncomingFile(new win.File([bytes], type + '.pdf', { type: 'application/pdf' }));
+      await new Promise(r => win.setTimeout(r, 120));
+      const back = win.fd(entry.form);
+      const lost = Object.keys(filled).filter(k => back[k] !== filled[k]);
+      // currentFormType is a module-level let, not on window, so ask which panel is showing
+      const showing = doc.getElementById('form-' + type).classList.contains('active');
+      if (!showing) bad.push(type + ' did not reopen into its own form');
+      else if (lost.length) bad.push(type + ' lost ' + lost.slice(0, 3).join(', '));
+      win.clearForm(entry.form);
+    }
+    win.showHome();
+    return bad.length === 0 || { detail: bad.join(' | ') };
+  });
+
   const g7 = group('Drafts');
   check(g7, 'Storage is usable', () => win.draftsAvailable() || { detail: 'localStorage unavailable here' });
   check(g7, 'A draft is saved and restored', () => {
