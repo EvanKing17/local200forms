@@ -7137,9 +7137,10 @@ function formStem(type, data) {
 }
 
 /*
- * "Across the Table Brief RE Overtime equalisation"
+ * "Across the Table Brief Re Overtime equalisation"
  *
- * The form and what it is about, nothing else. "RE" without its colon: Windows will not save a
+ * The form and what it is about, nothing else. "Re" as the heading writes it — it is the Latin
+ * word, not an acronym — and without its colon: Windows will not save a
  * file with a colon in its name, and the browser would swap it for something of its own
  * choosing. With no subject it is just the form's name, and a very long subject is cut at a
  * word so the name stays one Windows will save.
@@ -7155,7 +7156,7 @@ function briefStem(label, values) {
       .replace(/\s+(and|or|the|of|to|a|an|for|on|in|with|at|by)$/i, '');
   }
   const name = filenameSafe(label);
-  return subject ? name + ' RE ' + subject : name;
+  return subject ? name + ' Re ' + subject : name;
 }
 
 async function markUpForm(type) {
