@@ -367,20 +367,30 @@ const MONTH_NAMES_SHORT = MONTH_NAMES_FULL.map(m => m.slice(0, 3));
 
 /* "Evan King - Fact Sheet August 26 2026.pdf": who, which form, when. The form is named the
    way the config names it, so a folder of downloads reads the same as the form list. */
+/* "October 27 2026" for a filename. Today when the date hasn't been filled in yet. */
+function filenameDate(iso) {
+  const parts = String(iso || '').split('-');
+  const monthIndex = parseInt(parts[1], 10) - 1;
+  if (parts.length === 3 && MONTH_NAMES_FULL[monthIndex]) {
+    // Read off the string rather than via a Date, which would shift the day west of UTC
+    return `${MONTH_NAMES_FULL[monthIndex]} ${parseInt(parts[2], 10)} ${parts[0]}`;
+  }
+  const today = new Date();
+  return `${MONTH_NAMES_FULL[today.getMonth()]} ${today.getDate()} ${today.getFullYear()}`;
+}
+
+/* What Windows refuses in a filename */
+function filenameSafe(text) {
+  // A slash becomes a dash rather than vanishing, or "Shift 1/2" would be saved as "Shift 12"
+  return String(text || '').replace(/[\\/]/g, '-').replace(/[:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
 function buildFilename(name, formTitle, occurredIso) {
   // The date of the incident, not the day the PDF happened to be made — a grievance gets
   // reprinted and refiled, and it's the occurrence that identifies it. Falls back to today
   // when the incident date hasn't been filled in yet.
-  const parts = String(occurredIso || '').split('-');
-  const monthIndex = parseInt(parts[1], 10) - 1;
-  let dateStr;
-  if (parts.length === 3 && MONTH_NAMES_FULL[monthIndex]) {
-    // Read off the string rather than via a Date, which would shift the day west of UTC
-    dateStr = `${MONTH_NAMES_FULL[monthIndex]} ${parseInt(parts[2], 10)} ${parts[0]}`;
-  } else {
-    const today = new Date();
-    dateStr = `${MONTH_NAMES_FULL[today.getMonth()]} ${today.getDate()} ${today.getFullYear()}`;
-  }
+  const dateStr = filenameDate(occurredIso);
   const safeName = (name || 'Unnamed').trim().replace(/[\\/:*?"<>|]/g, '') || 'Unnamed';
   const safeTitle = String(formTitle || '').trim().replace(/[\\/:*?"<>|]/g, '');
   return `${safeName} - ${safeTitle} ${dateStr}.pdf`;
@@ -7122,7 +7132,32 @@ function formStem(type, data) {
   const [nameField, dateField] = FORM_NAME_FIELDS[type];
   // The card's label, not the sheet's heading: the heading can carry more than a filename wants
   const label = cfg.homeLabel || cfg.title || entry.label;
+  if (type === 'meeting') return briefStem(label, values);
   return buildFilename(values[nameField], label, values[dateField]).replace(/\.pdf$/i, '');
+}
+
+/*
+ * "Across the Table Brief - W. Macauley RE Overtime equalisation - October 27 2026"
+ *
+ * Form first, because these get filed together and should sort together. "RE" without its
+ * colon: Windows will not save a file with a colon in its name, and the browser would swap it
+ * for something of its own choosing. A part that is empty is left out rather than written as a
+ * blank, and a very long subject is cut at a word so the name stays one Windows will save.
+ */
+const BRIEF_SUBJECT_MAX = 100;
+
+function briefStem(label, values) {
+  const name = filenameSafe(values.employeeName);
+  let subject = filenameSafe(values.subject);
+  if (subject.length > BRIEF_SUBJECT_MAX) {
+    const cut = subject.slice(0, BRIEF_SUBJECT_MAX);
+    subject = cut.slice(0, Math.max(cut.lastIndexOf(' '), 60)).trim()
+      // and not on a word that only makes sense with the rest of the sentence after it
+      .replace(/\s+(and|or|the|of|to|a|an|for|on|in|with|at|by)$/i, '');
+  }
+  let middle = name;
+  if (subject) middle = (middle ? middle + ' ' : '') + 'RE ' + subject;
+  return [filenameSafe(label), middle, filenameDate(values.dateMeeting)].filter(Boolean).join(' - ');
 }
 
 async function markUpForm(type) {
