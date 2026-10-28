@@ -7137,17 +7137,16 @@ function formStem(type, data) {
 }
 
 /*
- * "Across the Table Brief - W. Macauley RE Overtime equalisation"
+ * "Across the Table Brief RE Overtime equalisation"
  *
- * Form first, because these get filed together and should sort together. "RE" without its
- * colon: Windows will not save a file with a colon in its name, and the browser would swap it
- * for something of its own choosing. A part that is empty is left out rather than written as a
- * blank, and a very long subject is cut at a word so the name stays one Windows will save.
+ * The form and what it is about, nothing else. "RE" without its colon: Windows will not save a
+ * file with a colon in its name, and the browser would swap it for something of its own
+ * choosing. With no subject it is just the form's name, and a very long subject is cut at a
+ * word so the name stays one Windows will save.
  */
 const BRIEF_SUBJECT_MAX = 100;
 
 function briefStem(label, values) {
-  const name = filenameSafe(values.employeeName);
   let subject = filenameSafe(values.subject);
   if (subject.length > BRIEF_SUBJECT_MAX) {
     const cut = subject.slice(0, BRIEF_SUBJECT_MAX);
@@ -7155,9 +7154,8 @@ function briefStem(label, values) {
       // and not on a word that only makes sense with the rest of the sentence after it
       .replace(/\s+(and|or|the|of|to|a|an|for|on|in|with|at|by)$/i, '');
   }
-  let middle = name;
-  if (subject) middle = (middle ? middle + ' ' : '') + 'RE ' + subject;
-  return [filenameSafe(label), middle].filter(Boolean).join(' - ');
+  const name = filenameSafe(label);
+  return subject ? name + ' RE ' + subject : name;
 }
 
 async function markUpForm(type) {
