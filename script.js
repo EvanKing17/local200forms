@@ -7137,7 +7137,7 @@ function formStem(type, data) {
 }
 
 /*
- * "Across the Table Brief - W. Macauley RE Overtime equalisation - October 27 2026"
+ * "Across the Table Brief - W. Macauley RE Overtime equalisation"
  *
  * Form first, because these get filed together and should sort together. "RE" without its
  * colon: Windows will not save a file with a colon in its name, and the browser would swap it
@@ -7157,7 +7157,7 @@ function briefStem(label, values) {
   }
   let middle = name;
   if (subject) middle = (middle ? middle + ' ' : '') + 'RE ' + subject;
-  return [filenameSafe(label), middle, filenameDate(values.dateMeeting)].filter(Boolean).join(' - ');
+  return [filenameSafe(label), middle].filter(Boolean).join(' - ');
 }
 
 async function markUpForm(type) {
