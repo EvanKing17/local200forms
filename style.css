@@ -2960,6 +2960,74 @@ input[type="radio"] { width: 15px; height: 15px; }
 .drot-status { margin: 12px 0 0; min-height: 18px; font-size: 12.5px; color: var(--c-text-muted); }
 
 .is-large-text .drot-view { zoom: 1.25; }
+
+/* ---------- Dept numbers ---------- */
+.dept-view {
+  max-width: 816px;
+  margin: 0 auto;
+  padding: clamp(12px, 2vw, 24px) clamp(16px, 4vw, 40px) 60px;
+}
+
+.dept-title { margin: 0 auto 0 0; font-size: 16px; font-weight: 700; color: var(--c-text); }
+.dept-status { font-size: 13px; color: var(--c-text-muted); }
+.dept-status.is-done { color: #1a7f37; font-weight: 600; }
+
+.dept-plant { margin-bottom: 20px; overflow-x: auto; }
+
+.dept-table {
+  width: 100%;
+  min-width: 560px;
+  table-layout: fixed;     /* so the two plants' columns line up */
+  border-collapse: collapse;
+  background: var(--c-surface);
+  font-size: 14px;
+  color: var(--c-text);
+}
+
+.dept-table caption {
+  padding: 8px 12px;
+  background: var(--dc-primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dept-table th {
+  padding: 8px 12px;
+  background: var(--c-surface-alt);
+  border: 1px solid var(--c-border-strong);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: left;
+}
+.dept-table th:nth-child(1) { width: 34%; }
+.dept-table th:nth-child(2) { width: 14%; }
+.dept-table th:nth-child(3) { width: 16%; }
+.dept-table th.is-code { text-align: center; }
+
+.dept-table td { padding: 0; border: 1px solid var(--c-border-strong); }
+.dept-table tbody tr:nth-child(even) td { background: var(--c-surface-alt); }
+
+.dept-copy {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: text;
+  transition: background 0.15s ease;
+}
+.dept-copy.is-code { font-family: var(--font-mono); text-align: center; }
+.dept-copy:hover { background: var(--c-avatar-bg); }
+.dept-copy:focus-visible { outline: 2px solid var(--c-accent); outline-offset: -2px; }
+.dept-copy.is-copied { background: #dcf3e3; color: #14652c; font-weight: 600; }
+
+.is-large-text .dept-view { zoom: 1.25; }
 @media print { .tools { display: none !important; } }
 
 .bar-text-size {

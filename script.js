@@ -3689,6 +3689,7 @@ function showDrot() {
   builderView.hidden = true;
   drotView.hidden = false;
   coverView.hidden = true;
+  deptView.hidden = true;
   showVersion(false);
   showTools(false);
   drotShiftSelect.value = drotShift;
@@ -3696,15 +3697,14 @@ function showDrot() {
 }
 
 /* Clipboard first; a locked-down machine can refuse it, and the old way still works there */
-async function copyDrot() {
-  const text = document.getElementById('drotCode').textContent;
+async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
-    setDrotStatus('Copied ' + text);
     return true;
   } catch (err) {
     /* fall through to the old way */
   }
+  const returnTo = document.activeElement;
   const scratch = document.createElement('textarea');
   scratch.value = text;
   scratch.setAttribute('readonly', '');
@@ -3714,6 +3714,13 @@ async function copyDrot() {
   let copied = false;
   try { copied = document.execCommand('copy'); } catch (err) { copied = false; }
   scratch.remove();
+  if (returnTo && returnTo.focus) returnTo.focus();
+  return copied;
+}
+
+async function copyDrot() {
+  const text = document.getElementById('drotCode').textContent;
+  const copied = await copyText(text);
   setDrotStatus(copied ? 'Copied ' + text : 'Couldn’t reach the clipboard — copy it by hand.');
   return copied;
 }
@@ -3804,6 +3811,7 @@ function showCover() {
   builderView.hidden = true;
   drotView.hidden = true;
   coverView.hidden = false;
+  deptView.hidden = true;
   showVersion(false);
   showTools(false);
   if (!coverDate.value) {
@@ -3864,6 +3872,105 @@ document.querySelector('[data-tool="cover"]').addEventListener('click', () => {
   showCover();
 });
 
+/* ============ Tools: dept numbers ============
+ *
+ * The skilled trades sheet, built from the list the DROT audit walks. Every cell copies itself
+ * on click. The DROT column is day shift, as it is on the sheet.
+ */
+const deptView = document.getElementById('deptView');
+const deptStatus = document.getElementById('deptStatus');
+const DEPT_HINT = 'Click any cell to copy';
+const DEPT_COLUMNS = [
+  { head: 'Department', value: d => d.name },
+  { head: 'Number', value: d => d.number, code: true },
+  { head: 'DROT', value: d => drotFor(d, 'days'), code: true },
+  { head: 'Name (Number)', value: d => d.name + ' (' + d.number + ')' },
+];
+
+function renderDeptTables() {
+  const host = document.getElementById('deptTables');
+  const plants = [...new Set(DROT_DEPARTMENTS.map(d => d.plant))];
+  plants.forEach(plant => {
+    const wrap = document.createElement('div');
+    wrap.className = 'dept-plant';
+    const table = document.createElement('table');
+    table.className = 'dept-table';
+    const caption = table.createCaption();
+    caption.textContent = plant;
+
+    const headRow = table.createTHead().insertRow();
+    DEPT_COLUMNS.forEach(column => {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = column.head;
+      if (column.code) th.className = 'is-code';
+      headRow.appendChild(th);
+    });
+
+    const body = table.createTBody();
+    DROT_DEPARTMENTS.filter(d => d.plant === plant).forEach(dept => {
+      const row = body.insertRow();
+      DEPT_COLUMNS.forEach(column => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'dept-copy' + (column.code ? ' is-code' : '');
+        button.textContent = column.value(dept);
+        row.insertCell().appendChild(button);
+      });
+    });
+    wrap.appendChild(table);
+    host.appendChild(wrap);
+  });
+}
+renderDeptTables();
+
+let deptCopied = null;
+let deptTimer = null;
+
+function resetDeptStatus() {
+  clearTimeout(deptTimer);
+  if (deptCopied) deptCopied.classList.remove('is-copied');
+  deptCopied = null;
+  deptStatus.textContent = DEPT_HINT;
+  deptStatus.classList.remove('is-done');
+}
+
+document.getElementById('deptTables').addEventListener('click', async (e) => {
+  const button = e.target.closest('.dept-copy');
+  if (!button) return;
+  const text = button.textContent;
+  const copied = await copyText(text);
+  resetDeptStatus();
+  if (copied) {
+    deptCopied = button;
+    button.classList.add('is-copied');
+    deptStatus.textContent = 'Copied ' + text;
+    deptStatus.classList.add('is-done');
+  } else {
+    deptStatus.textContent = 'Couldn’t reach the clipboard — copy it by hand.';
+  }
+  deptTimer = setTimeout(resetDeptStatus, 2500);
+});
+
+function showDept() {
+  currentFormType = null;
+  tuckTextSize(false);
+  homeView.hidden = true;
+  workspace.hidden = true;
+  builderView.hidden = true;
+  drotView.hidden = true;
+  coverView.hidden = true;
+  deptView.hidden = false;
+  showVersion(false);
+  showTools(false);
+  resetDeptStatus();
+}
+
+document.querySelector('[data-tool="dept"]').addEventListener('click', () => {
+  closeToolsMenu();
+  showDept();
+});
+
 /* ============ Home / fill-form view routing ============ */
 const homeView = document.getElementById('homeView');
 const coverView = document.getElementById('coverView');
@@ -3889,6 +3996,7 @@ function showHome() {
   builderView.hidden = true;
   drotView.hidden = true;
   coverView.hidden = true;
+  deptView.hidden = true;
   showVersion(true);
   showTools(true);
   refreshClearAllButton();
@@ -3950,6 +4058,7 @@ function showForm(type, data) {
   builderView.hidden = true;
   drotView.hidden = true;
   coverView.hidden = true;
+  deptView.hidden = true;
   workspace.hidden = false;
   showVersion(false);
   showTools(false);
@@ -4319,6 +4428,7 @@ function showBuilder() {
   builderView.hidden = false;
   drotView.hidden = true;
   coverView.hidden = true;
+  deptView.hidden = true;
   showVersion(false);
   showTools(false);
   builderError.hidden = true;

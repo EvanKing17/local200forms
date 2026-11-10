@@ -14,7 +14,7 @@
 <meta name="description" content="Fill in and print Unifor Local 200 grievance forms. Works offline; nothing is sent anywhere.">
 <!-- ?v= is bumped when these change, and must match VERSION in sw.js: both GitHub Pages and
      the service worker cache these, so a stale number keeps serving the previous build. -->
-<link rel="stylesheet" href="style.css?v=113">
+<link rel="stylesheet" href="style.css?v=114">
 </head>
 <body>
 
@@ -42,6 +42,7 @@
               aria-haspopup="true" aria-controls="toolsMenu">Tools</button>
       <div class="tools-menu" id="toolsMenu" hidden role="menu">
         <button type="button" role="menuitem" data-tool="drot">DROT Audit</button>
+        <button type="button" role="menuitem" data-tool="dept">Dept Numbers</button>
         <button type="button" role="menuitem" data-tool="cover">Cover page</button>
       </div>
     </div>
@@ -141,6 +142,23 @@
     </div>
     <p class="drot-status" id="drotStatus" role="status"></p>
   </div>
+</div>
+
+<!-- ================= DEPT NUMBERS =================
+     The skilled trades sheet. Rows are built from DROT_DEPARTMENTS in script.js. -->
+<div class="dept-view" id="deptView" hidden>
+  <div class="dc-toolbar">
+    <button type="button" class="dc-back" data-back-to-forms>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+      </svg>
+      Forms
+    </button>
+    <h1 class="dept-title">Skilled Trades Dept Numbers</h1>
+    <span class="dept-status" id="deptStatus" role="status"></span>
+  </div>
+  <div id="deptTables"></div>
 </div>
 
 <!-- ================= COVER PAGE =================
@@ -2720,9 +2738,9 @@
 </div>
 
 <script src="jspdf.umd.min.js"></script>
-<script src="forms.config.js?v=113"></script>
+<script src="forms.config.js?v=114"></script>
 <script src="unifor-logo.js"></script>
-<script src="annotate.js?v=113"></script>
-<script src="script.js?v=113"></script>
+<script src="annotate.js?v=114"></script>
+<script src="script.js?v=114"></script>
 </body>
 </html>
