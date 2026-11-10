@@ -3023,6 +3023,14 @@ input[type="radio"] { width: 15px; height: 15px; }
   transition: background 0.15s ease;
 }
 .dept-copy.is-code { font-family: var(--font-mono); text-align: center; }
+.dept-note {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--c-text-muted);
+  user-select: none;       /* dragging across a row should not pick it up either */
+}
 .dept-copy:hover { background: var(--c-avatar-bg); }
 .dept-copy:focus-visible { outline: 2px solid var(--c-accent); outline-offset: -2px; }
 .dept-copy.is-copied { background: #dcf3e3; color: #14652c; font-weight: 600; }

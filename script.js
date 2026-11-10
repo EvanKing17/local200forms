@@ -3627,8 +3627,8 @@ const DROT_DEPARTMENTS = [
   { plant: 'Essex', name: 'Rods', number: '8362', letter: 'M' },
   { plant: 'Essex', name: 'Stationary', number: '8340', letter: 'O' },
 
-  { plant: 'Annex', name: 'Blocks 6.8 MB2', number: '8660', letter: 'B' },
-  { plant: 'Annex', name: 'Blocks 7.3 MB1', number: '8688', letter: 'B' },
+  { plant: 'Annex', name: 'Blocks 6.8 MB2', number: '8660', letter: 'B', note: 'B mod' },
+  { plant: 'Annex', name: 'Blocks 7.3 MB1', number: '8688', letter: 'B', note: 'by 5.0 rods' },
   { plant: 'Annex', name: 'Building Services', number: '8618', letter: 'A' },
   { plant: 'Annex', name: 'Cranks', number: '8668', letter: 'B' },
   { plant: 'Annex', name: 'Dynamic', number: '8604', letter: 'M' },
@@ -3881,7 +3881,7 @@ const deptView = document.getElementById('deptView');
 const deptStatus = document.getElementById('deptStatus');
 const DEPT_HINT = 'Click any cell to copy';
 const DEPT_COLUMNS = [
-  { head: 'Department', value: d => d.name },
+  { head: 'Department', value: d => d.name, note: true },
   { head: 'Number', value: d => d.number, code: true },
   { head: 'DROT', value: d => drotFor(d, 'days'), code: true },
   { head: 'Name (Number)', value: d => d.name + ' (' + d.number + ')' },
@@ -3914,7 +3914,13 @@ function renderDeptTables() {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'dept-copy' + (column.code ? ' is-code' : '');
-        button.textContent = column.value(dept);
+        button.textContent = button.dataset.copy = column.value(dept);
+        if (column.note && dept.note) {
+          const note = document.createElement('span');
+          note.className = 'dept-note';
+          note.textContent = dept.note;
+          button.appendChild(note);
+        }
         row.insertCell().appendChild(button);
       });
     });
@@ -3938,7 +3944,7 @@ function resetDeptStatus() {
 document.getElementById('deptTables').addEventListener('click', async (e) => {
   const button = e.target.closest('.dept-copy');
   if (!button) return;
-  const text = button.textContent;
+  const text = button.dataset.copy;     // not textContent, which would include a note
   const copied = await copyText(text);
   resetDeptStatus();
   if (copied) {
